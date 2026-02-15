@@ -37,12 +37,23 @@
     },
   });
 
+  function createId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+
+    // Fallback for browsers/contexts where randomUUID is unavailable.
+    const seed = Date.now().toString(36);
+    const rand = Math.random().toString(36).slice(2, 10);
+    return `id_${seed}_${rand}`;
+  }
+
   window.DB = {
     // ────────────────────────────────────────────────
     // SESSIONS
     // ────────────────────────────────────────────────
     async saveSess(data) {
-      if (!data.id) data.id = crypto.randomUUID();
+      if (!data.id) data.id = createId();
       if (!data.createdAt) data.createdAt = Date.now();
       await db.put('sessions', data);
       return data;
@@ -69,7 +80,7 @@
     // GEAR
     // ────────────────────────────────────────────────
     async saveGear(data) {
-      if (!data.id) data.id = crypto.randomUUID();
+      if (!data.id) data.id = createId();
       if (!data.createdAt) data.createdAt = Date.now();
       await db.put('gear', data);
       return data;
@@ -96,7 +107,7 @@
     // RESOURCES
     // ────────────────────────────────────────────────
     async saveResource(data) {
-      if (!data.id) data.id = crypto.randomUUID();
+      if (!data.id) data.id = createId();
       if (!data.createdAt) data.createdAt = Date.now();
       await db.put('resources', data);
       return data;
