@@ -26,6 +26,7 @@ window.ManualMarkdown = {
       const target = this.wikiResolver ? this.wikiResolver(t) : this.slugifyTitle(t);
       return `<a href="#/manual/${target}">${t}</a>`;
     });
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     return s;
   },
@@ -57,8 +58,11 @@ window.ManualMarkdown = {
           // Page title is rendered by article shell.
           if (inList) { html += '</ul>'; inList = false; }
         } else if (line.startsWith('## ')) {
-          if (inList) { html += '</ul>'; inList = false; }
+          if (inList) { html += inList === 'ol' ? '</ol>' : '</ul>'; inList = false; }
           html += `<h2>${this.inline(line.slice(3))}</h2>`;
+        } else if (line.startsWith('### ')) {
+          if (inList) { html += inList === 'ol' ? '</ol>' : '</ul>'; inList = false; }
+          html += `<h3>${this.inline(line.slice(4))}</h3>`;
         } else if (/^\d+\.\s+/.test(line)) {
           if (!inList) { html += '<ol>'; inList = 'ol'; }
           else if (inList !== 'ol') { html += '</ul><ol>'; inList = 'ol'; }
