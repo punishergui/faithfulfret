@@ -1,0 +1,113 @@
+/* ============================================================
+   DAILY FRET — Animations
+   ============================================================ */
+
+/* Page transition */
+.page-out {
+  animation: pageOut 150ms ease forwards;
+}
+
+.page-in {
+  animation: pageIn 200ms ease forwards;
+}
+
+@keyframes pageOut {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card reveal stagger */
+.card-reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.card-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Metronome beat flash */
+.metro-display.beat {
+  color: #fff;
+  text-shadow:
+    0 0 40px var(--accent),
+    0 0 80px rgba(255,106,0,0.5);
+}
+
+/* Update banner slide */
+#update-banner {
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+#update-banner.visible {
+  transform: translateY(0);
+}
+
+/* Pulse animation for nav logo dot */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  50% {
+    opacity: 0.3;
+    box-shadow: none;
+  }
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #000;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Glow pulse */
+@keyframes glowPulse {
+  0%, 100% {
+    text-shadow: 0 0 20px var(--glow);
+  }
+  50% {
+    text-shadow: 0 0 40px rgba(255,106,0,0.5), 0 0 60px var(--glow);
+  }
+}
+
+/* Count-up number animation support */
+.count-target {
+  display: inline-block;
+}
