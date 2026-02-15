@@ -18,6 +18,7 @@
     { pattern: /^#\/progress$/,                   handler: () => Pages.Progress.render() },
     { pattern: /^#\/manual$/,                     handler: () => Pages.ManualHome.render() },
     { pattern: /^#\/manual\/search(?:\?.*)?$/,   handler: () => Pages.ManualHome.render() },
+    { pattern: /^#\/manual\/edit\/(.+)$/,         handler: (m) => Pages.ManualEditor.render(m[1]) },
     { pattern: /^#\/manual\/(.+)$/,              handler: (m) => Pages.ManualArticle.render(m[1]) },
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },

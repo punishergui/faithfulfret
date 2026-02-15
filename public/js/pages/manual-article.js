@@ -7,19 +7,21 @@ Pages.ManualArticle = {
     const safeSlug = ManualData.normalizeSlug(slug);
 
     try {
-      const [toc, index, md, backlinks, related] = await Promise.all([
+      const [toc, index, md, backlinks, related, customPages, customDoc] = await Promise.all([
         ManualData.loadToc(),
-        ManualData.loadIndex(),
+        ManualData.loadMergedIndex(),
         ManualData.loadPage(safeSlug),
         ManualData.backlinksFor(safeSlug),
         ManualData.relatedFor(safeSlug),
+        ManualData.getCustomPages(),
+        ManualData.getCustomPage(safeSlug),
       ]);
 
       const doc = index.docs.find(d => d.slug === safeSlug);
       const titleMap = new Map(index.docs.map(d => [d.title.toLowerCase(), d.slug]));
       ManualMarkdown.setWikiResolver((title) => titleMap.get(String(title || '').trim().toLowerCase()) || ManualMarkdown.slugifyTitle(title));
       const html = ManualMarkdown.render(md);
-      const breadcrumbs = this._breadcrumbs(toc, safeSlug);
+      const breadcrumbs = this._breadcrumbs(Pages.ManualHome._withCustomToc(toc, customPages), safeSlug);
 
       app.innerHTML = `
         <div class="manual-page">
@@ -30,10 +32,14 @@ Pages.ManualArticle = {
           </div>
 
           <div class="manual-layout">
-            <aside class="manual-sidebar">${Pages.ManualHome._toc(toc)}</aside>
+            <aside class="manual-sidebar">${Pages.ManualHome._toc(Pages.ManualHome._withCustomToc(toc, customPages))}</aside>
             <section class="manual-main">
               <div class="manual-breadcrumb">${breadcrumbs}</div>
               <h1>${doc?.title || slug}</h1>
+              <div class="manual-toolbar">
+                <a class="df-btn" href="#/manual/edit/${safeSlug}">Edit page</a>
+                ${customDoc ? '<button class="df-btn df-btn--outline" id="manual-delete-page">Delete page</button>' : ''}
+              </div>
               <div class="manual-content">${html}</div>
 
               <div class="manual-panels">
@@ -60,13 +66,18 @@ Pages.ManualArticle = {
       app.querySelector('#manual-drawer-btn')?.addEventListener('click', () => {
         app.querySelector('.manual-sidebar')?.classList.toggle('open');
       });
+
+      app.querySelector('#manual-delete-page')?.addEventListener('click', async () => {
+        if (!window.confirm('Delete this custom wiki page?')) return;
+        await ManualData.deleteCustomPage(safeSlug);
+        go('#/manual');
+      });
     } catch (e) {
       app.innerHTML = `<div class="manual-page"><div class="manual-error">Article not found.</div></div>`;
     }
   },
 
   _breadcrumbs(toc, slug) {
-    const trail = [];
     const walk = (nodes, parents = []) => {
       for (const n of nodes) {
         if (n.slug === slug) return parents.concat(n.title);
