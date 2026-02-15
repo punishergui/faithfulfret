@@ -26,10 +26,22 @@ Pages.ToolsHub = {
         desc: 'Common scale patterns · Fretboard visualization · Root notes',
       },
       {
-        href: '#/tools/bpm',
+        href: '#/tools/metronome',
         icon: '⏱',
-        title: 'BPM GUIDE',
-        desc: 'Tempo markings from Grave to Prestissimo · Click to open metronome',
+        title: 'METRONOME + BPM GUIDE',
+        desc: 'Click track, tap tempo, and full tempo marking guide in one tool',
+      },
+      {
+        href: '#/tools/tuning',
+        icon: '🪛',
+        title: 'TUNING GUIDE',
+        desc: 'Standard tuning reference · Ear + tuner workflow · Vypyr X2 tips',
+      },
+      {
+        href: '#/manual',
+        icon: '📘',
+        title: 'MANUAL WIKI',
+        desc: 'Searchable Vypyr X2 docs · diagrams · callouts · backlinks',
       },
       {
         href: '#/tools/tuning',

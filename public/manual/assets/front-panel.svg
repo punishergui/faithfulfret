@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151923"/>
+      <stop offset="1" stop-color="#0d1018"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="500" fill="url(#g)"/>
+  <rect x="40" y="90" width="1120" height="320" rx="18" fill="#1d2331" stroke="#2d3548"/>
+  <text x="70" y="70" fill="#ff7a1a" font-family="Arial" font-size="28">Peavey Vypyr X2 Front Panel (reference)</text>
+  <g fill="#9fb2d4" font-family="Arial" font-size="16">
+    <circle cx="160" cy="250" r="44" fill="#2a3347"/><text x="145" y="256">Input</text>
+    <circle cx="330" cy="250" r="44" fill="#2a3347"/><text x="306" y="256">Gain</text>
+    <circle cx="500" cy="250" r="44" fill="#2a3347"/><text x="486" y="256">Low</text>
+    <circle cx="670" cy="250" r="44" fill="#2a3347"/><text x="655" y="256">Mid</text>
+    <circle cx="840" cy="250" r="44" fill="#2a3347"/><text x="826" y="256">High</text>
+    <circle cx="1010" cy="250" r="44" fill="#2a3347"/><text x="984" y="256">Volume</text>
+  </g>
+</svg>

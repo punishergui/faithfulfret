@@ -55,6 +55,39 @@ docker compose up -d --build
 
 The app also shows an **in-app update banner** when a new commit is available on GitHub. Click "Pull & Restart" to update automatically.
 
+### ✅ Post-merge deploy checklist (run every time)
+
+```bash
+# 0) one-time safety fix if git complains about dubious ownership
+sudo git config --global --add safe.directory /opt/stacks/faithfulfret
+
+# 1) ensure your repo files are owned by your login user (replace josh if needed)
+sudo chown -R josh:josh /opt/stacks/faithfulfret
+
+# 2) update code
+cd /opt/stacks/faithfulfret
+git fetch origin
+git checkout main
+git pull origin main
+
+# 3) rebuild + restart containers
+sudo docker compose down --remove-orphans
+sudo docker compose up -d --build
+
+# 4) verify app is healthy
+sudo docker compose ps
+sudo docker compose logs --tail=120
+```
+
+Browser refresh after deploy:
+
+```text
+Open http://YOUR-VM-IP:3000
+Hard refresh: Ctrl+Shift+R (Cmd+Shift+R on Mac)
+If stale UI remains: DevTools > Application > Service Workers > Unregister
+Reload once more
+```
+
 ---
 
 ## Daily Usage
@@ -102,6 +135,33 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
 | Port | Host `3000` → Container `9999` |
+
+---
+
+## Manual Wiki (Amp Manual)
+
+Manual content is read-only and stored under `/public/manual`.
+
+### Add/edit pages
+
+1. Create/edit markdown files in `public/manual/pages/**/*.md`.
+2. Add images/diagrams from your PDF into `public/manual/assets/`.
+3. Update `public/manual/toc.json` for sidebar order.
+
+### Rebuild local search index
+
+```bash
+npm run build:manual
+```
+
+This generates `public/manual/search-index.json` (used for local search + backlinks).
+
+### Exporting images from PDF (recommended workflow)
+
+1. Open the PDF manual in your preferred tool (Acrobat, Preview, etc.).
+2. Export page regions/figures as PNG or WebP.
+3. Save to `public/manual/assets/`.
+4. Reference image paths directly in markdown, e.g. `/manual/assets/front-panel.png`.
 
 ---
 

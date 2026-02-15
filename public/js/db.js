@@ -138,29 +138,53 @@
       const maxBPM = bpms.length ? Math.max(...bpms) : 0;
       const avgBPM = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0;
 
-      // Streak calculation
+      // Streaks + inactivity
       const allDates = sessions.map(s => s.date).filter(Boolean).sort().reverse();
-      let streak = 0;
-      if (allDates.length) {
-        const today = new Date().toISOString().split('T')[0];
-        let check = allDates[0] === today ? today : null;
+      const uniqueDatesDesc = [...new Set(allDates)];
+      const uniqueDatesAsc = [...uniqueDatesDesc].reverse();
 
-        if (check) {
-          streak = 1;
-          let prev = new Date(today + 'T12:00:00');
-          for (let i = 1; i < allDates.length; i++) {
-            prev.setDate(prev.getDate() - 1);
-            const expected = prev.toISOString().split('T')[0];
-            if (allDates[i] === expected) {
-              streak++;
-            } else {
-              break;
-            }
+      const toDate = (ymd) => new Date(`${ymd}T12:00:00`);
+      const dayDiff = (a, b) => Math.round((toDate(a) - toDate(b)) / 86400000);
+
+      let currentStreak = 0;
+      const today = new Date().toISOString().split('T')[0];
+      if (uniqueDatesDesc.length) {
+        const first = uniqueDatesDesc[0];
+        const offset = dayDiff(today, first);
+        if (offset === 0 || offset === 1) {
+          currentStreak = 1;
+          for (let i = 1; i < uniqueDatesDesc.length; i++) {
+            if (dayDiff(uniqueDatesDesc[i - 1], uniqueDatesDesc[i]) === 1) currentStreak++;
+            else break;
           }
         }
       }
 
-      return { count, totalMinutes, totalHours, maxBPM, avgBPM, streak, allDates };
+      let longestStreak = 0;
+      let run = 0;
+      for (let i = 0; i < uniqueDatesAsc.length; i++) {
+        if (i === 0) run = 1;
+        else if (dayDiff(uniqueDatesAsc[i], uniqueDatesAsc[i - 1]) === 1) run++;
+        else run = 1;
+        if (run > longestStreak) longestStreak = run;
+      }
+
+      const lastSessionDate = uniqueDatesDesc[0] || null;
+      const daysSinceLastSession = lastSessionDate ? Math.max(0, dayDiff(today, lastSessionDate)) : null;
+
+      return {
+        count,
+        totalMinutes,
+        totalHours,
+        maxBPM,
+        avgBPM,
+        streak: currentStreak,
+        currentStreak,
+        longestStreak,
+        lastSessionDate,
+        daysSinceLastSession,
+        allDates,
+      };
     },
 
     // ────────────────────────────────────────────────

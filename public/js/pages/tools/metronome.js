@@ -3,6 +3,20 @@
 
 window.Pages = window.Pages || {};
 
+const METRO_TEMPOS = [
+  { min: 20,  max: 40,  name: 'Grave',       desc: 'Slow and solemn' },
+  { min: 41,  max: 60,  name: 'Largo',       desc: 'Very slow, broad' },
+  { min: 61,  max: 66,  name: 'Larghetto',   desc: 'Rather slow' },
+  { min: 67,  max: 76,  name: 'Adagio',      desc: 'Slow and stately' },
+  { min: 77,  max: 84,  name: 'Andante',     desc: 'Walking pace' },
+  { min: 85,  max: 100, name: 'Moderato',    desc: 'Moderate speed' },
+  { min: 101, max: 115, name: 'Allegretto',  desc: 'Moderately fast' },
+  { min: 116, max: 140, name: 'Allegro',     desc: 'Fast and bright' },
+  { min: 141, max: 167, name: 'Vivace',      desc: 'Lively and fast' },
+  { min: 168, max: 200, name: 'Presto',      desc: 'Very fast' },
+  { min: 201, max: 240, name: 'Prestissimo', desc: 'As fast as possible' },
+];
+
 Pages.Metronome = {
   render() {
     const app = document.getElementById('app');
@@ -56,6 +70,13 @@ Pages.Metronome = {
           <button class="metro-sig-btn" data-sig="3">3/4</button>
           <button class="metro-sig-btn" data-sig="2">2/4</button>
           <button class="metro-sig-btn" data-sig="6">6/8</button>
+        </div>
+
+        <div style="margin-top:22px;border:1px solid var(--line2);">
+          ${METRO_TEMPOS.map(t => {
+            const mid = Math.round((t.min + t.max) / 2);
+            return `<button type="button" class="bpm-row" data-mid="${mid}"><div class="bpm-row__range">${t.min}-${t.max}</div><div class="bpm-row__name">${t.name}</div><div class="bpm-row__desc">${t.desc}</div></button>`;
+          }).join('')}
         </div>
       </div>
     `;
@@ -154,20 +175,7 @@ Pages.Metronome = {
     }
 
     function updateTempoName() {
-      const TEMPOS = [
-        { min: 20,  max: 40,  name: 'Grave' },
-        { min: 41,  max: 60,  name: 'Largo' },
-        { min: 61,  max: 66,  name: 'Larghetto' },
-        { min: 67,  max: 76,  name: 'Adagio' },
-        { min: 77,  max: 84,  name: 'Andante' },
-        { min: 85,  max: 100, name: 'Moderato' },
-        { min: 101, max: 115, name: 'Allegretto' },
-        { min: 116, max: 140, name: 'Allegro' },
-        { min: 141, max: 167, name: 'Vivace' },
-        { min: 168, max: 200, name: 'Presto' },
-        { min: 201, max: 240, name: 'Prestissimo' },
-      ];
-      const t = TEMPOS.find(t => bpm >= t.min && bpm <= t.max);
+      const t = METRO_TEMPOS.find(t => bpm >= t.min && bpm <= t.max);
       tempoName.textContent = t ? t.name : '';
     }
 
@@ -232,6 +240,10 @@ Pages.Metronome = {
           scheduler();
         }
       });
+    });
+
+    container.querySelectorAll('.bpm-row[data-mid]').forEach(row => {
+      row.addEventListener('click', () => setBPM(parseInt(row.dataset.mid, 10)));
     });
 
     // ─── Keyboard ─────────────────────────────────────
