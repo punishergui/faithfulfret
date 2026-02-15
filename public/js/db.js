@@ -35,11 +35,6 @@
         resStore.createIndex('rating', 'rating');
       }
 
-      // User-editable wiki pages
-      if (!db.objectStoreNames.contains('wikiPages')) {
-        const wikiStore = db.createObjectStore('wikiPages', { keyPath: 'slug' });
-        wikiStore.createIndex('updatedAt', 'updatedAt');
-      }
     },
   });
 
@@ -133,42 +128,6 @@
     },
 
     // ────────────────────────────────────────────────
-    // EDITABLE WIKI PAGES
-    // ────────────────────────────────────────────────
-    async saveWikiPage(data) {
-      const slug = String(data?.slug || '').trim();
-      if (!slug) throw new Error('Wiki page slug is required');
-
-      const now = Date.now();
-      const existing = await db.get('wikiPages', slug);
-
-      const record = {
-        slug,
-        title: String(data.title || slug),
-        body: String(data.body || ''),
-        tags: Array.isArray(data.tags) ? data.tags : [],
-        createdAt: existing?.createdAt || now,
-        updatedAt: now,
-      };
-
-      await db.put('wikiPages', record);
-      return record;
-    },
-
-    async getWikiPage(slug) {
-      return db.get('wikiPages', String(slug || '').trim());
-    },
-
-    async getAllWikiPages() {
-      const all = await db.getAll('wikiPages');
-      return all.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    },
-
-    async deleteWikiPage(slug) {
-      return db.delete('wikiPages', String(slug || '').trim());
-    },
-
-    // ────────────────────────────────────────────────
     // STATS
     // ────────────────────────────────────────────────
     async getStats() {
@@ -233,21 +192,19 @@
     // EXPORT / IMPORT
     // ────────────────────────────────────────────────
     async exportAll() {
-      const [sessions, gear, resources, wikiPages] = await Promise.all([
+      const [sessions, gear, resources] = await Promise.all([
         this.getAllSess(),
         this.getAllGear(),
         this.getAllResources(),
-        this.getAllWikiPages(),
       ]);
-      return { sessions, gear, resources, wikiPages, exportedAt: new Date().toISOString() };
+      return { sessions, gear, resources, exportedAt: new Date().toISOString() };
     },
 
     async importAll(data) {
-      const tx = db.transaction(['sessions', 'gear', 'resources', 'wikiPages'], 'readwrite');
+      const tx = db.transaction(['sessions', 'gear', 'resources'], 'readwrite');
       await tx.objectStore('sessions').clear();
       await tx.objectStore('gear').clear();
       await tx.objectStore('resources').clear();
-      await tx.objectStore('wikiPages').clear();
 
       for (const item of (data.sessions || [])) {
         await tx.objectStore('sessions').put(item);
@@ -257,9 +214,6 @@
       }
       for (const item of (data.resources || [])) {
         await tx.objectStore('resources').put(item);
-      }
-      for (const item of (data.wikiPages || [])) {
-        await tx.objectStore('wikiPages').put(item);
       }
       await tx.done;
     },

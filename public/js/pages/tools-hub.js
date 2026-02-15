@@ -32,10 +32,10 @@ Pages.ToolsHub = {
         desc: 'Standard tuning reference · Ear + tuner workflow · Vypyr X2 tips',
       },
       {
-        href: '#/manual',
+        href: '/manual.pdf',
         icon: '📘',
-        title: 'MANUAL WIKI',
-        desc: 'Searchable Vypyr X2 docs · diagrams · callouts · backlinks',
+        title: 'MANUAL PDF',
+        desc: 'Open the amp manual PDF in a new tab',
       },
     ];
 
@@ -51,7 +51,7 @@ Pages.ToolsHub = {
       <div class="page-wrap" style="padding:40px 24px 60px;">
         <div class="tools-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);">
           ${tools.map(t => `
-            <a href="${t.href}" class="tool-card">
+            <a href="${t.href}" class="tool-card" ${t.href.startsWith('/') ? "target=\"_blank\" rel=\"noopener\"" : ""}>
               <div class="tool-card__icon">${t.icon}</div>
               <div class="tool-card__title">${t.title}</div>
               <div class="tool-card__desc">${t.desc}</div>
