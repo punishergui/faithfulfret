@@ -6,15 +6,14 @@ services:
     ports:
       - "3000:9999"
     environment:
-      - PORT=9999
-      - NODE_ENV=production
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
+      PORT: "9999"
+      NODE_ENV: "production"
+      TZ: "America/Chicago"
 
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: watchtower
+  faithfulfret-watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: faithfulfret-watchtower
     restart: unless-stopped
-    command: --interval 300 --cleanup daily-fret
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 300 daily-fret
