@@ -55,6 +55,23 @@ docker compose up -d --build
 
 The app also shows an **in-app update banner** when a new commit is available on GitHub. Click **"Sync & Refresh"** for one-click update: it fetches/reset-to-remote, installs deps, rebuilds manual index, restarts the container, clears caches, and refreshes the app shell.
 
+If update fails, the app now opens an **Update Assistant** modal with:
+- exact copy-paste commands for your current tracked branch,
+- server output from the failed step,
+- a one-click “Reload app” action.
+
+Quick manual force-sync (same flow as the app button):
+
+```bash
+cd /opt/stacks/faithfulfret
+git fetch origin main
+git reset --hard origin/main
+npm install --production
+npm run build:manual
+docker compose restart
+# then hard-refresh browser: Ctrl+Shift+R
+```
+
 ### ✅ Post-merge deploy checklist (run every time)
 
 ```bash

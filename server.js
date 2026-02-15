@@ -79,6 +79,33 @@ app.get('/api/version', async (req, res) => {
   }
 });
 
+
+app.get('/api/update/help', (req, res) => {
+  const currentBranch = gitExec('git rev-parse --abbrev-ref HEAD') || 'main';
+  const remote = gitExec(`git config branch.${currentBranch}.remote`) || 'origin';
+  const mergeRef = gitExec(`git config branch.${currentBranch}.merge`) || `refs/heads/${currentBranch}`;
+  const remoteBranch = mergeRef.replace('refs/heads/', '');
+
+  const commands = [
+    `cd ${__dirname}`,
+    `git fetch ${remote} ${remoteBranch}`,
+    `git reset --hard ${remote}/${remoteBranch}`,
+    'npm install --production',
+    'npm run build:manual',
+    'docker compose restart',
+    'Hard refresh browser (Ctrl+Shift+R)',
+  ];
+
+  res.json({
+    branch: currentBranch,
+    remote,
+    remoteBranch,
+    mode: 'force-sync',
+    summary: 'One-click sync discards local repo edits and fast-forwards to remote branch.',
+    commands,
+  });
+});
+
 // POST /api/update
 app.post('/api/update', (req, res) => {
   try {
