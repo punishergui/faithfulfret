@@ -1,0 +1,5 @@
+- Prefer simplest solutions
+- Keep dev compose + prod compose separate
+- No breaking changes to ports (external 3000 -> internal 9999 must remain)
+- Always update README deploy steps
+- Keep rollback path (publish version tags and document how to pin them)
