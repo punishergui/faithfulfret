@@ -3,6 +3,16 @@ window.ManualData = {
   index: null,
   pageCache: new Map(),
 
+  normalizeSlug(slug) {
+    const aliases = {
+      'no-sound-troubleshooting': 'troubleshooting/no-sound',
+      'front-panel-controls': 'features/front-panel-controls',
+      'factory-reset-recovery': 'troubleshooting/factory-reset',
+    };
+    const incoming = String(slug || '').replace(/^\/+/, '').replace(/\.\./g, '');
+    return aliases[incoming] || incoming;
+  },
+
   async loadToc() {
     if (this.toc) return this.toc;
     const res = await fetch('/manual/toc.json');
@@ -20,7 +30,7 @@ window.ManualData = {
   },
 
   async loadPage(slug) {
-    const safe = slug.replace(/^\/+/, '').replace(/\.\./g, '');
+    const safe = this.normalizeSlug(slug);
     if (this.pageCache.has(safe)) return this.pageCache.get(safe);
     const res = await fetch(`/manual/pages/${safe}.md`);
     if (!res.ok) throw new Error('Page not found');

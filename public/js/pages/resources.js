@@ -65,7 +65,7 @@ Pages.Resources = {
         <div class="resource-row__level">${r.level || ''}</div>
         <div class="resource-row__stars">${stars}</div>
         <div class="resource-row__link">
-          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" title="Open resource">&#8599;</a>` : ''}
+          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" title="Open resource" class="resource-row__open-btn">Open</a>` : ''}
           <button type="button" class="resource-row__edit" onclick="go('#/resources/edit/${r.id}')" title="Edit resource">✎</button>
         </div>
       </div>

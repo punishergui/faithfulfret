@@ -1439,6 +1439,15 @@ select.df-input option {
   transition: color 0.15s;
 }
 
+.resource-row__open-btn {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line2);
+  padding: 6px 10px;
+}
+
 .resource-row__link a:hover {
   color: var(--accent);
 }

@@ -1,48 +1,95 @@
 {
-  "generatedAt": "2026-02-15T17:17:35.756Z",
+  "generatedAt": "2026-02-15T17:44:11.154Z",
   "docs": [
     {
       "slug": "features/front-panel-controls",
       "title": "Front Panel Controls",
-      "text": "Front Panel Controls This page explains the core controls for quick setup and repeatable tones. Numbered callouts 1. Input should be first check when there is no sound. 2. Gain controls breakup and sustain. 3. EQ should be adjusted in small steps while playing. 4. Post/master volume should be changed gradually. Related: Getting Started, No Sound Troubleshooting.",
+      "text": "Front Panel Controls This page explains the core controls for quick setup and repeatable tones. Signal chain 1. Guitar input 2. Pre gain / amp voice 3. EQ section (low, mid, high) 4. Effects/modulation/delay/reverb 5. Post/master volume to speaker output Practical control notes Input : if silent, verify guitar volume knob and cable first. Gain : increase for drive/sustain; keep lower for chord clarity. EQ : cut bass first to remove mud, then shape mids/highs. Post Volume : level match presets to avoid sudden jumps. Effects : subtle mix settings help practice articulation. Numbered callouts 1. Start from a clean patch. 2. Set gain before heavy effects. 3. Dial EQ while strumming full chords. 4. Raise volume only after tone is set. Related: Getting Started, No Sound Troubleshooting, Factory Reset & Recovery.",
       "links": [
         "getting-started",
-        "troubleshooting/no-sound"
+        "troubleshooting/no-sound",
+        "troubleshooting/factory-reset"
       ],
       "tags": [
         "features",
         "front-panel-controls",
+        "signal chain",
+        "practical control notes",
         "numbered callouts"
       ],
       "sections": [
+        "Signal chain",
+        "Practical control notes",
         "Numbered callouts"
+      ]
+    },
+    {
+      "slug": "features/usb-audio-recording",
+      "title": "USB Audio & Recording",
+      "text": "USB Audio & Recording Use this section for quick setup notes when connecting the amp to a computer. Checklist 1. Connect USB cable directly (avoid unstable hubs). 2. Select the amp as input/output device in DAW or OS audio settings. 3. Set monitoring levels conservatively to avoid clipping. 4. Record dry/clean reference takes before layering effects. Troubleshooting No device shown: reconnect USB and restart DAW. Distorted audio: lower gain and interface/track input level. Latency: reduce buffer size where stable. Related: Front Panel Controls, No Sound Troubleshooting.",
+      "links": [
+        "features/front-panel-controls",
+        "troubleshooting/no-sound"
+      ],
+      "tags": [
+        "features",
+        "usb-audio-recording",
+        "checklist",
+        "troubleshooting"
+      ],
+      "sections": [
+        "Checklist",
+        "Troubleshooting"
       ]
     },
     {
       "slug": "getting-started",
       "title": "Getting Started",
-      "text": "Getting Started Welcome to the Vypyr X2 Manual Wiki. This is a searchable, read only quick reference designed for practice sessions. First sound checklist 1. Plug guitar into input. 2. Choose a clean amp model. 3. Set gain low medium. 4. Bring up volume slowly. See also Front Panel Controls and No Sound Troubleshooting. Related Signal chain basics",
+      "text": "Getting Started Welcome to the Vypyr X2 Manual Wiki. This is a searchable, read only quick reference designed for practice sessions. First sound checklist 1. Plug guitar into the amp input. 2. Select a clean amp voice/preset. 3. Set gain low to medium. 4. Bring up volume slowly. 5. Confirm speaker output and cable condition. Safe update / no data loss workflow Export backup from Progress Export All Data before server updates. Keep the same URL origin (domain + port) for your PWA data. If you must change host/port, import backup after move. Related Front Panel Controls No Sound Troubleshooting USB Audio & Recording",
       "links": [
         "features/front-panel-controls",
-        "troubleshooting/no-sound"
+        "troubleshooting/no-sound",
+        "features/usb-audio-recording"
       ],
       "tags": [
         "getting-started",
         "first sound checklist",
+        "safe update / no-data-loss workflow",
         "related"
       ],
       "sections": [
         "First sound checklist",
+        "Safe update / no-data-loss workflow",
         "Related"
+      ]
+    },
+    {
+      "slug": "troubleshooting/factory-reset",
+      "title": "Factory Reset & Recovery",
+      "text": "Factory Reset & Recovery Use reset only when needed and after documenting key presets. Before reset Write down important gain/EQ/effects settings. Export/backup any external project/session notes. Confirm issue persists after power cycle and cable checks. After reset 1. Start with clean patch. 2. Re check guitar cable and input. 3. Rebuild one baseline preset first. Related: No Sound Troubleshooting, Front Panel Controls.",
+      "links": [
+        "troubleshooting/no-sound",
+        "features/front-panel-controls"
+      ],
+      "tags": [
+        "troubleshooting",
+        "factory-reset",
+        "before reset",
+        "after reset"
+      ],
+      "sections": [
+        "Before reset",
+        "After reset"
       ]
     },
     {
       "slug": "troubleshooting/no-sound",
       "title": "No Sound Troubleshooting",
-      "text": "No Sound Troubleshooting If your amp powers on but no guitar sound is heard, run this list in order. Quick checks Confirm guitar volume knob is up. Reseat instrument cable on both ends. Try a known good cable. Switch to a clean preset. Raise post volume slowly. If still silent 1. Test with another guitar. 2. Test with headphones (if available). 3. Factory reset only after backing up key settings. Back references: Front Panel Controls, Getting Started.",
+      "text": "No Sound Troubleshooting If your amp powers on but no guitar sound is heard, run this list in order. Quick checks Confirm guitar volume knob is up. Reseat instrument cable on both ends. Try a known good cable. Switch to a clean preset. Raise post volume slowly. If still silent 1. Test with another guitar. 2. Test with headphones (if available). 3. Verify global output/volume state in amp settings. 4. Perform a factory reset only after saving preset notes. Back references: Front Panel Controls, Getting Started, Factory Reset & Recovery.",
       "links": [
         "features/front-panel-controls",
-        "getting-started"
+        "getting-started",
+        "troubleshooting/factory-reset"
       ],
       "tags": [
         "troubleshooting",
@@ -73,18 +120,50 @@
         "title": "Front Panel Controls"
       },
       {
-        "slug": "getting-started",
-        "title": "Getting Started"
-      }
-    ],
-    "features/front-panel-controls": [
+        "slug": "features/usb-audio-recording",
+        "title": "USB Audio & Recording"
+      },
       {
         "slug": "getting-started",
         "title": "Getting Started"
       },
       {
+        "slug": "troubleshooting/factory-reset",
+        "title": "Factory Reset & Recovery"
+      }
+    ],
+    "troubleshooting/factory-reset": [
+      {
+        "slug": "features/front-panel-controls",
+        "title": "Front Panel Controls"
+      },
+      {
         "slug": "troubleshooting/no-sound",
         "title": "No Sound Troubleshooting"
+      }
+    ],
+    "features/front-panel-controls": [
+      {
+        "slug": "features/usb-audio-recording",
+        "title": "USB Audio & Recording"
+      },
+      {
+        "slug": "getting-started",
+        "title": "Getting Started"
+      },
+      {
+        "slug": "troubleshooting/factory-reset",
+        "title": "Factory Reset & Recovery"
+      },
+      {
+        "slug": "troubleshooting/no-sound",
+        "title": "No Sound Troubleshooting"
+      }
+    ],
+    "features/usb-audio-recording": [
+      {
+        "slug": "getting-started",
+        "title": "Getting Started"
       }
     ]
   }

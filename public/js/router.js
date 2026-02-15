@@ -23,9 +23,8 @@
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
     { pattern: /^#\/tools\/scales$/,              handler: () => Pages.Scales.render() },
     { pattern: /^#\/tools\/bpm$/,                 handler: () => Pages.Metronome.render() },
-    { pattern: /^#\/tools\/bpm$/,                 handler: () => Pages.BpmGuide.render() },
     { pattern: /^#\/tools\/tuning$/,              handler: () => Pages.Tuning.render() },
-    { pattern: /^#\/tools\/amp-manual$/,          handler: () => Pages.AmpManual.render() },
+    { pattern: /^#\/tools\/amp-manual$/,          handler: () => Pages.ManualHome.render() },
     { pattern: /^#\/tools$/,                      handler: () => Pages.ToolsHub.render() },
   ];
 

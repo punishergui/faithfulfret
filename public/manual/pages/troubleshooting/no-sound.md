@@ -18,6 +18,7 @@ Turn volume down before unplugging cables.
 
 1. Test with another guitar.
 2. Test with headphones (if available).
-3. Factory reset only after backing up key settings.
+3. Verify global output/volume state in amp settings.
+4. Perform a factory reset only after saving preset notes.
 
-Back references: [[Front Panel Controls]], [[Getting Started]].
+Back references: [[Front Panel Controls]], [[Getting Started]], [[Factory Reset & Recovery]].

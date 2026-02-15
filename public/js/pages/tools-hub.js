@@ -9,9 +9,9 @@ Pages.ToolsHub = {
     const tools = [
       {
         href: '#/tools/metronome',
-        icon: '🎵',
-        title: 'METRONOME',
-        desc: 'Click track · Tap tempo · 30–240 BPM · Web Audio',
+        icon: '⏱',
+        title: 'METRONOME + BPM GUIDE',
+        desc: 'Click track, tap tempo, and full tempo marking guide in one tool',
       },
       {
         href: '#/tools/chords',
@@ -26,12 +26,6 @@ Pages.ToolsHub = {
         desc: 'Common scale patterns · Fretboard visualization · Root notes',
       },
       {
-        href: '#/tools/metronome',
-        icon: '⏱',
-        title: 'METRONOME + BPM GUIDE',
-        desc: 'Click track, tap tempo, and full tempo marking guide in one tool',
-      },
-      {
         href: '#/tools/tuning',
         icon: '🪛',
         title: 'TUNING GUIDE',
@@ -42,18 +36,6 @@ Pages.ToolsHub = {
         icon: '📘',
         title: 'MANUAL WIKI',
         desc: 'Searchable Vypyr X2 docs · diagrams · callouts · backlinks',
-      },
-      {
-        href: '#/tools/tuning',
-        icon: '🪛',
-        title: 'TUNING GUIDE',
-        desc: 'Standard tuning reference · Ear + tuner workflow · Vypyr X2 tips',
-      },
-      {
-        href: '#/tools/amp-manual',
-        icon: '📘',
-        title: 'AMP WIKI',
-        desc: 'Searchable Peavey Vypyr X2 quick manual · Presets · Troubleshooting',
       },
     ];
 

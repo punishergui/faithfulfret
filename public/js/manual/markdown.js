@@ -1,4 +1,10 @@
 window.ManualMarkdown = {
+  wikiResolver: null,
+
+  setWikiResolver(fn) {
+    this.wikiResolver = typeof fn === 'function' ? fn : null;
+  },
+
   slugifyTitle(title) {
     return String(title || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   },
@@ -16,7 +22,10 @@ window.ManualMarkdown = {
     if (!text) return '';
     let s = this.escapeHtml(text);
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    s = s.replace(/\[\[([^\]]+)\]\]/g, (_, t) => `<a href="#/manual/${this.slugifyTitle(t)}">${t}</a>`);
+    s = s.replace(/\[\[([^\]]+)\]\]/g, (_, t) => {
+      const target = this.wikiResolver ? this.wikiResolver(t) : this.slugifyTitle(t);
+      return `<a href="#/manual/${target}">${t}</a>`;
+    });
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     return s;
   },
@@ -45,8 +54,8 @@ window.ManualMarkdown = {
         }
 
         if (line.startsWith('# ')) {
+          // Page title is rendered by article shell.
           if (inList) { html += '</ul>'; inList = false; }
-          html += `<h1>${this.inline(line.slice(2))}</h1>`;
         } else if (line.startsWith('## ')) {
           if (inList) { html += '</ul>'; inList = false; }
           html += `<h2>${this.inline(line.slice(3))}</h2>`;

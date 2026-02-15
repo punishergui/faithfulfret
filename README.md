@@ -88,6 +88,13 @@ If stale UI remains: DevTools > Application > Service Workers > Unregister
 Reload once more
 ```
 
+### Data safety (important)
+
+- Your sessions/gear/resources are stored in your browser's IndexedDB for the app origin.
+- If you change domain or port, the browser treats it as a different app storage area.
+- Always export a backup JSON from `Progress` before major updates/migrations.
+- After moving hosts/ports, use `Import Data` in `Progress` to restore.
+
 ---
 
 ## Daily Usage

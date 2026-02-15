@@ -3,18 +3,25 @@
 Welcome to the Vypyr X2 Manual Wiki. This is a searchable, read-only quick reference designed for practice sessions.
 
 :::tip
-Keep your master volume low before changing amp models or effect levels.
+Keep master volume low before changing amp models or effect levels.
 :::
 
 ## First sound checklist
 
-1. Plug guitar into input.
-2. Choose a clean amp model.
-3. Set gain low-medium.
+1. Plug guitar into the amp input.
+2. Select a clean amp voice/preset.
+3. Set gain low-to-medium.
 4. Bring up volume slowly.
+5. Confirm speaker output and cable condition.
 
-See also [[Front Panel Controls]] and [[No Sound Troubleshooting]].
+## Safe update / no-data-loss workflow
+
+- Export backup from **Progress > Export All Data** before server updates.
+- Keep the same URL origin (domain + port) for your PWA data.
+- If you must change host/port, import backup after move.
 
 ## Related
 
-- [Signal chain basics](#/manual/features/front-panel-controls)
+- [[Front Panel Controls]]
+- [[No Sound Troubleshooting]]
+- [[USB Audio & Recording]]

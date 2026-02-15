@@ -1,5 +1,4 @@
-const CACHE_NAME = 'daily-fret-v3';
-const CACHE_NAME = 'daily-fret-v2';
+const CACHE_NAME = 'daily-fret-v4';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -26,14 +25,14 @@ const PRECACHE = [
   '/js/pages/tools/scales.js',
   '/js/pages/tools/bpm-guide.js',
   '/js/pages/tools/tuning.js',
-  '/js/pages/tools/amp-manual.js',
   '/css/manual.css',
   '/manual/toc.json',
   '/manual/search-index.json',
   '/manual/pages/getting-started.md',
   '/manual/pages/features/front-panel-controls.md',
+  '/manual/pages/features/usb-audio-recording.md',
   '/manual/pages/troubleshooting/no-sound.md',
-  '/manual/assets/front-panel.svg',
+  '/manual/pages/troubleshooting/factory-reset.md',
   '/manifest.json',
 ];
 

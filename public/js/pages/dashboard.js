@@ -64,6 +64,7 @@ Pages.Dashboard = {
             <span class="count-target" data-target="${stats.count}" data-type="int">${stats.count}</span> sessions &middot; <span class="count-target" data-target="${stats.totalHours}" data-type="float">${stats.totalHours}</span> hours in &middot; keep going.
           </div>
           <div style="font-family:var(--f-mono);font-size:11px;color:var(--text3);margin-bottom:12px;">${awayText}</div>
+          ${stats.count === 0 ? `<div style="font-family:var(--f-mono);font-size:10px;color:var(--yellow);letter-spacing:.06em;">If you recently updated and data looks empty, go to Progress and import your backup JSON.</div>` : ''}
           ${stats.streak > 0 ? `
           <div style="font-family:var(--f-mono);font-size:14px;color:var(--text2);">
             <span class="streak-num count-target" data-target="${stats.streak}" data-type="int" style="font-family:var(--f-hero);font-size:48px;color:var(--accent);text-shadow:0 0 20px var(--glow);vertical-align:middle;">${stats.streak}</span>

@@ -4,19 +4,22 @@ Pages.ManualArticle = {
   async render(slug) {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="manual-page"><div class="manual-loading">Loading article...</div></div>';
+    const safeSlug = ManualData.normalizeSlug(slug);
 
     try {
       const [toc, index, md, backlinks, related] = await Promise.all([
         ManualData.loadToc(),
         ManualData.loadIndex(),
-        ManualData.loadPage(slug),
-        ManualData.backlinksFor(slug),
-        ManualData.relatedFor(slug),
+        ManualData.loadPage(safeSlug),
+        ManualData.backlinksFor(safeSlug),
+        ManualData.relatedFor(safeSlug),
       ]);
 
-      const doc = index.docs.find(d => d.slug === slug);
+      const doc = index.docs.find(d => d.slug === safeSlug);
+      const titleMap = new Map(index.docs.map(d => [d.title.toLowerCase(), d.slug]));
+      ManualMarkdown.setWikiResolver((title) => titleMap.get(String(title || '').trim().toLowerCase()) || ManualMarkdown.slugifyTitle(title));
       const html = ManualMarkdown.render(md);
-      const breadcrumbs = this._breadcrumbs(toc, slug);
+      const breadcrumbs = this._breadcrumbs(toc, safeSlug);
 
       app.innerHTML = `
         <div class="manual-page">

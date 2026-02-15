@@ -3,26 +3,30 @@
 This page explains the core controls for quick setup and repeatable tones.
 
 :::note
-Use this as a practical guide while practicing. Refer to your official PDF for complete manufacturer specs.
+Source manual: [Peavey Vypyr X2 Official PDF](https://assets.peavey.com/literature/manuals/119226_37874.PDF)
 :::
 
-```hotspots
-{
-  "image": "/manual/assets/front-panel.svg",
-  "points": [
-    {"n":1,"x":12,"y":50,"title":"Input","text":"Plug guitar cable here. If no signal, test with another cable first."},
-    {"n":2,"x":28,"y":50,"title":"Pre Gain","text":"Sets drive amount. Start lower for clean practice, increase for lead sustain."},
-    {"n":3,"x":42,"y":50,"title":"Low / Mid / High","text":"Use EQ to clear muddy sound: reduce bass first, then adjust mids/treble."},
-    {"n":4,"x":84,"y":50,"title":"Post Volume","text":"Adjust loudness after tone shaping. Match levels between presets."}
-  ]
-}
-```
+## Signal chain
+
+1. Guitar input
+2. Pre gain / amp voice
+3. EQ section (low, mid, high)
+4. Effects/modulation/delay/reverb
+5. Post/master volume to speaker output
+
+## Practical control notes
+
+- **Input**: if silent, verify guitar volume knob and cable first.
+- **Gain**: increase for drive/sustain; keep lower for chord clarity.
+- **EQ**: cut bass first to remove mud, then shape mids/highs.
+- **Post Volume**: level-match presets to avoid sudden jumps.
+- **Effects**: subtle mix settings help practice articulation.
 
 ## Numbered callouts
 
-1. Input should be first check when there is no sound.
-2. Gain controls breakup and sustain.
-3. EQ should be adjusted in small steps while playing.
-4. Post/master volume should be changed gradually.
+1. Start from a clean patch.
+2. Set gain before heavy effects.
+3. Dial EQ while strumming full chords.
+4. Raise volume only after tone is set.
 
-Related: [[Getting Started]], [[No Sound Troubleshooting]].
+Related: [[Getting Started]], [[No Sound Troubleshooting]], [[Factory Reset & Recovery]].
