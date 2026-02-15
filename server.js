@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { execSync, exec } = require('child_process');
 const https = require('https');
+const Store = require('./data-store');
 
 const app = express();
 const PORT = process.env.PORT || 9999;
@@ -46,6 +47,98 @@ function fetchJson(url, headers) {
     req.setTimeout(8000, () => { req.destroy(); reject(new Error('timeout')); });
   });
 }
+
+
+
+// Data API
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, db: Store.dbPath });
+});
+
+app.get('/api/sessions', (req, res) => res.json(Store.listSessions()));
+app.post('/api/sessions', (req, res) => {
+  if (!req.body?.date) return res.status(400).json({ error: 'date is required' });
+  return res.json(Store.saveSession(req.body));
+});
+app.get('/api/sessions/:id', (req, res) => {
+  const row = Store.getSession(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(row);
+});
+app.put('/api/sessions/:id', (req, res) => {
+  const saved = Store.saveSession({ ...req.body, id: req.params.id });
+  res.json(saved);
+});
+app.delete('/api/sessions/:id', (req, res) => {
+  Store.deleteSession(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/gear-items', (req, res) => res.json(Store.listGear()));
+app.post('/api/gear-items', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  return res.json(Store.saveGear(req.body));
+});
+app.get('/api/gear-items/:id', (req, res) => {
+  const row = Store.getGear(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(row);
+});
+app.put('/api/gear-items/:id', (req, res) => res.json(Store.saveGear({ ...req.body, id: req.params.id })));
+app.delete('/api/gear-items/:id', (req, res) => {
+  Store.deleteGear(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/presets', (req, res) => res.json(Store.listPresets()));
+app.post('/api/presets', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  res.json(Store.savePreset(req.body));
+});
+app.get('/api/presets/:id', (req, res) => {
+  const row = Store.getPreset(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(row);
+});
+app.put('/api/presets/:id', (req, res) => res.json(Store.savePreset({ ...req.body, id: req.params.id })));
+app.delete('/api/presets/:id', (req, res) => {
+  Store.deletePreset(req.params.id);
+  res.json({ ok: true });
+});
+
+// Keep existing resources features
+app.get('/api/resources', (req, res) => res.json(Store.listResources()));
+app.post('/api/resources', (req, res) => res.json(Store.saveResource(req.body || {})));
+app.get('/api/resources/:id', (req, res) => {
+  const row = Store.getResource(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  res.json(row);
+});
+app.put('/api/resources/:id', (req, res) => res.json(Store.saveResource({ ...req.body, id: req.params.id })));
+app.delete('/api/resources/:id', (req, res) => {
+  Store.deleteResource(req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/export', (req, res) => {
+  res.json({
+    sessions: Store.listSessions(),
+    gear: Store.listGear(),
+    resources: Store.listResources(),
+    presets: Store.listPresets(),
+    exportedAt: new Date().toISOString(),
+  });
+});
+
+app.post('/api/import', (req, res) => {
+  const payload = req.body || {};
+  Store.clearAll();
+  for (const row of (payload.sessions || [])) Store.saveSession(row);
+  for (const row of (payload.gear || [])) Store.saveGear(row);
+  for (const row of (payload.resources || [])) Store.saveResource(row);
+  for (const row of (payload.presets || [])) Store.savePreset(row);
+  res.json({ ok: true });
+});
 
 // GET /api/version
 app.get('/api/version', async (req, res) => {
