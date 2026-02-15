@@ -53,7 +53,7 @@ docker compose restart
 docker compose up -d --build
 ```
 
-The app also shows an **in-app update banner** when a new commit is available on GitHub. Click "Pull & Restart" to update automatically.
+The app also shows an **in-app update banner** when a new commit is available on GitHub. Click **"Sync & Refresh"** for one-click update: it fetches/reset-to-remote, installs deps, rebuilds manual index, restarts the container, clears caches, and refreshes the app shell.
 
 ### ✅ Post-merge deploy checklist (run every time)
 

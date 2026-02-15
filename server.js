@@ -82,14 +82,29 @@ app.get('/api/version', async (req, res) => {
 // POST /api/update
 app.post('/api/update', (req, res) => {
   try {
-    const pullOut = execSync('git pull', { cwd: __dirname, encoding: 'utf8' });
+    const currentBranch = gitExec('git rev-parse --abbrev-ref HEAD') || 'main';
+    const remote = gitExec(`git config branch.${currentBranch}.remote`) || 'origin';
+    const mergeRef = gitExec(`git config branch.${currentBranch}.merge`) || `refs/heads/${currentBranch}`;
+    const remoteBranch = mergeRef.replace('refs/heads/', '');
+
+    const fetchOut = execSync(`git fetch ${remote} ${remoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
+    const hardResetOut = execSync(`git reset --hard ${remote}/${remoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
+
     let npmOut = '';
     try {
       npmOut = execSync('npm install --production', { cwd: __dirname, encoding: 'utf8' });
     } catch (e) {
       npmOut = e.message;
     }
-    res.json({ ok: true, output: pullOut + '\n' + npmOut });
+
+    let manualOut = '';
+    try {
+      manualOut = execSync('npm run build:manual', { cwd: __dirname, encoding: 'utf8' });
+    } catch (e) {
+      manualOut = e.message;
+    }
+
+    res.json({ ok: true, output: [fetchOut, hardResetOut, npmOut, manualOut].join('\n') });
 
     setTimeout(() => {
       exec('docker compose restart', { cwd: __dirname }, (err) => {
