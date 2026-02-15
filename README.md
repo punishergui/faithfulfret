@@ -181,6 +181,8 @@ Data gone:         Data lives in THIS browser's IndexedDB
                    Use export/import to move between browsers
 
 Update stuck:      docker compose restart
+                   Hard refresh browser (Ctrl/Cmd+Shift+R)
+                   DevTools -> Application -> Service Workers -> Unregister
 
 Icons missing:     node scripts/gen-icons.js
                    npm install canvas && node scripts/gen-icons.js   (better icons)

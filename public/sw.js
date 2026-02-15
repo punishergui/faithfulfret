@@ -1,6 +1,7 @@
-const CACHE_NAME = 'daily-fret-v1';
+const CACHE_NAME = 'daily-fret-v2';
 const PRECACHE = [
   '/',
+  '/index.html',
   '/css/global.css',
   '/css/animations.css',
   '/js/db.js',
@@ -19,6 +20,8 @@ const PRECACHE = [
   '/js/pages/tools/chords.js',
   '/js/pages/tools/scales.js',
   '/js/pages/tools/bpm-guide.js',
+  '/js/pages/tools/tuning.js',
+  '/js/pages/tools/amp-manual.js',
   '/manifest.json',
 ];
 
