@@ -2,7 +2,7 @@
 
 Personal guitar practice tracker — Progressive Web App (PWA).
 
-Dark, grungy aesthetic. Tracks sessions, gear, presets, resources, and progress. Works in desktop browsers and installs as a native app on mobile. Data is persisted in SQLite at `/data/faithfulfret.sqlite`.
+Dark, grungy aesthetic. Tracks sessions, gear, presets, resources, and progress. Works in desktop browsers and installs as a native app on mobile. Data is persisted in SQLite at `/data/faithfulfret.sqlite`. On startup the server logs `DB: /data/faithfulfret.sqlite` for quick verification.
 
 ---
 
@@ -39,6 +39,9 @@ Production uses prebuilt GHCR images and Watchtower auto-updates.
 # Start/refresh production stack (no local build, no bind mounts)
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
+
+# Verify DB path after deploy
+docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
 ```
 
 How updates work:
@@ -49,8 +52,9 @@ How updates work:
 Rollback (pin a version tag):
 
 1. Publish a tag from GitHub (`vX.Y.Z`) so GHCR has an immutable image.
-2. Pin `docker-compose.prod.yml` to that exact tag.
+2. Pin `docker-compose.prod.yml` to that exact tag (`image: ghcr.io/punishergui/faithfulfret:vX.Y.Z`).
 3. Redeploy with compose pull/up.
+4. Keep the previous known-good tag noted so you can pin back instantly if needed.
 
 
 ```bash
@@ -147,7 +151,7 @@ Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still us
 |-------|------|
 | Server | Node.js + Express |
 | Frontend | Vanilla JS (ES6 modules, zero build tools) |
-| Database | SQLite (`/data/faithfulfret.sqlite`) via Node built-in `node:sqlite` |
+| Database | SQLite (`/data/faithfulfret.sqlite`) via `better-sqlite3` |
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
 | Port | Host `3000` → Container `9999` |
