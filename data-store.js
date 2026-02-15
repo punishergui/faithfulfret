@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { DatabaseSync } = require('node:sqlite');
+const Database = require('better-sqlite3');
 
 const dataDir = '/data';
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const dbPath = path.join(dataDir, 'faithfulfret.sqlite');
-const db = new DatabaseSync(dbPath);
+console.log(`DB: ${dbPath}`);
+const db = new Database(dbPath);
 db.exec('PRAGMA journal_mode = WAL;');
 
 db.exec(`
