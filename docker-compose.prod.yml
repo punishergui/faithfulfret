@@ -1,0 +1,23 @@
+services:
+  daily-fret:
+    image: ghcr.io/punishergui/faithfulfret:latest
+    container_name: daily-fret
+    restart: unless-stopped
+    ports:
+      - "3000:9999"
+    volumes:
+      - ./data:/data
+    environment:
+      PORT: "9999"
+      NODE_ENV: "production"
+      TZ: "America/Chicago"
+
+  faithfulfret-watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: faithfulfret-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DOCKER_API_VERSION: "1.53"
+    command: --cleanup --interval 300 daily-fret

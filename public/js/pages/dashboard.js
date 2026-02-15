@@ -85,6 +85,7 @@ Pages.Dashboard = {
       { key: 'Avg BPM', val: stats.avgBPM || '—' },
       { key: 'Streak', val: stats.currentStreak ? `${stats.currentStreak}d` : '0d' },
       { key: 'Best Streak', val: stats.longestStreak ? `${stats.longestStreak}d` : '0d' },
+      { key: 'Sessions/Week', val: stats.sessionsPerWeek || 0 },
       { key: 'Last Session', val: stats.daysSinceLastSession == null ? '—' : `${stats.daysSinceLastSession}d ago` },
     ];
     return `

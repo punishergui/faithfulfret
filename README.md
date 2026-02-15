@@ -2,7 +2,7 @@
 
 Personal guitar practice tracker — Progressive Web App (PWA).
 
-Dark, grungy aesthetic. Tracks sessions, gear, resources, and progress. Works in desktop browsers and installs as a native app on mobile. All data lives in your browser's IndexedDB — no accounts, no cloud, no BS.
+Dark, grungy aesthetic. Tracks sessions, gear, presets, resources, and progress. Works in desktop browsers and installs as a native app on mobile. Data is persisted in SQLite at `/data/faithfulfret.sqlite`.
 
 ---
 
@@ -16,7 +16,7 @@ cd daily-fret
 # 2. Generate icons (one time)
 node scripts/gen-icons.js
 
-# 3. Start with Docker Compose
+# 3. Start with Docker Compose (mounts ./data -> /data)
 docker compose up -d
 
 # 4. Open in browser
@@ -25,6 +25,39 @@ docker compose up -d
 # 5. (Optional) Install as app
 # Chrome: click the install icon in the address bar
 # Mobile: tap Share → Add to Home Screen
+```
+
+---
+
+## Deployment / Updates
+
+Production uses prebuilt GHCR images and Watchtower auto-updates.
+
+`docker-compose.prod.yml` keeps host port `3000` mapped to container port `9999`, and mounts `./data:/data` so the SQLite DB survives restarts and image updates.
+
+```bash
+# Start/refresh production stack (no local build, no bind mounts)
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+How updates work:
+- Push to `main` builds/pushes `ghcr.io/punishergui/faithfulfret:latest` via GitHub Actions.
+- Creating a tag like `v0.1-starter` also pushes `ghcr.io/punishergui/faithfulfret:v0.1-starter`.
+- Watchtower checks every 5 minutes and restarts only `daily-fret` when a new image is available.
+
+Rollback (pin a version tag):
+
+1. Publish a tag from GitHub (`vX.Y.Z`) so GHCR has an immutable image.
+2. Pin `docker-compose.prod.yml` to that exact tag.
+3. Redeploy with compose pull/up.
+
+
+```bash
+# Example: pin to a known-good image tag
+# edit docker-compose.prod.yml -> image: ghcr.io/punishergui/faithfulfret:v0.1-starter
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ---
@@ -44,87 +77,32 @@ docker compose up -d
 
 ## Updating From GitHub
 
-```bash
-# On your Docker VM via SSH:
-git pull
-docker compose restart
-
-# If you changed package.json:
-docker compose up -d --build
-```
-
-The app also shows an **in-app update banner** when a new commit is available on GitHub. Click **"Sync & Refresh"** for one-click update: it fetches/reset-to-remote, installs deps, rebuilds manual index, restarts the container, clears caches, and refreshes the app shell.
-
-If update fails, the app now opens an **Update Assistant** modal with:
-- exact copy-paste commands for your current tracked branch,
-- server output from the failed step,
-- a one-click “Reload app” action,
-- automatic conflict handling details (force-sync + backup branch).
-
-> **No manual conflict picking:** Sync & Refresh force-resets to remote and auto-creates a local backup branch first.
-
-Quick manual force-sync (same flow as the app button):
+For production, you no longer build on the server.
 
 ```bash
-cd /opt/stacks/faithfulfret
-git fetch origin main
-git reset --hard origin/main
-npm install --production
-npm run build:manual
-docker compose restart
-# then hard-refresh browser: Ctrl+Shift+R
+# 1) push changes to main (or push a v* tag for a versioned image)
+# 2) GitHub Actions publishes GHCR image tags
+# 3) Watchtower auto-pulls and restarts daily-fret within ~5 minutes
 ```
 
-Auto-merge PR branch with no manual conflict picking:
+Manual refresh (optional):
 
 ```bash
-cd /opt/stacks/faithfulfret
-./scripts/auto-merge-update.sh codex/enhance-wiki-to-fully-support-editing-lzc1lo
-```
-
-Notes:
-- If you omit the branch, the script auto-selects the latest `origin/codex/*` branch.
-- It merges `origin/main` with `-X ours` (keeps your PR branch side in conflicts), then pushes automatically.
-
-### ✅ Post-merge deploy checklist (run every time)
-
-```bash
-# 0) one-time safety fix if git complains about dubious ownership
-sudo git config --global --add safe.directory /opt/stacks/faithfulfret
-
-# 1) ensure your repo files are owned by your login user (replace josh if needed)
-sudo chown -R josh:josh /opt/stacks/faithfulfret
-
-# 2) update code
-cd /opt/stacks/faithfulfret
-git fetch origin
-git checkout main
-git pull origin main
-
-# 3) rebuild + restart containers
-sudo docker compose down --remove-orphans
-sudo docker compose up -d --build
-
-# 4) verify app is healthy
-sudo docker compose ps
-sudo docker compose logs --tail=120
-```
-
-Browser refresh after deploy:
-
-```text
-Open http://YOUR-VM-IP:3000
-Hard refresh: Ctrl+Shift+R (Cmd+Shift+R on Mac)
-If stale UI remains: DevTools > Application > Service Workers > Unregister
-Reload once more
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Data safety (important)
 
-- Your sessions/gear/resources are stored in your browser's IndexedDB for the app origin.
-- If you change domain or port, the browser treats it as a different app storage area.
-- Always export a backup JSON from `Progress` before major updates/migrations.
-- After moving hosts/ports, use `Import Data` in `Progress` to restore.
+- App data is stored in SQLite: `/data/faithfulfret.sqlite`.
+- In both dev and prod compose files, `./data:/data` is mounted, so data persists across restarts/updates.
+- Backup the DB file directly:
+
+```bash
+cp ./data/faithfulfret.sqlite ./data/faithfulfret.sqlite.backup-$(date +%Y%m%d-%H%M%S)
+```
+
+- You can also export/import JSON from the `Progress` page for portability between environments.
 
 ---
 
@@ -159,7 +137,7 @@ Progress page → "Export All Data" → saves daily-fret-backup-DATE.json
 To restore: Progress page → "Import Data" → select backup file
 ```
 
-Data is stored in **this browser's IndexedDB**. Use export/import to move data between browsers or devices.
+Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still useful for moving data between environments or creating portable backups.
 
 ---
 
@@ -169,7 +147,7 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 |-------|------|
 | Server | Node.js + Express |
 | Frontend | Vanilla JS (ES6 modules, zero build tools) |
-| Database | IndexedDB via `idb` CDN library |
+| Database | SQLite (`/data/faithfulfret.sqlite`) via Node built-in `node:sqlite` |
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
 | Port | Host `3000` → Container `9999` |
@@ -233,7 +211,7 @@ Use **Rebuild Search** in the wiki sidebar after bulk edits/imports.
 daily-fret/
 ├── Dockerfile
 ├── docker-compose.yml
-├── server.js                     Express: static files + /api/version + /api/update
+├── server.js                     Express: static files + update endpoints + data REST API
 ├── package.json
 ├── public/
 │   ├── index.html                App shell
@@ -246,7 +224,7 @@ daily-fret/
 │   │   ├── global.css
 │   │   └── animations.css
 │   └── js/
-│       ├── db.js                 IndexedDB wrapper
+│       ├── db.js                 Frontend API wrapper
 │       ├── router.js             Hash-based SPA router
 │       ├── app.js                Bootstrap + update banner
 │       ├── utils.js              Shared utilities

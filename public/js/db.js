@@ -1,135 +1,118 @@
-// Daily Fret — IndexedDB Wrapper
+// Daily Fret — API DB Wrapper
 // Exposes window.DB
-// Depends on idb UMD loaded before this script
 
 (async function initDB() {
-  // Wait for idb to be available
-  const idb = window.idb;
-  if (!idb) {
-    console.error('idb library not loaded');
-    return;
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(txt || `Request failed: ${res.status}`);
+    }
+    return res.json();
   }
 
-  const DB_NAME = 'daily-fret-db';
-  const DB_VERSION = 2;
-
-  const db = await idb.openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Sessions store
-      if (!db.objectStoreNames.contains('sessions')) {
-        const sessStore = db.createObjectStore('sessions', { keyPath: 'id' });
-        sessStore.createIndex('date', 'date', { unique: true });
-        sessStore.createIndex('createdAt', 'createdAt');
-      }
-
-      // Gear store
-      if (!db.objectStoreNames.contains('gear')) {
-        const gearStore = db.createObjectStore('gear', { keyPath: 'id' });
-        gearStore.createIndex('category', 'category');
-      }
-
-      // Resources store
-      if (!db.objectStoreNames.contains('resources')) {
-        const resStore = db.createObjectStore('resources', { keyPath: 'id' });
-        resStore.createIndex('category', 'category');
-        resStore.createIndex('rating', 'rating');
-      }
-
-    },
-  });
-
-  function createId() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return window.crypto.randomUUID();
-    }
-
-    // Fallback for browsers/contexts where randomUUID is unavailable.
-    const seed = Date.now().toString(36);
-    const rand = Math.random().toString(36).slice(2, 10);
-    return `id_${seed}_${rand}`;
+  function normalizeSession(row) {
+    if (!row) return row;
+    return {
+      ...row,
+      minutes: row.minutes ?? row.durationMinutes ?? null,
+      videoId: row.videoId || row.youtubeId || '',
+      focus: row.focus || row.focusTag || row.title || '',
+    };
   }
 
   window.DB = {
-    // ────────────────────────────────────────────────
-    // SESSIONS
-    // ────────────────────────────────────────────────
+    // Sessions
     async saveSess(data) {
-      if (!data.id) data.id = createId();
-      if (!data.createdAt) data.createdAt = Date.now();
-      await db.put('sessions', data);
-      return data;
+      const payload = {
+        ...data,
+        durationMinutes: data.durationMinutes ?? data.minutes,
+        youtubeId: data.youtubeId ?? data.videoId,
+        focusTag: data.focusTag ?? data.focus,
+      };
+      const row = data.id
+        ? await api(`/api/sessions/${data.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+        : await api('/api/sessions', { method: 'POST', body: JSON.stringify(payload) });
+      return normalizeSession(row);
     },
 
     async getSess(id) {
-      return db.get('sessions', id);
+      try {
+        const row = await api(`/api/sessions/${id}`);
+        return normalizeSession(row);
+      } catch {
+        return null;
+      }
     },
 
     async getSessByDate(date) {
-      return db.getFromIndex('sessions', 'date', date);
+      const all = await this.getAllSess();
+      return all.find(x => x.date === date) || null;
     },
 
     async getAllSess() {
-      const all = await db.getAll('sessions');
-      return all.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const rows = await api('/api/sessions');
+      return rows.map(normalizeSession);
     },
 
     async deleteSess(id) {
-      return db.delete('sessions', id);
+      return api(`/api/sessions/${id}`, { method: 'DELETE' });
     },
 
-    // ────────────────────────────────────────────────
-    // GEAR
-    // ────────────────────────────────────────────────
+    // Gear
     async saveGear(data) {
-      if (!data.id) data.id = createId();
-      if (!data.createdAt) data.createdAt = Date.now();
-      await db.put('gear', data);
-      return data;
+      return data.id
+        ? api(`/api/gear-items/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/gear-items', { method: 'POST', body: JSON.stringify(data) });
     },
 
     async getGear(id) {
-      return db.get('gear', id);
+      try { return await api(`/api/gear-items/${id}`); } catch { return null; }
     },
 
     async getAllGear() {
-      const all = await db.getAll('gear');
-      return all.sort((a, b) => {
-        const catCmp = (a.category || '').localeCompare(b.category || '');
-        if (catCmp !== 0) return catCmp;
-        return (a.name || '').localeCompare(b.name || '');
-      });
+      return api('/api/gear-items');
     },
 
     async deleteGear(id) {
-      return db.delete('gear', id);
+      return api(`/api/gear-items/${id}`, { method: 'DELETE' });
     },
 
-    // ────────────────────────────────────────────────
-    // RESOURCES
-    // ────────────────────────────────────────────────
+    // Presets
+    async savePreset(data) {
+      return data.id
+        ? api(`/api/presets/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/presets', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async getPreset(id) {
+      try { return await api(`/api/presets/${id}`); } catch { return null; }
+    },
+    async getAllPresets() {
+      return api('/api/presets');
+    },
+    async deletePreset(id) {
+      return api(`/api/presets/${id}`, { method: 'DELETE' });
+    },
+
+    // Resources legacy
     async saveResource(data) {
-      if (!data.id) data.id = createId();
-      if (!data.createdAt) data.createdAt = Date.now();
-      await db.put('resources', data);
-      return data;
+      return data.id
+        ? api(`/api/resources/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/resources', { method: 'POST', body: JSON.stringify(data) });
     },
-
     async getResource(id) {
-      return db.get('resources', id);
+      try { return await api(`/api/resources/${id}`); } catch { return null; }
     },
-
     async getAllResources() {
-      const all = await db.getAll('resources');
-      return all.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      return api('/api/resources');
     },
-
     async deleteResource(id) {
-      return db.delete('resources', id);
+      return api(`/api/resources/${id}`, { method: 'DELETE' });
     },
 
-    // ────────────────────────────────────────────────
-    // STATS
-    // ────────────────────────────────────────────────
     async getStats() {
       const sessions = await this.getAllSess();
       const count = sessions.length;
@@ -139,7 +122,6 @@
       const maxBPM = bpms.length ? Math.max(...bpms) : 0;
       const avgBPM = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0;
 
-      // Streaks + inactivity
       const allDates = sessions.map(s => s.date).filter(Boolean).sort().reverse();
       const uniqueDatesDesc = [...new Set(allDates)];
       const uniqueDatesAsc = [...uniqueDatesDesc].reverse();
@@ -173,6 +155,8 @@
       const lastSessionDate = uniqueDatesDesc[0] || null;
       const daysSinceLastSession = lastSessionDate ? Math.max(0, dayDiff(today, lastSessionDate)) : null;
 
+      const sessionsPerWeek = count ? Math.round((count / Math.max(1, new Set(uniqueDatesDesc.map(d => d.slice(0, 8))).size / 7)) * 10) / 10 : 0;
+
       return {
         count,
         totalMinutes,
@@ -185,40 +169,18 @@
         lastSessionDate,
         daysSinceLastSession,
         allDates,
+        sessionsPerWeek,
       };
     },
 
-    // ────────────────────────────────────────────────
-    // EXPORT / IMPORT
-    // ────────────────────────────────────────────────
     async exportAll() {
-      const [sessions, gear, resources] = await Promise.all([
-        this.getAllSess(),
-        this.getAllGear(),
-        this.getAllResources(),
-      ]);
-      return { sessions, gear, resources, exportedAt: new Date().toISOString() };
+      return api('/api/export');
     },
 
     async importAll(data) {
-      const tx = db.transaction(['sessions', 'gear', 'resources'], 'readwrite');
-      await tx.objectStore('sessions').clear();
-      await tx.objectStore('gear').clear();
-      await tx.objectStore('resources').clear();
-
-      for (const item of (data.sessions || [])) {
-        await tx.objectStore('sessions').put(item);
-      }
-      for (const item of (data.gear || [])) {
-        await tx.objectStore('gear').put(item);
-      }
-      for (const item of (data.resources || [])) {
-        await tx.objectStore('resources').put(item);
-      }
-      await tx.done;
+      return api('/api/import', { method: 'POST', body: JSON.stringify(data) });
     },
   };
 
-  // Emit event so app.js knows DB is ready
   window.dispatchEvent(new Event('db-ready'));
 })();
