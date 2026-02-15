@@ -36,11 +36,11 @@ Pages.Resources = {
     return Object.entries(byCategory).map(([cat, items]) => `
       <div class="cat-header">${cat} <span style="color:var(--text2);">(${items.length})</span></div>
       <div style="margin-bottom:24px;">
-        <div style="display:grid;grid-template-columns:1fr 90px 80px 30px;gap:14px;padding:8px 0;border-bottom:1px solid var(--line2);">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px 90px 130px;gap:14px;padding:8px 0;border-bottom:1px solid var(--line2);">
           <span class="df-label">Resource</span>
           <span class="df-label" style="text-align:center;">Level</span>
           <span class="df-label" style="text-align:center;">Rating</span>
-          <span></span>
+          <span class="df-label" style="text-align:right;">Actions</span>
         </div>
         ${items.map(r => this._renderRow(r)).join('')}
       </div>
