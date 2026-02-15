@@ -11,7 +11,7 @@ app.use(express.json());
 
 function gitExec(cmd) {
   try {
-    return execSync(cmd, { cwd: __dirname, encoding: 'utf8' }).trim();
+    return execSync(cmd, { cwd: __dirname, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch (e) {
     return null;
   }
