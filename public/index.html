@@ -29,9 +29,25 @@
   <!-- Update Banner -->
   <div id="update-banner" aria-live="polite">
     <span class="update-banner__text">&#8593; Update available on GitHub</span>
-    <button id="update-btn">Pull &amp; Restart</button>
+    <button id="update-btn">Sync &amp; Refresh</button>
     <a id="update-repo-link" target="_blank" rel="noopener">View Changes &#8599;</a>
     <button id="update-dismiss" aria-label="Dismiss">&#10005;</button>
+  </div>
+
+
+  <div id="sync-help-modal" class="sync-help-modal" aria-hidden="true">
+    <div class="sync-help-modal__card">
+      <div class="sync-help-modal__head">
+        <strong>Update Assistant</strong>
+        <button id="sync-help-close" aria-label="Close">✕</button>
+      </div>
+      <p id="sync-help-summary"></p>
+      <pre id="sync-help-output"></pre>
+      <div class="sync-help-modal__actions">
+        <button id="sync-help-copy">Copy commands</button>
+        <button id="sync-help-refresh">Reload app</button>
+      </div>
+    </div>
   </div>
 
   <!-- Navigation -->
@@ -47,6 +63,7 @@
         <a href="#/resources" class="nav__link" data-route="resources">Resources</a>
         <a href="#/progress" class="nav__link" data-route="progress">Progress</a>
         <a href="#/tools" class="nav__link" data-route="tools">Tools</a>
+        <a href="#/manual" class="nav__link" data-route="manual">Wiki</a>
       </div>
       <div class="nav__actions">
         <a href="#/log" class="nav__log-btn">+ LOG</a>
@@ -62,6 +79,7 @@
       <a href="#/resources" class="nav__mobile-link">Resources</a>
       <a href="#/progress" class="nav__mobile-link">Progress</a>
       <a href="#/tools" class="nav__mobile-link">Tools</a>
+      <a href="#/manual" class="nav__mobile-link">Wiki</a>
       <a href="#/log" class="nav__mobile-link nav__mobile-link--cta">+ Log Session</a>
     </div>
   </nav>
@@ -82,6 +100,9 @@
   <script type="module" src="/js/pages/progress.js"></script>
   <script type="module" src="/js/manual/manual-data.js"></script>
   <script type="module" src="/js/manual/markdown.js"></script>
+  <script type="module" src="/js/wiki/wiki-storage.js"></script>
+  <script type="module" src="/js/wiki/wiki-search.js"></script>
+  <script type="module" src="/js/wiki/wiki-assets.js"></script>
   <script type="module" src="/js/pages/manual.js"></script>
   <script type="module" src="/js/pages/manual-article.js"></script>
   <script type="module" src="/js/pages/manual-editor.js"></script>
