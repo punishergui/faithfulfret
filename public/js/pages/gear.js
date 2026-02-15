@@ -268,8 +268,12 @@ Pages.GearForm = {
       if (isEdit) { data.id = gear.id; data.createdAt = gear.createdAt; }
       // Attach image (base64 string or null to clear)
       if (pendingImageData) data.imageData = pendingImageData;
-      await DB.saveGear(data);
-      go('#/gear');
+      try {
+        await DB.saveGear(data);
+        go('#/gear');
+      } catch (err) {
+        alert('Error saving gear: ' + (err.message || err));
+      }
     });
 
     // ── Delete ──────────────────────────────────────────────────────

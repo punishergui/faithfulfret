@@ -192,8 +192,12 @@ Pages.ResourceForm = {
       Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
       if (!data.title) { alert('Title is required.'); return; }
       if (isEdit) { data.id = resource.id; data.createdAt = resource.createdAt; }
-      await DB.saveResource(data);
-      go('#/resources');
+      try {
+        await DB.saveResource(data);
+        go('#/resources');
+      } catch (err) {
+        alert('Error saving resource: ' + (err.message || err));
+      }
     });
 
     const deleteBtn = app.querySelector('#delete-resource-btn');

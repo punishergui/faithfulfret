@@ -1590,7 +1590,7 @@ select.df-input option {
    CHORD STYLES
    ============================================================ */
 .chords-wrap {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 32px 24px;
 }
@@ -1603,9 +1603,9 @@ select.df-input option {
 }
 
 .chord-btn {
-  padding: 8px 14px;
+  padding: 12px 22px;
   font-family: var(--f-mono);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   background: var(--bg2);
   border: 1px solid var(--line2);
@@ -1637,7 +1637,7 @@ select.df-input option {
 
 .chord-display__name {
   font-family: var(--f-hero);
-  font-size: 32px;
+  font-size: 52px;
   color: #fff;
   margin-bottom: 12px;
 }
@@ -1655,14 +1655,14 @@ select.df-input option {
 
 .chord-display__fingers {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 13px;
   color: var(--text3);
   margin-top: 10px;
   letter-spacing: 0.06em;
 }
 
 .chord-display__tip {
-  font-size: 13px;
+  font-size: 15px;
   font-style: italic;
   color: var(--text2);
   margin-top: 12px;
@@ -1675,30 +1675,66 @@ select.df-input option {
    SCALE STYLES
    ============================================================ */
 .scales-wrap {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 32px 24px;
 }
 
-.scale-select {
-  margin-bottom: 24px;
+.scale-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 32px;
 }
 
-.scale-fretboard {
+.scale-btn {
+  padding: 12px 22px;
   font-family: var(--f-mono);
-  font-size: 12px;
-  line-height: 2;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-top-width: 3px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.scale-btn:hover,
+.scale-btn.active {
+  border-color: currentColor;
+  background: var(--bg3);
+}
+
+.scale-btn--pent-minor { border-top-color: #5599ff; }
+.scale-btn--pent-major { border-top-color: var(--green); }
+.scale-btn--major      { border-top-color: var(--accent); }
+.scale-btn--blues      { border-top-color: var(--yellow); }
+
+.scale-display {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 32px;
+  padding: 28px;
   background: var(--bg1);
   border: 1px solid var(--line2);
-  padding: 20px;
-  overflow-x: auto;
 }
 
-.scale-desc {
+.scale-display__name {
+  font-family: var(--f-hero);
+  font-size: 32px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.scale-display__desc {
   font-size: 14px;
-  color: var(--text2);
-  margin-top: 14px;
   font-style: italic;
+  color: var(--text2);
+  font-family: var(--f-body);
+  font-weight: 300;
+  line-height: 1.6;
 }
 
 /* ============================================================
@@ -2088,6 +2124,10 @@ select.df-input option {
   }
 
   .chord-display {
+    grid-template-columns: 1fr;
+  }
+
+  .scale-display {
     grid-template-columns: 1fr;
   }
 

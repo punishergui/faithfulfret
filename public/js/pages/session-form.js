@@ -123,8 +123,12 @@ Pages.SessionForm = {
         data.createdAt = session.createdAt;
       }
 
-      const saved = await DB.saveSess(data);
-      go(`#/session/${saved.id}`);
+      try {
+        const saved = await DB.saveSess(data);
+        go(`#/session/${saved.id}`);
+      } catch (err) {
+        alert('Error saving session: ' + (err.message || err));
+      }
     });
 
     // Delete

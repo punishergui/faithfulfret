@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v1';
+const CACHE_NAME = 'daily-fret-v2';
 const PRECACHE = [
   '/',
   '/css/global.css',

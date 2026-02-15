@@ -119,13 +119,13 @@ Pages.Chords = {
     const STRINGS = 6;
 
     // SVG layout constants
-    const SX   = 28;   // left margin (room for fret-position label)
-    const SY   = 34;   // top margin (room for X/O markers)
-    const SW   = 13;   // string spacing (px)
-    const FH   = 18;   // fret height (px)
-    const W    = SX + SW * (STRINGS - 1) + 20;
-    const H    = SY + FH * FRETS + 14;
-    const DOT_R = 5;
+    const SX   = 40;   // left margin (room for fret-position label)
+    const SY   = 50;   // top margin (room for X/O markers)
+    const SW   = 22;   // string spacing (px)
+    const FH   = 28;   // fret height (px)
+    const W    = SX + SW * (STRINGS - 1) + 28;
+    const H    = SY + FH * FRETS + 20;
+    const DOT_R = 8;
 
     const sx = i => SX + i * SW;          // x coord of string i (0=low E, 5=high e)
     const fy = r => SY + r * FH;          // y coord of top of fret row r (0-based)
@@ -136,9 +136,9 @@ Pages.Chords = {
     // ── Nut or position number ──────────────────────
     if (startFret === 0) {
       // Thick nut bar
-      parts.push(`<rect x="${sx(0)}" y="${SY - 3}" width="${SW * (STRINGS - 1)}" height="4" rx="0" fill="#d8d8cf"/>`);
+      parts.push(`<rect x="${sx(0)}" y="${SY - 5}" width="${SW * (STRINGS - 1)}" height="6" rx="0" fill="#d8d8cf"/>`);
     } else {
-      parts.push(`<text x="4" y="${dotY(0) + 4}" font-family="JetBrains Mono,monospace" font-size="9" fill="#6a6a60" text-anchor="start">${startFret + 1}fr</text>`);
+      parts.push(`<text x="4" y="${dotY(0) + 5}" font-family="JetBrains Mono,monospace" font-size="12" fill="#6a6a60" text-anchor="start">${startFret + 1}fr</text>`);
     }
 
     // ── Fret lines (horizontal) ─────────────────────
@@ -156,20 +156,20 @@ Pages.Chords = {
     // ── Open / mute markers above nut ───────────────
     for (let i = 0; i < STRINGS; i++) {
       const x = sx(i);
-      const y = SY - 16;
+      const y = SY - 22;
       if (f[i] === 'x') {
-        const d = 4;
-        parts.push(`<line x1="${x-d}" y1="${y-d}" x2="${x+d}" y2="${y+d}" stroke="#ff2d55" stroke-width="1.5" stroke-linecap="square"/>`);
-        parts.push(`<line x1="${x+d}" y1="${y-d}" x2="${x-d}" y2="${y+d}" stroke="#ff2d55" stroke-width="1.5" stroke-linecap="square"/>`);
+        const d = 6;
+        parts.push(`<line x1="${x-d}" y1="${y-d}" x2="${x+d}" y2="${y+d}" stroke="#ff2d55" stroke-width="2" stroke-linecap="square"/>`);
+        parts.push(`<line x1="${x+d}" y1="${y-d}" x2="${x-d}" y2="${y+d}" stroke="#ff2d55" stroke-width="2" stroke-linecap="square"/>`);
       } else if (f[i] === '0') {
-        parts.push(`<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#d8d8cf" stroke-width="1.5"/>`);
+        parts.push(`<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="#d8d8cf" stroke-width="2"/>`);
       }
     }
 
     // ── String labels (low E … high e) ──────────────
     const STRING_NAMES = ['E','A','D','G','B','e'];
     for (let i = 0; i < STRINGS; i++) {
-      parts.push(`<text x="${sx(i)}" y="${H - 2}" font-family="JetBrains Mono,monospace" font-size="8" fill="#3a3a34" text-anchor="middle">${STRING_NAMES[i]}</text>`);
+      parts.push(`<text x="${sx(i)}" y="${H - 2}" font-family="JetBrains Mono,monospace" font-size="11" fill="#3a3a34" text-anchor="middle">${STRING_NAMES[i]}</text>`);
     }
 
     // ── Finger dots ─────────────────────────────────

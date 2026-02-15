@@ -4,26 +4,31 @@ window.Pages = window.Pages || {};
 
 const SCALES = {
   'E Minor Pentatonic': {
+    type: 'pent-minor',
     strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2], 4:[2,5], 5:[0,3] },
     roots:   { 0:[0], 5:[0] },
     desc: 'Box 1 — the foundation of rock and blues. Learn this first.',
   },
   'A Minor Pentatonic': {
+    type: 'pent-minor',
     strings: { 0:[0,3], 1:[1,3], 2:[0,2], 3:[0,2], 4:[0,2], 5:[0,3] },
     roots:   { 0:[0], 1:[1] },
     desc: 'Box 1 — most-used soloing pattern in rock and blues.',
   },
   'G Major Scale': {
+    type: 'major',
     strings: { 0:[0,2,3], 1:[0,2,3], 2:[0,2], 3:[0,2,4], 4:[0,2,4], 5:[0,2,3] },
     roots:   {},
     desc: 'Open position major scale. Essential for understanding harmony.',
   },
   'C Major Pentatonic': {
+    type: 'pent-major',
     strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2], 4:[3,5], 5:[0,3] },
     roots:   {},
     desc: 'Major pentatonic — bright, happy sound. Country and pop staple.',
   },
   'E Blues Scale': {
+    type: 'blues',
     strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2,4], 4:[2,5], 5:[0,2,3] },
     roots:   { 0:[0], 5:[0] },
     desc: 'Minor pentatonic + flat 5. The core of blues guitar.',
@@ -33,6 +38,20 @@ const SCALES = {
 Pages.Scales = {
   render() {
     const app = document.getElementById('app');
+
+    const typeColor = {
+      'pent-minor': '#5599ff',
+      'pent-major': 'var(--green)',
+      'major':      'var(--accent)',
+      'blues':      'var(--yellow)',
+    };
+
+    const typeLabel = {
+      'pent-minor': 'Minor Pentatonic',
+      'pent-major': 'Major Pentatonic',
+      'major':      'Major Scale',
+      'blues':      'Blues Scale',
+    };
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=1200&q=80');">
@@ -44,81 +63,144 @@ Pages.Scales = {
       </div>
 
       <div class="scales-wrap">
-        <div class="df-field scale-select">
-          <label class="df-label" for="scale-picker">Scale Pattern</label>
-          <select id="scale-picker" class="df-input">
-            ${Object.keys(SCALES).map(name => `<option value="${name}">${name}</option>`).join('')}
-          </select>
+        <div class="scale-grid">
+          ${Object.entries(SCALES).map(([name, scale]) => `
+            <button class="scale-btn scale-btn--${scale.type}" data-scale="${name}"
+              style="border-top-color:${typeColor[scale.type]};">
+              ${name}
+            </button>
+          `).join('')}
         </div>
 
-        <div class="scale-fretboard" id="scale-fretboard"></div>
-        <div class="scale-desc" id="scale-desc"></div>
+        <!-- Type legend -->
+        <div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+          ${Object.entries({ 'Minor Pentatonic': '#5599ff', 'Major Pentatonic': 'var(--green)', 'Major Scale': 'var(--accent)', 'Blues Scale': 'var(--yellow)' }).map(([label, color]) => `
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:12px;height:12px;background:${color};"></div>
+              <span style="font-family:var(--f-mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;">${label}</span>
+            </div>
+          `).join('')}
+        </div>
 
-        <div style="margin-top:24px;background:var(--bg1);border:1px solid var(--line2);padding:16px;">
-          <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Legend</div>
-          <div style="display:flex;gap:20px;font-family:var(--f-mono);font-size:12px;">
-            <span><span style="color:var(--accent);">●</span> Root note</span>
-            <span><span style="color:var(--text2);">○</span> Scale tone</span>
-            <span><span style="color:var(--text3);">─</span> Open string / No note</span>
+        <div id="scale-display" style="display:none;" class="scale-display">
+          <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
+            <div class="scale-display__name" id="scale-name"></div>
+            <div id="scale-diagram"></div>
+            <div class="scale-display__desc" id="scale-desc"></div>
+          </div>
+          <div>
+            <div style="background:var(--bg1);border:1px solid var(--line2);padding:16px;margin-top:8px;">
+              <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Legend</div>
+              <div style="display:flex;gap:20px;font-family:var(--f-mono);font-size:12px;flex-wrap:wrap;">
+                <span><svg width="16" height="16" style="vertical-align:middle;margin-right:4px;"><circle cx="8" cy="8" r="7" fill="#ff6a00"/></svg>Root note</span>
+                <span><svg width="16" height="16" style="vertical-align:middle;margin-right:4px;"><circle cx="8" cy="8" r="7" fill="#1e2a50" stroke="#5599ff" stroke-width="2"/></svg>Scale tone</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     `;
 
-    const picker = app.querySelector('#scale-picker');
-    const showScale = (name) => {
-      const scale = SCALES[name];
-      if (!scale) return;
-      app.querySelector('#scale-fretboard').innerHTML = this._buildFretboard(scale);
-      app.querySelector('#scale-desc').textContent = scale.desc;
-    };
+    // Select first scale by default
+    const firstScale = Object.keys(SCALES)[0];
+    this._showScale(app, firstScale);
 
-    picker.addEventListener('change', () => showScale(picker.value));
-    showScale(picker.value);
+    // Bind scale buttons
+    app.querySelectorAll('.scale-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.querySelectorAll('.scale-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this._showScale(app, btn.dataset.scale);
+      });
+    });
+
+    // Auto-select first button
+    app.querySelector(`[data-scale="${firstScale}"]`)?.classList.add('active');
+  },
+
+  _showScale(container, name) {
+    const scale = SCALES[name];
+    if (!scale) return;
+
+    const display = container.querySelector('#scale-display');
+    display.style.display = 'grid';
+
+    container.querySelector('#scale-name').textContent = name;
+    container.querySelector('#scale-diagram').innerHTML = this._buildFretboard(scale);
+    container.querySelector('#scale-desc').textContent = scale.desc;
   },
 
   _buildFretboard(scale) {
-    const FRETS = 6; // frets 0-5
-    const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E']; // high e to low E
+    const SX = 35;    // left margin for string names
+    const SY = 28;    // top margin for fret numbers
+    const SS = 32;    // string spacing (vertical)
+    const FS = 72;    // fret spacing (horizontal)
+    const STRINGS = 6;
+    const FRETS = 6;  // positions 0-5
+    const DOT_R = 9;
 
-    // String indices in our data: 0=e(high), 1=B, 2=G, 3=D, 4=A, 5=E(low)
-    // Display top-to-bottom: e, B, G, D, A, E
+    const W = SX + FS * (FRETS - 1) + 30;
+    const H = SY + SS * (STRINGS - 1) + 28;
 
-    let header = '     ';
-    for (let f = 0; f <= FRETS - 1; f++) {
-      header += f.toString().padEnd(5, ' ');
+    // x coord of fret fi (0=open, 1-5=fretted)
+    const fx = fi => SX + fi * FS;
+    // y coord of string si (0=high-e, 5=low-E)
+    const sy = si => SY + si * SS;
+
+    const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E']; // high to low
+
+    const parts = [];
+
+    // Background
+    // Fret numbers along the top
+    for (let fi = 0; fi < FRETS; fi++) {
+      parts.push(`<text x="${fx(fi)}" y="${SY - 10}" font-family="JetBrains Mono,monospace" font-size="11" fill="#3a3a34" text-anchor="middle">${fi}</text>`);
     }
 
-    let rows = [header];
+    // Nut (thick vertical line at fret 0 position — left edge of fretboard)
+    parts.push(`<line x1="${fx(0)}" y1="${sy(0)}" x2="${fx(0)}" y2="${sy(STRINGS-1)}" stroke="#d8d8cf" stroke-width="4"/>`);
 
-    for (let si = 0; si < 6; si++) {
-      const strName = STRING_NAMES[si].padEnd(2, ' ');
-      const notesOnString = scale.strings[si] || [];
-      const rootsOnString = (scale.roots[si] || []);
+    // Fret lines (fi 1-5)
+    for (let fi = 1; fi < FRETS; fi++) {
+      parts.push(`<line x1="${fx(fi)}" y1="${sy(0)}" x2="${fx(fi)}" y2="${sy(STRINGS-1)}" stroke="#2a2a28" stroke-width="1.5"/>`);
+    }
 
-      let row = strName + ' ';
-      for (let f = 0; f < FRETS; f++) {
-        if (notesOnString.includes(f)) {
-          if (rootsOnString.includes(f)) {
-            row += '<span style="color:var(--accent);text-shadow:0 0 8px var(--glow);">●</span>    ';
-          } else {
-            row += '<span style="color:var(--text2);">○</span>    ';
-          }
+    // String lines
+    for (let si = 0; si < STRINGS; si++) {
+      const thickness = si === 0 ? 1 : si < 3 ? 1.5 : 2;
+      parts.push(`<line x1="${fx(0)}" y1="${sy(si)}" x2="${fx(FRETS-1)}" y2="${sy(si)}" stroke="#3a3a34" stroke-width="${thickness}"/>`);
+    }
+
+    // String names on the left
+    for (let si = 0; si < STRINGS; si++) {
+      parts.push(`<text x="${SX - 10}" y="${sy(si) + 4}" font-family="JetBrains Mono,monospace" font-size="11" fill="#6a6a60" text-anchor="middle">${STRING_NAMES[si]}</text>`);
+    }
+
+    // Note markers
+    for (let si = 0; si < STRINGS; si++) {
+      const notes = scale.strings[si] || [];
+      const roots = scale.roots[si] || [];
+
+      for (const fi of notes) {
+        const x = fx(fi);
+        const y = sy(si);
+
+        if (roots.includes(fi)) {
+          // Root: orange filled
+          parts.push(`<circle cx="${x}" cy="${y}" r="${DOT_R}" fill="#ff6a00"/>`);
+          parts.push(`<circle cx="${x}" cy="${y}" r="${DOT_R + 4}" fill="none" stroke="rgba(255,106,0,0.3)" stroke-width="1.5"/>`);
         } else {
-          row += '<span style="color:var(--text3);">─</span>    ';
+          // Scale tone: blue-tinted
+          parts.push(`<circle cx="${x}" cy="${y}" r="${DOT_R}" fill="#1e2a50" stroke="#5599ff" stroke-width="2"/>`);
         }
       }
-
-      rows.push(row);
     }
 
     // Fret number footer
-    let footer = '     ';
-    for (let f = 0; f < FRETS; f++) {
-      footer += f.toString().padEnd(5, ' ');
+    for (let fi = 0; fi < FRETS; fi++) {
+      parts.push(`<text x="${fx(fi)}" y="${H - 4}" font-family="JetBrains Mono,monospace" font-size="11" fill="#2a2a28" text-anchor="middle">${fi}</text>`);
     }
-    rows.push(footer);
 
-    return rows.join('\n');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;background:var(--bg1);border:1px solid var(--line2);overflow:visible;">${parts.join('')}</svg>`;
   },
 };
