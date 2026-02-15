@@ -100,6 +100,8 @@ app.get('/api/update/help', (req, res) => {
     'npm run build:manual',
     'docker compose restart',
     'Hard refresh browser (Ctrl+Shift+R)',
+    '# PR conflict auto-merge helper (replace branch if needed)',
+    `./scripts/auto-merge-update.sh ${currentBranch}`,
   ];
 
   res.json({

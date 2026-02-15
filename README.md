@@ -75,6 +75,17 @@ docker compose restart
 # then hard-refresh browser: Ctrl+Shift+R
 ```
 
+Auto-merge PR branch with no manual conflict picking:
+
+```bash
+cd /opt/stacks/faithfulfret
+./scripts/auto-merge-update.sh codex/enhance-wiki-to-fully-support-editing-lzc1lo
+```
+
+Notes:
+- If you omit the branch, the script auto-selects the latest `origin/codex/*` branch.
+- It merges `origin/main` with `-X ours` (keeps your PR branch side in conflicts), then pushes automatically.
+
 ### ✅ Post-merge deploy checklist (run every time)
 
 ```bash
