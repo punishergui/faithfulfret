@@ -1347,7 +1347,7 @@ select.df-input option {
    ============================================================ */
 .resource-row {
   display: grid;
-  grid-template-columns: 1fr 90px 80px 30px;
+  grid-template-columns: minmax(0, 1fr) 110px 90px 130px;
   gap: 14px;
   align-items: center;
   padding: 14px 0;
@@ -1432,6 +1432,7 @@ select.df-input option {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .resource-row__link a {
@@ -1446,6 +1447,8 @@ select.df-input option {
   text-transform: uppercase;
   border: 1px solid var(--line2);
   padding: 6px 10px;
+  min-width: 78px;
+  text-align: center;
 }
 
 .resource-row__link a:hover {
@@ -1453,11 +1456,12 @@ select.df-input option {
 }
 
 .resource-row__edit {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 1px solid var(--line2);
   color: var(--text3);
   font-size: 11px;
+  flex: 0 0 auto;
 }
 
 .resource-row__edit:hover {
@@ -2193,11 +2197,18 @@ select.df-input option {
   }
 
   .resource-row {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
   }
 
-  .resource-row__level {
+  .resource-row__level,
+  .resource-row__stars {
     display: none;
+  }
+
+  .resource-row__open-btn {
+    min-width: 64px;
+    padding: 5px 8px;
   }
 
   .df-statbar {

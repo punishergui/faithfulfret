@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v9';
+const CACHE_NAME = 'daily-fret-v11';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -8,14 +8,6 @@ const PRECACHE = [
   '/js/router.js',
   '/js/app.js',
   '/js/utils.js',
-  '/js/manual/manual-data.js',
-  '/js/manual/markdown.js',
-  '/js/wiki/wiki-assets.js',
-  '/js/wiki/wiki-search.js',
-  '/js/wiki/wiki-storage.js',
-  '/js/pages/manual.js',
-  '/js/pages/manual-article.js',
-  '/js/pages/manual-editor.js',
   '/js/pages/dashboard.js',
   '/js/pages/sessions.js',
   '/js/pages/session-single.js',
@@ -29,14 +21,6 @@ const PRECACHE = [
   '/js/pages/tools/scales.js',
   '/js/pages/tools/bpm-guide.js',
   '/js/pages/tools/tuning.js',
-  '/css/manual.css',
-  '/manual/toc.json',
-  '/manual/search-index.json',
-  '/manual/pages/getting-started.md',
-  '/manual/pages/features/front-panel-controls.md',
-  '/manual/pages/features/usb-audio-recording.md',
-  '/manual/pages/troubleshooting/no-sound.md',
-  '/manual/pages/troubleshooting/factory-reset.md',
   '/manifest.json',
 ];
 
@@ -63,20 +47,6 @@ self.addEventListener('fetch', e => {
       fetch(e.request).catch(() => new Response(JSON.stringify({ error: 'offline' }), {
         headers: { 'Content-Type': 'application/json' }
       }))
-    );
-    return;
-  }
-
-  // Runtime-cache manual pages/assets after first visit.
-  if (e.request.url.includes('/manual/pages/') || e.request.url.includes('/manual/assets/')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
     );
     return;
   }

@@ -27,7 +27,10 @@ Pages.Gear = {
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
           <div class="page-title">Gear</div>
-          <a href="#/gear/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Gear</a>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <a href="/manual.pdf" target="_blank" rel="noopener" class="df-btn df-btn--outline" style="margin-bottom:4px;">Open Manual PDF</a>
+            <a href="#/gear/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Gear</a>
+          </div>
         </div>
         <div class="fret-line"></div>
       </div>
@@ -59,6 +62,7 @@ Pages.Gear = {
   _renderCard(g) {
     // Use uploaded photo if available, otherwise fall back to category Unsplash image
     const imgUrl = g.imageData || Utils.gearImage(g.category);
+    const manualUrl = g.manualUrl || '/manual.pdf';
     const statusBadge = {
       'Own it':    'df-badge--green',
       'Sold':      'df-badge--red',
@@ -81,7 +85,7 @@ Pages.Gear = {
             <div class="gear-card__links">
               ${g.buyUrl ? `<a href="${g.buyUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
               ${g.mfrUrl ? `<a href="${g.mfrUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Mfr</a>` : ''}
-              ${g.manualUrl ? `<a href="${g.manualUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Manual</a>` : ''}
+              <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Manual</a>
             </div>
           </div>
         </div>

@@ -16,18 +16,12 @@
     { pattern: /^#\/resources\/edit\/(.+)$/,      handler: (m) => Pages.ResourceForm.render(m[1]) },
     { pattern: /^#\/resources$/,                  handler: () => Pages.Resources.render() },
     { pattern: /^#\/progress$/,                   handler: () => Pages.Progress.render() },
-    { pattern: /^#\/manual$/,                     handler: () => Pages.ManualHome.render() },
-    { pattern: /^#\/manual\/search(?:\?.*)?$/,   handler: () => Pages.ManualHome.render() },
-    { pattern: /^#\/manual\/new$/,                handler: () => Pages.ManualEditor.render('new') },
-    { pattern: /^#\/manual\/assets$/,             handler: () => Pages.ManualEditor.renderAssets() },
-    { pattern: /^#\/manual\/edit\/(.+)$/,         handler: (m) => Pages.ManualEditor.render(m[1]) },
-    { pattern: /^#\/manual\/(.+)$/,              handler: (m) => Pages.ManualArticle.render(m[1]) },
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
     { pattern: /^#\/tools\/scales$/,              handler: () => Pages.Scales.render() },
     { pattern: /^#\/tools\/bpm$/,                 handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/tuning$/,              handler: () => Pages.Tuning.render() },
-    { pattern: /^#\/tools\/amp-manual$/,          handler: () => Pages.ManualHome.render() },
+    { pattern: /^#\/tools\/amp-manual$/,          handler: () => window.location.assign('/manual.pdf') },
     { pattern: /^#\/tools$/,                      handler: () => Pages.ToolsHub.render() },
   ];
 
@@ -95,9 +89,6 @@
       }
       else if (hash.startsWith('#/tools') || hash.startsWith('#/log')) {
         if (hash.startsWith('#/tools') && href.includes('tools')) link.classList.add('active');
-      }
-      else if (hash.startsWith('#/manual')) {
-        if (href.includes('manual') || href.includes('resources')) link.classList.add('active');
       }
     });
   }
