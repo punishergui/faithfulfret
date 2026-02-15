@@ -1,0 +1,85 @@
+.manual-page {
+  background: var(--bg);
+  min-height: calc(100vh - var(--nav-h));
+  color: var(--text);
+}
+
+.manual-topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line2);
+  background: rgba(10,10,8,0.8);
+}
+
+.manual-title { font-family: var(--f-mono); letter-spacing: .08em; color: var(--text); }
+.manual-toplink { font-size: 12px; color: var(--text2); }
+.manual-search-wrap { max-width: 460px; width: 100%; }
+.manual-search {
+  width: 100%; background: var(--bg2); border: 1px solid var(--line2); color: var(--text); padding: 10px 12px;
+}
+.manual-drawer-btn { display: none; color: var(--text); border: 1px solid var(--line2); width: 34px; height: 34px; }
+
+.manual-layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; max-width: 1280px; margin: 0 auto; padding: 18px; }
+.manual-sidebar {
+  background: var(--bg1); border: 1px solid var(--line2); border-radius: 12px; padding: 12px; height: fit-content;
+}
+.manual-sidebar ul { list-style: none; margin-left: 10px; }
+.manual-sidebar li { margin: 8px 0; }
+.manual-sidebar a { color: var(--text); font-size: 13px; }
+.manual-sidebar a:hover { color: var(--accent); }
+.manual-toc-heading { color: var(--text3); font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+
+.manual-main {
+  background: var(--bg1); border: 1px solid var(--line2); border-radius: 14px; padding: 20px;
+}
+.manual-breadcrumb { color: var(--text3); font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }
+.manual-main h1 { font-family: var(--f-hero); font-size: clamp(28px, 4vw, 46px); margin-bottom: 10px; }
+.manual-intro { color: var(--text2); margin-bottom: 16px; }
+.manual-content h2 { margin-top: 24px; margin-bottom: 10px; font-family: var(--f-mono); color: var(--text); }
+.manual-content p, .manual-content li { color: var(--text2); line-height: 1.65; }
+.manual-content ul, .manual-content ol { margin: 8px 0 12px 20px; }
+.manual-content a { color: var(--accent); }
+
+.manual-callout {
+  border-left: 3px solid var(--accent); background: var(--bg2); padding: 10px 12px; margin: 12px 0;
+}
+.manual-callout--warning { border-color: var(--yellow); }
+.manual-callout--tip { border-color: var(--green); }
+.manual-callout--note { border-color: var(--accent2); }
+
+.manual-hotspots { margin: 14px 0; background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px; padding: 12px; }
+.manual-hotspots__image-wrap { position: relative; }
+.manual-hotspots__image { width: 100%; border-radius: 8px; border: 1px solid var(--line2); }
+.manual-hotspot-dot {
+  position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 999px;
+  background: #ff7a1a; color: #000; font-weight: 700; font-size: 11px;
+}
+.manual-hotspots__list { margin: 12px 0 0 20px; }
+.manual-hotspots__list li { margin-bottom: 8px; }
+.manual-hotspots__list li span { display: block; color: var(--text2); }
+.manual-hotspots__item--active { background: rgba(255,122,26,.15); }
+
+.manual-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.manual-card, .manual-result, .manual-panel {
+  background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px; padding: 14px; display: block;
+}
+.manual-card h3, .manual-result h3 { color: var(--text); margin-bottom: 6px; }
+.manual-card p, .manual-result p { color: var(--text2); font-size: 14px; }
+.manual-results { display: grid; gap: 10px; }
+.manual-panels { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.manual-panel h3, .manual-backlinks h3 { font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+.manual-panel a, .manual-backlinks a { display: block; padding: 6px 0; color: var(--text); }
+.manual-panel a:hover, .manual-backlinks a:hover { color: var(--accent); }
+.manual-backlinks { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.manual-empty, .manual-loading, .manual-error { color: var(--text2); padding: 18px; }
+
+@media (max-width: 860px) {
+  .manual-drawer-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .manual-layout { grid-template-columns: 1fr; }
+  .manual-sidebar { display: none; }
+  .manual-sidebar.open { display: block; }
+  .manual-panels { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Getting Started",
+    "slug": "getting-started"
+  },
+  {
+    "title": "Features",
+    "children": [
+      {
+        "title": "Front Panel Controls",
+        "slug": "features/front-panel-controls"
+      },
+      {
+        "title": "USB Audio & Recording",
+        "slug": "features/usb-audio-recording"
+      }
+    ]
+  },
+  {
+    "title": "Troubleshooting",
+    "children": [
+      {
+        "title": "No Sound Troubleshooting",
+        "slug": "troubleshooting/no-sound"
+      },
+      {
+        "title": "Factory Reset & Recovery",
+        "slug": "troubleshooting/factory-reset"
+      }
+    ]
+  }
+]

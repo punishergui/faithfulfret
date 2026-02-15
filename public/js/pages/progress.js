@@ -26,6 +26,8 @@ Pages.Progress = {
       ${this._renderStatBar(stats)}
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
+        ${this._renderInsightCards(sessions, stats)}
+
         ${sessions.length >= 2 ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;">
             <div class="df-chart">
@@ -78,7 +80,9 @@ Pages.Progress = {
       { key: 'Total Hours', val: stats.totalHours },
       { key: 'Peak BPM', val: stats.maxBPM || '—' },
       { key: 'Avg BPM', val: stats.avgBPM || '—' },
-      { key: 'Streak', val: stats.streak ? `${stats.streak}d` : '0d' },
+      { key: 'Current Streak', val: stats.currentStreak ? `${stats.currentStreak}d` : '0d' },
+      { key: 'Best Streak', val: stats.longestStreak ? `${stats.longestStreak}d` : '0d' },
+      { key: 'Last Session', val: stats.daysSinceLastSession == null ? '—' : `${stats.daysSinceLastSession}d ago` },
     ];
     return `
       <div class="df-statbar">
@@ -118,6 +122,7 @@ Pages.Progress = {
       <div style="display:flex;gap:12px;flex-wrap:wrap;padding:20px;background:var(--bg1);border:1px solid var(--line2);margin-bottom:24px;">
         <div style="flex:1;">
           <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Data Management</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Before any server update, export a backup file. Changing browser profile, domain, or port can hide local IndexedDB data.</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button id="export-btn" class="df-btn df-btn--outline">Export All Data</button>
             <div style="position:relative;">
@@ -127,6 +132,35 @@ Pages.Progress = {
           </div>
           <div id="import-status" style="margin-top:10px;font-family:var(--f-mono);font-size:10px;color:var(--green);display:none;"></div>
         </div>
+      </div>
+    `;
+  },
+
+  _renderInsightCards(sessions, stats) {
+    if (!sessions.length) return '';
+
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.minutes || 0), 0);
+    const withMinutes = sessions.filter(s => s.minutes);
+    const avgMinutes = withMinutes.length ? Math.round(totalMinutes / withMinutes.length) : 0;
+    const topMinutes = sessions.reduce((best, s) => ((s.minutes || 0) > (best.minutes || 0) ? s : best), sessions[0]);
+    const topBpm = sessions.reduce((best, s) => ((s.bpm || 0) > (best.bpm || 0) ? s : best), sessions[0]);
+
+    const cards = [
+      { k: 'Average Minutes / Session', v: avgMinutes ? `${avgMinutes}m` : '—' },
+      { k: 'Longest Session', v: topMinutes?.minutes ? `${topMinutes.minutes}m` : '—', hint: topMinutes?.date ? Utils.formatDate(topMinutes.date, 'short') : '' },
+      { k: 'Highest BPM Session', v: topBpm?.bpm || '—', hint: topBpm?.date ? Utils.formatDate(topBpm.date, 'short') : '' },
+      { k: 'Days Since Last Session', v: stats.daysSinceLastSession == null ? '—' : stats.daysSinceLastSession },
+    ];
+
+    return `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:24px;">
+        ${cards.map(c => `
+          <div style="border:1px solid var(--line2);background:var(--bg1);padding:14px;">
+            <div style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">${c.k}</div>
+            <div style="font-family:var(--f-hero);font-size:30px;line-height:1;color:var(--accent);">${c.v}</div>
+            ${c.hint ? `<div style="font-size:12px;color:var(--text2);margin-top:6px;">${c.hint}</div>` : ''}
+          </div>
+        `).join('')}
       </div>
     `;
   },

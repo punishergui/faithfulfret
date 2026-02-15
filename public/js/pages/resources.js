@@ -50,11 +50,14 @@ Pages.Resources = {
   _renderRow(r) {
     const stars = this._renderStars(r.rating || 0);
     const tags = r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const openUrl = r.url ? Utils.normalizeUrl(r.url) : '';
 
     return `
       <div class="resource-row">
         <div>
-          <div class="resource-row__name" onclick="go('#/resources/edit/${r.id}')" style="cursor:pointer;">${r.title}</div>
+          ${openUrl
+            ? `<a class="resource-row__name" href="${openUrl}" target="_blank" rel="noopener">${r.title}</a>`
+            : `<div class="resource-row__name" onclick="go('#/resources/edit/${r.id}')" style="cursor:pointer;">${r.title}</div>`}
           ${r.author ? `<div class="resource-row__author">${r.author}</div>` : ''}
           ${r.notes ? `<div class="resource-row__notes">${Utils.truncate(r.notes, 100)}</div>` : ''}
           ${tags.length ? `<div class="resource-row__tags">${tags.map(t => `<span class="resource-row__tag">${t}</span>`).join('')}</div>` : ''}
@@ -62,7 +65,8 @@ Pages.Resources = {
         <div class="resource-row__level">${r.level || ''}</div>
         <div class="resource-row__stars">${stars}</div>
         <div class="resource-row__link">
-          ${r.url ? `<a href="${r.url}" target="_blank" rel="noopener" title="Open resource">&#8599;</a>` : ''}
+          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" title="Open resource" class="resource-row__open-btn">Open</a>` : ''}
+          <button type="button" class="resource-row__edit" onclick="go('#/resources/edit/${r.id}')" title="Edit resource">✎</button>
         </div>
       </div>
     `;
@@ -189,6 +193,7 @@ Pages.ResourceForm = {
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
       if (data.rating) data.rating = parseInt(data.rating);
+      if (data.url) data.url = Utils.normalizeUrl(data.url);
       Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
       if (!data.title) { alert('Title is required.'); return; }
       if (isEdit) { data.id = resource.id; data.createdAt = resource.createdAt; }

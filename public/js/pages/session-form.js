@@ -108,6 +108,12 @@ Pages.SessionForm = {
       if (data.bpm) data.bpm = parseInt(data.bpm);
       if (data.dayNumber) data.dayNumber = parseInt(data.dayNumber);
 
+      // Normalize YouTube input (accept full URL or ID)
+      if (data.videoId) {
+        const extracted = Utils.extractYouTubeId(data.videoId);
+        data.videoId = extracted || data.videoId.trim();
+      }
+
       // Strip empty strings
       Object.keys(data).forEach(k => {
         if (data[k] === '') delete data[k];

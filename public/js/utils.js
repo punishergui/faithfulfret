@@ -2,7 +2,7 @@
 // Exposes window.Utils
 
 window.Utils = {
-  uuid: () => crypto.randomUUID(),
+  uuid: () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
 
   // Always use T12:00:00 to avoid timezone day-shift bugs
   formatDate: (ymd, fmt = 'long') => {
@@ -21,8 +21,49 @@ window.Utils = {
 
   truncate: (str, n) => str && str.length > n ? str.slice(0, n) + '...' : str,
 
-  ytThumb: (videoId, quality = 'mqdefault') =>
-    videoId ? `https://img.youtube.com/vi/${videoId}/${quality}.jpg` : null,
+  extractYouTubeId: (value) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (!raw) return '';
+
+    // Looks like an ID already
+    if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+    try {
+      const url = new URL(raw.includes('://') ? raw : `https://${raw}`);
+      const host = url.hostname.replace('www.', '');
+
+      if (host === 'youtu.be') {
+        const id = url.pathname.slice(1).split('/')[0];
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : '';
+      }
+
+      if (host.includes('youtube.com')) {
+        const v = url.searchParams.get('v');
+        if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+        const parts = url.pathname.split('/').filter(Boolean);
+        const maybe = parts[1] || parts[0] || '';
+        return /^[a-zA-Z0-9_-]{11}$/.test(maybe) ? maybe : '';
+      }
+    } catch {
+      // ignore parse failures
+    }
+
+    return '';
+  },
+
+  ytThumb: (videoValue, quality = 'mqdefault') => {
+    const id = window.Utils.extractYouTubeId(videoValue);
+    return id ? `https://img.youtube.com/vi/${id}/${quality}.jpg` : null;
+  },
+
+  normalizeUrl: (value) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return `https://${raw}`;
+  },
 
   gearImage: (category) => ({
     'Guitar':    'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=600&q=80',
