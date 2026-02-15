@@ -19,6 +19,10 @@ function gitExec(cmd) {
   }
 }
 
+function shellEscapeRef(ref) {
+  return String(ref || '').replace(/[^a-zA-Z0-9_\-/.]/g, '');
+}
+
 function parseRepoOwnerRepo(remoteUrl) {
   if (!remoteUrl) return null;
   // Handle SSH: git@github.com:owner/repo.git
@@ -88,6 +92,8 @@ app.get('/api/update/help', (req, res) => {
 
   const commands = [
     `cd ${__dirname}`,
+    '# optional safety backup before force-sync',
+    `git branch backup-before-sync-$(date +%Y%m%d-%H%M%S)`,
     `git fetch ${remote} ${remoteBranch}`,
     `git reset --hard ${remote}/${remoteBranch}`,
     'npm install --production',
@@ -114,8 +120,17 @@ app.post('/api/update', (req, res) => {
     const mergeRef = gitExec(`git config branch.${currentBranch}.merge`) || `refs/heads/${currentBranch}`;
     const remoteBranch = mergeRef.replace('refs/heads/', '');
 
-    const fetchOut = execSync(`git fetch ${remote} ${remoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
-    const hardResetOut = execSync(`git reset --hard ${remote}/${remoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
+    const safeBranch = shellEscapeRef(currentBranch);
+    const safeRemote = shellEscapeRef(remote);
+    const safeRemoteBranch = shellEscapeRef(remoteBranch);
+
+    const beforeHead = gitExec('git rev-parse --short HEAD') || 'unknown';
+    const isDirty = (gitExec('git status --porcelain') || '').trim().length > 0;
+    const backupBranch = `backup-auto-sync-${Date.now()}`;
+
+    const backupOut = execSync(`git branch ${backupBranch} ${safeBranch}`, { cwd: __dirname, encoding: 'utf8' });
+    const fetchOut = execSync(`git fetch ${safeRemote} ${safeRemoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
+    const hardResetOut = execSync(`git reset --hard ${safeRemote}/${safeRemoteBranch}`, { cwd: __dirname, encoding: 'utf8' });
 
     let npmOut = '';
     try {
@@ -131,7 +146,15 @@ app.post('/api/update', (req, res) => {
       manualOut = e.message;
     }
 
-    res.json({ ok: true, output: [fetchOut, hardResetOut, npmOut, manualOut].join('\n') });
+    const syncSummary = [
+      `Auto conflict resolution: enabled (force-sync).`,
+      `Previous HEAD: ${beforeHead}`,
+      `Working tree dirty before sync: ${isDirty ? 'yes' : 'no'}`,
+      `Backup branch created: ${backupBranch}`,
+      `Now tracking: ${safeRemote}/${safeRemoteBranch}`,
+    ].join('\n');
+
+    res.json({ ok: true, output: [syncSummary, backupOut, fetchOut, hardResetOut, npmOut, manualOut].join('\n') });
 
     setTimeout(() => {
       exec('docker compose restart', { cwd: __dirname }, (err) => {

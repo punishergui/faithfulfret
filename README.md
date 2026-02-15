@@ -58,7 +58,10 @@ The app also shows an **in-app update banner** when a new commit is available on
 If update fails, the app now opens an **Update Assistant** modal with:
 - exact copy-paste commands for your current tracked branch,
 - server output from the failed step,
-- a one-click “Reload app” action.
+- a one-click “Reload app” action,
+- automatic conflict handling details (force-sync + backup branch).
+
+> **No manual conflict picking:** Sync & Refresh force-resets to remote and auto-creates a local backup branch first.
 
 Quick manual force-sync (same flow as the app button):
 

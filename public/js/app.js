@@ -118,7 +118,7 @@
         if (data.ok) {
           updateBtn.textContent = 'Applying update...';
           openHelpModal(
-            '✅ Sync complete. The app will now hard-refresh caches so you see the newest version.',
+            '✅ Sync complete with automatic conflict handling (force-sync + backup branch). The app will now hard-refresh caches so you see the newest version.',
             data.output || 'Update completed.',
             help?.commands || []
           );
@@ -127,7 +127,7 @@
           updateBtn.textContent = 'Update failed';
           updateBtn.disabled = false;
           openHelpModal(
-            '❌ Sync failed. Use these exact commands to force sync manually.',
+            '❌ Sync failed. Use these exact force-sync commands (no manual conflict resolution needed).',
             data.error || 'Unknown update error',
             help?.commands || []
           );
