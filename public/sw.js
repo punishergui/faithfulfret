@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v4';
+const CACHE_NAME = 'daily-fret-v5';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -12,6 +12,7 @@ const PRECACHE = [
   '/js/manual/markdown.js',
   '/js/pages/manual.js',
   '/js/pages/manual-article.js',
+  '/js/pages/manual-editor.js',
   '/js/pages/dashboard.js',
   '/js/pages/sessions.js',
   '/js/pages/session-single.js',
