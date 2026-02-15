@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:9999"
+    volumes:
+      - ./data:/data
     environment:
       PORT: "9999"
       NODE_ENV: "production"

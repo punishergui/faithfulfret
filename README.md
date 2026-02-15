@@ -2,7 +2,7 @@
 
 Personal guitar practice tracker — Progressive Web App (PWA).
 
-Dark, grungy aesthetic. Tracks sessions, gear, resources, and progress. Works in desktop browsers and installs as a native app on mobile. All data lives in your browser's IndexedDB — no accounts, no cloud, no BS.
+Dark, grungy aesthetic. Tracks sessions, gear, presets, resources, and progress. Works in desktop browsers and installs as a native app on mobile. Data is persisted in SQLite at `/data/faithfulfret.sqlite`.
 
 ---
 
@@ -16,7 +16,7 @@ cd daily-fret
 # 2. Generate icons (one time)
 node scripts/gen-icons.js
 
-# 3. Start with Docker Compose
+# 3. Start with Docker Compose (mounts ./data -> /data)
 docker compose up -d
 
 # 4. Open in browser
@@ -33,6 +33,8 @@ docker compose up -d
 
 Production uses prebuilt GHCR images and Watchtower auto-updates.
 
+`docker-compose.prod.yml` keeps host port `3000` mapped to container port `9999`, and mounts `./data:/data` so the SQLite DB survives restarts and image updates.
+
 ```bash
 # Start/refresh production stack (no local build, no bind mounts)
 docker compose -f docker-compose.prod.yml pull
@@ -45,6 +47,11 @@ How updates work:
 - Watchtower checks every 5 minutes and restarts only `daily-fret` when a new image is available.
 
 Rollback (pin a version tag):
+
+1. Publish a tag from GitHub (`vX.Y.Z`) so GHCR has an immutable image.
+2. Pin `docker-compose.prod.yml` to that exact tag.
+3. Redeploy with compose pull/up.
+
 
 ```bash
 # Example: pin to a known-good image tag
@@ -87,10 +94,15 @@ docker compose -f docker-compose.prod.yml up -d
 
 ### Data safety (important)
 
-- Your sessions/gear/resources are stored in your browser's IndexedDB for the app origin.
-- If you change domain or port, the browser treats it as a different app storage area.
-- Always export a backup JSON from `Progress` before major updates/migrations.
-- After moving hosts/ports, use `Import Data` in `Progress` to restore.
+- App data is stored in SQLite: `/data/faithfulfret.sqlite`.
+- In both dev and prod compose files, `./data:/data` is mounted, so data persists across restarts/updates.
+- Backup the DB file directly:
+
+```bash
+cp ./data/faithfulfret.sqlite ./data/faithfulfret.sqlite.backup-$(date +%Y%m%d-%H%M%S)
+```
+
+- You can also export/import JSON from the `Progress` page for portability between environments.
 
 ---
 
@@ -125,7 +137,7 @@ Progress page → "Export All Data" → saves daily-fret-backup-DATE.json
 To restore: Progress page → "Import Data" → select backup file
 ```
 
-Data is stored in **this browser's IndexedDB**. Use export/import to move data between browsers or devices.
+Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still useful for moving data between environments or creating portable backups.
 
 ---
 
@@ -135,7 +147,7 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 |-------|------|
 | Server | Node.js + Express |
 | Frontend | Vanilla JS (ES6 modules, zero build tools) |
-| Database | IndexedDB via `idb` CDN library |
+| Database | SQLite (`/data/faithfulfret.sqlite`) via Node built-in `node:sqlite` |
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
 | Port | Host `3000` → Container `9999` |
@@ -199,7 +211,7 @@ Use **Rebuild Search** in the wiki sidebar after bulk edits/imports.
 daily-fret/
 ├── Dockerfile
 ├── docker-compose.yml
-├── server.js                     Express: static files + /api/version + /api/update
+├── server.js                     Express: static files + update endpoints + data REST API
 ├── package.json
 ├── public/
 │   ├── index.html                App shell
@@ -212,7 +224,7 @@ daily-fret/
 │   │   ├── global.css
 │   │   └── animations.css
 │   └── js/
-│       ├── db.js                 IndexedDB wrapper
+│       ├── db.js                 Frontend API wrapper
 │       ├── router.js             Hash-based SPA router
 │       ├── app.js                Bootstrap + update banner
 │       ├── utils.js              Shared utilities

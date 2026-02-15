@@ -15,6 +15,7 @@
     { pattern: /^#\/resources\/add$/,             handler: () => Pages.ResourceForm.render(null) },
     { pattern: /^#\/resources\/edit\/(.+)$/,      handler: (m) => Pages.ResourceForm.render(m[1]) },
     { pattern: /^#\/resources$/,                  handler: () => Pages.Resources.render() },
+    { pattern: /^#\/presets$/,                    handler: () => Pages.Presets.render() },
     { pattern: /^#\/progress$/,                   handler: () => Pages.Progress.render() },
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
@@ -83,6 +84,9 @@
       }
       else if (hash.startsWith('#/resources')) {
         if (href.includes('resources')) link.classList.add('active');
+      }
+      else if (hash.startsWith('#/presets')) {
+        if (href.includes('presets')) link.classList.add('active');
       }
       else if (hash.startsWith('#/progress')) {
         if (href.includes('progress')) link.classList.add('active');
