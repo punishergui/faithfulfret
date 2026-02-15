@@ -83,3 +83,12 @@
   .manual-sidebar.open { display: block; }
   .manual-panels { grid-template-columns: 1fr; }
 }
+
+
+.manual-content img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line2); margin: 10px 0; }
+.manual-content h3 { margin-top: 18px; margin-bottom: 8px; color: var(--text); }
+.manual-toolbar { display: flex; gap: 10px; align-items: center; margin: 10px 0 16px; flex-wrap: wrap; }
+.manual-pill { font-size: 10px; color: var(--accent2); border: 1px solid var(--line2); padding: 1px 6px; border-radius: 999px; text-transform: uppercase; letter-spacing: .08em; }
+.manual-editor-form { display: grid; gap: 10px; }
+.manual-editor-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; color: var(--text3); text-transform: uppercase; }
+.manual-editor-textarea { min-height: 340px; resize: vertical; background: var(--bg2); border: 1px solid var(--line2); color: var(--text); padding: 12px; border-radius: 8px; font-family: var(--f-mono); line-height: 1.5; }
