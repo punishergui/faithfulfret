@@ -29,6 +29,32 @@ docker compose up -d
 
 ---
 
+## Deployment / Updates
+
+Production uses prebuilt GHCR images and Watchtower auto-updates.
+
+```bash
+# Start/refresh production stack (no local build, no bind mounts)
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+How updates work:
+- Push to `main` builds/pushes `ghcr.io/punishergui/faithfulfret:latest` via GitHub Actions.
+- Creating a tag like `v0.1-starter` also pushes `ghcr.io/punishergui/faithfulfret:v0.1-starter`.
+- Watchtower checks every 5 minutes and restarts only `daily-fret` when a new image is available.
+
+Rollback (pin a version tag):
+
+```bash
+# Example: pin to a known-good image tag
+# edit docker-compose.prod.yml -> image: ghcr.io/punishergui/faithfulfret:v0.1-starter
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
 ## VS Code SSH Workflow
 
 ```
@@ -44,79 +70,19 @@ docker compose up -d
 
 ## Updating From GitHub
 
-```bash
-# On your Docker VM via SSH:
-git pull
-docker compose restart
-
-# If you changed package.json:
-docker compose up -d --build
-```
-
-The app also shows an **in-app update banner** when a new commit is available on GitHub. Click **"Sync & Refresh"** for one-click update: it fetches/reset-to-remote, installs deps, rebuilds manual index, restarts the container, clears caches, and refreshes the app shell.
-
-If update fails, the app now opens an **Update Assistant** modal with:
-- exact copy-paste commands for your current tracked branch,
-- server output from the failed step,
-- a one-click “Reload app” action,
-- automatic conflict handling details (force-sync + backup branch).
-
-> **No manual conflict picking:** Sync & Refresh force-resets to remote and auto-creates a local backup branch first.
-
-Quick manual force-sync (same flow as the app button):
+For production, you no longer build on the server.
 
 ```bash
-cd /opt/stacks/faithfulfret
-git fetch origin main
-git reset --hard origin/main
-npm install --production
-npm run build:manual
-docker compose restart
-# then hard-refresh browser: Ctrl+Shift+R
+# 1) push changes to main (or push a v* tag for a versioned image)
+# 2) GitHub Actions publishes GHCR image tags
+# 3) Watchtower auto-pulls and restarts daily-fret within ~5 minutes
 ```
 
-Auto-merge PR branch with no manual conflict picking:
+Manual refresh (optional):
 
 ```bash
-cd /opt/stacks/faithfulfret
-./scripts/auto-merge-update.sh codex/enhance-wiki-to-fully-support-editing-lzc1lo
-```
-
-Notes:
-- If you omit the branch, the script auto-selects the latest `origin/codex/*` branch.
-- It merges `origin/main` with `-X ours` (keeps your PR branch side in conflicts), then pushes automatically.
-
-### ✅ Post-merge deploy checklist (run every time)
-
-```bash
-# 0) one-time safety fix if git complains about dubious ownership
-sudo git config --global --add safe.directory /opt/stacks/faithfulfret
-
-# 1) ensure your repo files are owned by your login user (replace josh if needed)
-sudo chown -R josh:josh /opt/stacks/faithfulfret
-
-# 2) update code
-cd /opt/stacks/faithfulfret
-git fetch origin
-git checkout main
-git pull origin main
-
-# 3) rebuild + restart containers
-sudo docker compose down --remove-orphans
-sudo docker compose up -d --build
-
-# 4) verify app is healthy
-sudo docker compose ps
-sudo docker compose logs --tail=120
-```
-
-Browser refresh after deploy:
-
-```text
-Open http://YOUR-VM-IP:3000
-Hard refresh: Ctrl+Shift+R (Cmd+Shift+R on Mac)
-If stale UI remains: DevTools > Application > Service Workers > Unregister
-Reload once more
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Data safety (important)

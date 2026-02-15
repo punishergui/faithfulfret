@@ -1,0 +1,20 @@
+services:
+  daily-fret:
+    image: ghcr.io/punishergui/faithfulfret:latest
+    container_name: daily-fret
+    restart: unless-stopped
+    ports:
+      - "3000:9999"
+    environment:
+      - PORT=9999
+      - NODE_ENV=production
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    command: --interval 300 --cleanup daily-fret
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
