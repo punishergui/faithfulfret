@@ -1,0 +1,24 @@
+[
+  {
+    "title": "Getting Started",
+    "slug": "getting-started"
+  },
+  {
+    "title": "Features",
+    "children": [
+      {
+        "title": "Front Panel Controls",
+        "slug": "features/front-panel-controls"
+      }
+    ]
+  },
+  {
+    "title": "Troubleshooting",
+    "children": [
+      {
+        "title": "No Sound Troubleshooting",
+        "slug": "troubleshooting/no-sound"
+      }
+    ]
+  }
+]

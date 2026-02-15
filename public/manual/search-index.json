@@ -1,0 +1,91 @@
+{
+  "generatedAt": "2026-02-15T17:17:35.756Z",
+  "docs": [
+    {
+      "slug": "features/front-panel-controls",
+      "title": "Front Panel Controls",
+      "text": "Front Panel Controls This page explains the core controls for quick setup and repeatable tones. Numbered callouts 1. Input should be first check when there is no sound. 2. Gain controls breakup and sustain. 3. EQ should be adjusted in small steps while playing. 4. Post/master volume should be changed gradually. Related: Getting Started, No Sound Troubleshooting.",
+      "links": [
+        "getting-started",
+        "troubleshooting/no-sound"
+      ],
+      "tags": [
+        "features",
+        "front-panel-controls",
+        "numbered callouts"
+      ],
+      "sections": [
+        "Numbered callouts"
+      ]
+    },
+    {
+      "slug": "getting-started",
+      "title": "Getting Started",
+      "text": "Getting Started Welcome to the Vypyr X2 Manual Wiki. This is a searchable, read only quick reference designed for practice sessions. First sound checklist 1. Plug guitar into input. 2. Choose a clean amp model. 3. Set gain low medium. 4. Bring up volume slowly. See also Front Panel Controls and No Sound Troubleshooting. Related Signal chain basics",
+      "links": [
+        "features/front-panel-controls",
+        "troubleshooting/no-sound"
+      ],
+      "tags": [
+        "getting-started",
+        "first sound checklist",
+        "related"
+      ],
+      "sections": [
+        "First sound checklist",
+        "Related"
+      ]
+    },
+    {
+      "slug": "troubleshooting/no-sound",
+      "title": "No Sound Troubleshooting",
+      "text": "No Sound Troubleshooting If your amp powers on but no guitar sound is heard, run this list in order. Quick checks Confirm guitar volume knob is up. Reseat instrument cable on both ends. Try a known good cable. Switch to a clean preset. Raise post volume slowly. If still silent 1. Test with another guitar. 2. Test with headphones (if available). 3. Factory reset only after backing up key settings. Back references: Front Panel Controls, Getting Started.",
+      "links": [
+        "features/front-panel-controls",
+        "getting-started"
+      ],
+      "tags": [
+        "troubleshooting",
+        "no-sound",
+        "quick checks",
+        "if still silent"
+      ],
+      "sections": [
+        "Quick checks",
+        "If still silent"
+      ]
+    }
+  ],
+  "backlinks": {
+    "getting-started": [
+      {
+        "slug": "features/front-panel-controls",
+        "title": "Front Panel Controls"
+      },
+      {
+        "slug": "troubleshooting/no-sound",
+        "title": "No Sound Troubleshooting"
+      }
+    ],
+    "troubleshooting/no-sound": [
+      {
+        "slug": "features/front-panel-controls",
+        "title": "Front Panel Controls"
+      },
+      {
+        "slug": "getting-started",
+        "title": "Getting Started"
+      }
+    ],
+    "features/front-panel-controls": [
+      {
+        "slug": "getting-started",
+        "title": "Getting Started"
+      },
+      {
+        "slug": "troubleshooting/no-sound",
+        "title": "No Sound Troubleshooting"
+      }
+    ]
+  }
+}

@@ -41,7 +41,8 @@ Pages.Sessions = {
       { key: 'Total Hours', val: stats.totalHours },
       { key: 'Peak BPM', val: stats.maxBPM || '—' },
       { key: 'Avg BPM', val: stats.avgBPM || '—' },
-      { key: 'Streak', val: stats.streak ? `${stats.streak}d` : '0d' },
+      { key: 'Streak', val: stats.currentStreak ? `${stats.currentStreak}d` : '0d' },
+      { key: 'Best', val: stats.longestStreak ? `${stats.longestStreak}d` : '0d' },
     ];
     return `
       <div class="df-statbar">

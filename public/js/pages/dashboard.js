@@ -49,8 +49,11 @@ Pages.Dashboard = {
 
   _renderHero(stats) {
     const greeting = Utils.greeting();
-    const sessionTxt = stats.count === 1 ? '1 session' : `${stats.count} sessions`;
-    const hourTxt = stats.totalHours === 1 ? '1 hour' : `${stats.totalHours} hours`;
+    const awayText = stats.daysSinceLastSession == null
+      ? 'No sessions logged yet.'
+      : stats.daysSinceLastSession === 0
+        ? 'Practiced today.'
+        : `${stats.daysSinceLastSession} day${stats.daysSinceLastSession === 1 ? '' : 's'} since last session.`;
 
     return `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');overflow:hidden;">
@@ -60,6 +63,7 @@ Pages.Dashboard = {
           <div style="font-family:var(--f-mono);font-size:13px;color:var(--text2);margin-bottom:${stats.streak > 0 ? '12px' : '0'};">
             <span class="count-target" data-target="${stats.count}" data-type="int">${stats.count}</span> sessions &middot; <span class="count-target" data-target="${stats.totalHours}" data-type="float">${stats.totalHours}</span> hours in &middot; keep going.
           </div>
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--text3);margin-bottom:12px;">${awayText}</div>
           ${stats.streak > 0 ? `
           <div style="font-family:var(--f-mono);font-size:14px;color:var(--text2);">
             <span class="streak-num count-target" data-target="${stats.streak}" data-type="int" style="font-family:var(--f-hero);font-size:48px;color:var(--accent);text-shadow:0 0 20px var(--glow);vertical-align:middle;">${stats.streak}</span>
@@ -78,7 +82,9 @@ Pages.Dashboard = {
       { key: 'Total Hours', val: stats.totalHours },
       { key: 'Peak BPM', val: stats.maxBPM || '—' },
       { key: 'Avg BPM', val: stats.avgBPM || '—' },
-      { key: 'Streak', val: stats.streak ? `${stats.streak}d` : '0d' },
+      { key: 'Streak', val: stats.currentStreak ? `${stats.currentStreak}d` : '0d' },
+      { key: 'Best Streak', val: stats.longestStreak ? `${stats.longestStreak}d` : '0d' },
+      { key: 'Last Session', val: stats.daysSinceLastSession == null ? '—' : `${stats.daysSinceLastSession}d ago` },
     ];
     return `
       <div class="df-statbar">
@@ -189,7 +195,7 @@ Pages.Dashboard = {
         ${resources.map(r => `
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);">
             <span style="color:var(--text3);font-family:var(--f-mono);font-size:11px;">&#8599;</span>
-            <a href="${r.url || '#'}" target="_blank" rel="noopener" style="flex:1;font-size:14px;color:var(--text);text-decoration:none;font-weight:500;">${r.title}</a>
+            <a href="${r.url ? Utils.normalizeUrl(r.url) : '#/resources'}" target="_blank" rel="noopener" style="flex:1;font-size:14px;color:var(--text);text-decoration:none;font-weight:500;">${r.title}</a>
             <span class="df-badge df-badge--muted">${r.category || ''}</span>
           </div>
         `).join('')}

@@ -31,7 +31,7 @@ Pages.SessionSingle = {
 
     app.innerHTML = `
       ${this._renderHero(session)}
-      ${this._renderVideo(session)}
+      ${this._renderVideo(session, prevSession, nextSession, todaySession, today)}
       <div class="session-body">
         <div class="session-main">
           ${session.win ? this._renderWin(session.win) : ''}
@@ -47,7 +47,6 @@ Pages.SessionSingle = {
           </div>
         </div>
       </div>
-      ${this._renderNav(prevSession, nextSession, session, todaySession, today)}
     `;
 
     this._initChecklist(app, session);
@@ -57,7 +56,7 @@ Pages.SessionSingle = {
     const longDate = Utils.formatDate(s.date, 'long').toUpperCase();
     return `
       <div class="session-hero">
-        <div style="max-width:1200px;margin:0 auto;padding:48px 24px 40px;position:relative;z-index:1;">
+        <div style="max-width:1200px;margin:0 auto;padding:20px 24px 20px;position:relative;z-index:1;">
           <div class="session-hero__meta">
             ${s.dayNumber ? `<span class="df-badge df-badge--orange">Day ${s.dayNumber}</span>` : ''}
             ${s.mood ? `<span class="df-badge df-badge--muted">${s.mood}</span>` : ''}
@@ -94,13 +93,30 @@ Pages.SessionSingle = {
     `;
   },
 
-  _renderVideo(s) {
-    if (s.videoId) {
+  _renderVideo(s, prev, next, todaySession, today) {
+    const cleanVideoId = Utils.extractYouTubeId(s.videoId);
+    const isToday = s.date === today;
+
+    let centerEl;
+    if (isToday) centerEl = `<span class="session-video-nav__today">Today</span>`;
+    else if (todaySession) centerEl = `<a href="#/session/${todaySession.id}" class="session-video-nav__jump">Today</a>`;
+    else centerEl = `<a href="#/log" class="session-video-nav__jump">+ Log Today</a>`;
+
+    const nav = `
+      <div class="session-video-nav">
+        ${prev ? `<a href="#/session/${prev.id}" class="session-video-nav__arrow" title="Previous session">&#8592;</a>` : `<span class="session-video-nav__arrow session-video-nav__arrow--off">&#8592;</span>`}
+        ${centerEl}
+        ${next ? `<a href="#/session/${next.id}" class="session-video-nav__arrow" title="Next session">&#8594;</a>` : `<span class="session-video-nav__arrow session-video-nav__arrow--off">&#8594;</span>`}
+      </div>
+    `;
+
+    if (cleanVideoId) {
       return `
         <div class="session-video">
+          ${nav}
           <div class="session-video__wrap">
             <iframe
-              src="https://www.youtube.com/embed/${s.videoId}?rel=0&modestbranding=1"
+              src="https://www.youtube.com/embed/${cleanVideoId}?rel=0&modestbranding=1"
               title="Session video"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowfullscreen>
@@ -111,6 +127,7 @@ Pages.SessionSingle = {
     }
     return `
       <div style="max-width:700px;margin:24px auto;padding:0 24px;">
+        ${nav}
         <div class="session-video__placeholder">// NO VIDEO LOGGED</div>
       </div>
     `;
@@ -212,40 +229,5 @@ Pages.SessionSingle = {
     });
   },
 
-  _renderNav(prev, next, current, todaySession, today) {
-    const isToday = current.date === today;
-
-    let centerEl;
-    if (isToday) {
-      centerEl = `<span style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.1em;color:var(--text3);text-transform:uppercase;">Today</span>`;
-    } else if (todaySession) {
-      centerEl = `<a href="#/session/${todaySession.id}" class="session-nav__btn">Today</a>`;
-    } else {
-      centerEl = `<a href="#/log" class="session-nav__btn">+ Log Today</a>`;
-    }
-
-    return `
-      <div class="session-nav">
-        <div>
-          ${prev ? `
-            <a href="#/session/${prev.id}" class="session-nav__item">
-              <span class="session-nav__dir">&#8592; Previous</span>
-              <span class="session-nav__date">${Utils.formatDate(prev.date, 'short')}</span>
-            </a>
-          ` : `<div class="session-nav__item"><span class="session-nav__dir" style="color:var(--text3);">No previous</span></div>`}
-        </div>
-        <div class="session-nav__item session-nav__item--center">
-          ${centerEl}
-        </div>
-        <div>
-          ${next ? `
-            <a href="#/session/${next.id}" class="session-nav__item session-nav__item--right">
-              <span class="session-nav__dir">Next &#8594;</span>
-              <span class="session-nav__date">${Utils.formatDate(next.date, 'short')}</span>
-            </a>
-          ` : `<div class="session-nav__item session-nav__item--right"><span class="session-nav__dir" style="color:var(--text3);">No next</span></div>`}
-        </div>
-      </div>
-    `;
-  },
+  _renderNav() { return ''; },
 };

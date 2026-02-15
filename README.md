@@ -20,7 +20,7 @@ node scripts/gen-icons.js
 docker compose up -d
 
 # 4. Open in browser
-# http://YOUR-VM-IP:9999
+# http://YOUR-VM-IP:3000
 
 # 5. (Optional) Install as app
 # Chrome: click the install icon in the address bar
@@ -55,6 +55,39 @@ docker compose up -d --build
 
 The app also shows an **in-app update banner** when a new commit is available on GitHub. Click "Pull & Restart" to update automatically.
 
+### ✅ Post-merge deploy checklist (run every time)
+
+```bash
+# 0) one-time safety fix if git complains about dubious ownership
+sudo git config --global --add safe.directory /opt/stacks/faithfulfret
+
+# 1) ensure your repo files are owned by your login user (replace josh if needed)
+sudo chown -R josh:josh /opt/stacks/faithfulfret
+
+# 2) update code
+cd /opt/stacks/faithfulfret
+git fetch origin
+git checkout main
+git pull origin main
+
+# 3) rebuild + restart containers
+sudo docker compose down --remove-orphans
+sudo docker compose up -d --build
+
+# 4) verify app is healthy
+sudo docker compose ps
+sudo docker compose logs --tail=120
+```
+
+Browser refresh after deploy:
+
+```text
+Open http://YOUR-VM-IP:3000
+Hard refresh: Ctrl+Shift+R (Cmd+Shift+R on Mac)
+If stale UI remains: DevTools > Application > Service Workers > Unregister
+Reload once more
+```
+
 ---
 
 ## Daily Usage
@@ -71,13 +104,13 @@ Check progress:    Click "PROGRESS"
 ## Port / Network
 
 ```
-Default port: 9999
-Access: http://YOUR-VM-IP:9999
+Default mapping: 3000:9999 (host:container)
+Access: http://YOUR-VM-IP:3000
 Remote access: Connect via VPN first, then open URL
-Change port: Edit docker-compose.yml → ports: "XXXX:9999"
+Change host port: Edit docker-compose.yml → ports: "XXXX:9999"
 ```
 
-The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:9999` when on the same network or VPN.
+The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:3000` when on the same network or VPN.
 
 ---
 
@@ -101,7 +134,34 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 | Database | IndexedDB via `idb` CDN library |
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
-| Port | 9999 |
+| Port | Host `3000` → Container `9999` |
+
+---
+
+## Manual Wiki (Amp Manual)
+
+Manual content is read-only and stored under `/public/manual`.
+
+### Add/edit pages
+
+1. Create/edit markdown files in `public/manual/pages/**/*.md`.
+2. Add images/diagrams from your PDF into `public/manual/assets/`.
+3. Update `public/manual/toc.json` for sidebar order.
+
+### Rebuild local search index
+
+```bash
+npm run build:manual
+```
+
+This generates `public/manual/search-index.json` (used for local search + backlinks).
+
+### Exporting images from PDF (recommended workflow)
+
+1. Open the PDF manual in your preferred tool (Acrobat, Preview, etc.).
+2. Export page regions/figures as PNG or WebP.
+3. Save to `public/manual/assets/`.
+4. Reference image paths directly in markdown, e.g. `/manual/assets/front-panel.png`.
 
 ---
 
@@ -181,6 +241,8 @@ Data gone:         Data lives in THIS browser's IndexedDB
                    Use export/import to move between browsers
 
 Update stuck:      docker compose restart
+                   Hard refresh browser (Ctrl/Cmd+Shift+R)
+                   DevTools -> Application -> Service Workers -> Unregister
 
 Icons missing:     node scripts/gen-icons.js
                    npm install canvas && node scripts/gen-icons.js   (better icons)

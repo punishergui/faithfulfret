@@ -1,12 +1,17 @@
-const CACHE_NAME = 'daily-fret-v1';
+const CACHE_NAME = 'daily-fret-v3';
 const PRECACHE = [
   '/',
+  '/index.html',
   '/css/global.css',
   '/css/animations.css',
   '/js/db.js',
   '/js/router.js',
   '/js/app.js',
   '/js/utils.js',
+  '/js/manual/manual-data.js',
+  '/js/manual/markdown.js',
+  '/js/pages/manual.js',
+  '/js/pages/manual-article.js',
   '/js/pages/dashboard.js',
   '/js/pages/sessions.js',
   '/js/pages/session-single.js',
@@ -19,6 +24,15 @@ const PRECACHE = [
   '/js/pages/tools/chords.js',
   '/js/pages/tools/scales.js',
   '/js/pages/tools/bpm-guide.js',
+  '/js/pages/tools/tuning.js',
+  '/js/pages/tools/amp-manual.js',
+  '/css/manual.css',
+  '/manual/toc.json',
+  '/manual/search-index.json',
+  '/manual/pages/getting-started.md',
+  '/manual/pages/features/front-panel-controls.md',
+  '/manual/pages/troubleshooting/no-sound.md',
+  '/manual/assets/front-panel.svg',
   '/manifest.json',
 ];
 
@@ -48,6 +62,21 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
+
+  // Runtime-cache manual pages/assets after first visit.
+  if (e.request.url.includes('/manual/pages/') || e.request.url.includes('/manual/assets/')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
   // Cache-first for everything else
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
