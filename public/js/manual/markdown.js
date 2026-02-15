@@ -18,15 +18,42 @@ window.ManualMarkdown = {
       .replace(/'/g, '&#39;');
   },
 
+  sanitizeUrl(url) {
+    const s = String(url || '').trim();
+    if (!s) return '';
+    if (s.startsWith('wiki-asset://')) return s;
+    if (s.startsWith('/')) return s;
+    if (/^https?:\/\//i.test(s)) return s;
+    return '';
+  },
+
   inline(text) {
     if (!text) return '';
     let s = this.escapeHtml(text);
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
     s = s.replace(/\[\[([^\]]+)\]\]/g, (_, t) => {
       const target = this.wikiResolver ? this.wikiResolver(t) : this.slugifyTitle(t);
-      return `<a href="#/manual/${target}">${t}</a>`;
+      return `<a href="#/manual/${target}">${this.escapeHtml(t)}</a>`;
     });
-    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+      const safe = this.sanitizeUrl(url);
+      if (!safe) return '';
+      if (safe.startsWith('wiki-asset://')) {
+        return `<img data-wiki-asset="${safe}" alt="${this.escapeHtml(alt)}">`;
+      }
+      return `<img src="${safe}" alt="${this.escapeHtml(alt)}">`;
+    });
+
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+      const safe = this.sanitizeUrl(url);
+      if (!safe) return this.escapeHtml(label);
+      const external = /^https?:\/\//i.test(safe) ? ' target="_blank" rel="noopener"' : '';
+      return `<a href="${safe}"${external}>${this.escapeHtml(label)}</a>`;
+    });
+
     return s;
   },
 
@@ -49,16 +76,26 @@ window.ManualMarkdown = {
       for (const lineRaw of lines) {
         const line = lineRaw.trim();
         if (!line) {
-          if (inList) { html += '</ul>'; inList = false; }
+          if (inList === 'ul') html += '</ul>';
+          if (inList === 'ol') html += '</ol>';
+          inList = false;
           continue;
         }
 
         if (line.startsWith('# ')) {
-          // Page title is rendered by article shell.
-          if (inList) { html += '</ul>'; inList = false; }
+          if (inList === 'ul') html += '</ul>';
+          if (inList === 'ol') html += '</ol>';
+          inList = false;
         } else if (line.startsWith('## ')) {
-          if (inList) { html += '</ul>'; inList = false; }
+          if (inList === 'ul') html += '</ul>';
+          if (inList === 'ol') html += '</ol>';
+          inList = false;
           html += `<h2>${this.inline(line.slice(3))}</h2>`;
+        } else if (line.startsWith('### ')) {
+          if (inList === 'ul') html += '</ul>';
+          if (inList === 'ol') html += '</ol>';
+          inList = false;
+          html += `<h3>${this.inline(line.slice(4))}</h3>`;
         } else if (/^\d+\.\s+/.test(line)) {
           if (!inList) { html += '<ol>'; inList = 'ol'; }
           else if (inList !== 'ol') { html += '</ul><ol>'; inList = 'ol'; }
@@ -78,6 +115,16 @@ window.ManualMarkdown = {
     }
 
     return html;
+  },
+
+  async hydrateWikiAssets(container) {
+    if (!container) return;
+    const imgs = Array.from(container.querySelectorAll('img[data-wiki-asset]'));
+    for (const img of imgs) {
+      const ref = img.getAttribute('data-wiki-asset');
+      const src = await WikiStorage.resolveAssetUrl(ref);
+      if (src) img.src = src;
+    }
   },
 
   _extractBlocks(md) {
@@ -118,7 +165,7 @@ window.ManualMarkdown = {
     return `
       <div class="manual-hotspots" data-hotspots>
         <div class="manual-hotspots__image-wrap">
-          <img src="${data.image}" alt="Manual diagram" class="manual-hotspots__image">
+          <img src="${this.sanitizeUrl(data.image)}" alt="Manual diagram" class="manual-hotspots__image">
           ${points}
         </div>
         <ol class="manual-hotspots__list">${list}</ol>

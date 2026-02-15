@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v4';
+const CACHE_NAME = 'daily-fret-v6';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -10,8 +10,12 @@ const PRECACHE = [
   '/js/utils.js',
   '/js/manual/manual-data.js',
   '/js/manual/markdown.js',
+  '/js/wiki/wiki-assets.js',
+  '/js/wiki/wiki-search.js',
+  '/js/wiki/wiki-storage.js',
   '/js/pages/manual.js',
   '/js/pages/manual-article.js',
+  '/js/pages/manual-editor.js',
   '/js/pages/dashboard.js',
   '/js/pages/sessions.js',
   '/js/pages/session-single.js',

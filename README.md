@@ -145,30 +145,54 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 
 ---
 
-## Manual Wiki (Amp Manual)
+## Manual Wiki (Full Local Wiki Editor)
 
-Manual content is read-only and stored under `/public/manual`.
+Open `Wiki` in the top navigation to use the in-app local wiki.
 
-### Add/edit pages
+### What it supports now
 
-1. Create/edit markdown files in `public/manual/pages/**/*.md`.
-2. Add images/diagrams from your PDF into `public/manual/assets/`.
-3. Update `public/manual/toc.json` for sidebar order.
+- Create, edit, duplicate, move, and delete local wiki pages.
+- Sidebar TOC tree with drag/drop reorder and section creation.
+- Rich toolbar for markdown insertions (headings, lists, links, code, quote, table, callouts).
+- Edit / Preview / Split views with autosave and unsaved-change warning.
+- Local image insertion with **three methods**:
+  - Insert Image button (file picker)
+  - Drag/drop image into editor
+  - Paste image from clipboard (`Ctrl+V`)
+- Built-in image manager at `#/manual/assets` (copy embed code, rename, delete).
+- Offline search index rebuild from local pages.
 
-### Rebuild local search index
+### Storage modes
 
-```bash
-npm run build:manual
+By default the wiki is **IndexedDB-only** (fully local/offline, no server writes required).
+
+Optional server mode is available in Wiki Settings:
+- Pages: `public/manual/pages_local/**/*.md`
+- Assets: `public/manual/assets_local/*`
+- API endpoints:
+  - `GET /api/wiki/pages`
+  - `GET /api/wiki/pages/:slug`
+  - `PUT /api/wiki/pages/:slug`
+  - `DELETE /api/wiki/pages/:slug`
+  - `POST /api/wiki/assets`
+
+### Image embed format
+
+IndexedDB mode embeds as:
+
+```md
+![Alt text](wiki-asset://<assetId>)
 ```
 
-This generates `public/manual/search-index.json` (used for local search + backlinks).
+Server mode embeds as:
 
-### Exporting images from PDF (recommended workflow)
+```md
+![Alt text](/manual/assets_local/<filename>)
+```
 
-1. Open the PDF manual in your preferred tool (Acrobat, Preview, etc.).
-2. Export page regions/figures as PNG or WebP.
-3. Save to `public/manual/assets/`.
-4. Reference image paths directly in markdown, e.g. `/manual/assets/front-panel.png`.
+### Search
+
+Use **Rebuild Search** in the wiki sidebar after bulk edits/imports.
 
 ---
 
