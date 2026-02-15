@@ -12,7 +12,7 @@ Pages.Metronome = {
     const urlBpm = parseInt(new URLSearchParams(hashParams).get('bpm')) || 120;
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1452457750107-be127b9f2f77?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div class="page-title">Metronome</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>
@@ -235,24 +235,34 @@ Pages.Metronome = {
     });
 
     // ─── Keyboard ─────────────────────────────────────
+    // Exclude INPUT, SELECT, and TEXTAREA so typing is never blocked
     const keyHandler = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
       if (e.code === 'ArrowUp')   setBPM(bpm + 1);
       if (e.code === 'ArrowDown') setBPM(bpm - 1);
     };
     document.addEventListener('keydown', keyHandler);
 
-    // Cleanup on navigate away
-    const origNavigate = window.Router?.navigate;
+    // ─── Cleanup on navigate away ─────────────────────
+    // We watch #app for childList mutations. When the metronome is replaced
+    // (user navigates away), playBtn is no longer inside container, so we
+    // know to fully tear down: stop audio scheduler and remove key handler.
+    // NOTE: we cannot check document.contains(container) because container
+    // IS #app and is never removed — we must check for our own element.
     const observer = new MutationObserver(() => {
-      if (!document.contains(container)) {
-        document.removeEventListener('keydown', keyHandler);
+      if (!container.contains(playBtn)) {
         clearTimeout(schedulerTimer);
+        isPlaying = false;
+        if (audioCtx) {
+          audioCtx.close().catch(() => {});
+          audioCtx = null;
+        }
+        document.removeEventListener('keydown', keyHandler);
         observer.disconnect();
       }
     });
-    observer.observe(document.getElementById('app'), { childList: true });
+    observer.observe(container, { childList: true });
 
     // ─── Init ──────────────────────────────────────────
     buildDots();

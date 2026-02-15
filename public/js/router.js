@@ -91,8 +91,31 @@
     });
   }
 
-  window.addEventListener('hashchange', () => navigate(location.hash));
-  window.addEventListener('load', () => navigate(getHash()));
+  // ── DB-ready guard ────────────────────────────────────────────────
+  // db.js opens IndexedDB asynchronously. We must not render any page
+  // that calls DB until window.DB is fully initialised.
+  let dbReady = false;
+  let pendingHash = null;
+
+  window.addEventListener('db-ready', () => {
+    dbReady = true;
+    if (pendingHash !== null) {
+      const h = pendingHash;
+      pendingHash = null;
+      navigate(h);
+    }
+  });
+
+  window.addEventListener('hashchange', () => {
+    if (dbReady) navigate(location.hash);
+    else pendingHash = location.hash;
+  });
+
+  window.addEventListener('load', () => {
+    const h = getHash();
+    if (dbReady) navigate(h);
+    else pendingHash = h;
+  });
 
   // Global navigate helper
   window.go = (hash) => { location.hash = hash; };

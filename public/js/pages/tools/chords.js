@@ -34,7 +34,7 @@ Pages.Chords = {
     };
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516924962500-2b4b3b99ea02?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div class="page-title">Chords</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>
@@ -63,9 +63,9 @@ Pages.Chords = {
         </div>
 
         <div id="chord-display" style="display:none;" class="chord-display">
-          <div>
+          <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
             <div class="chord-display__name" id="chord-name"></div>
-            <div class="chord-display__diagram" id="chord-diagram"></div>
+            <div id="chord-diagram"></div>
             <div class="chord-display__fingers" id="chord-fingers"></div>
           </div>
           <div>
@@ -100,58 +100,112 @@ Pages.Chords = {
     display.style.display = 'grid';
 
     container.querySelector('#chord-name').textContent = name;
-    container.querySelector('#chord-diagram').innerHTML = this._buildDiagram(chord.frets);
-    container.querySelector('#chord-fingers').textContent = 'Fingers: ' + chord.fingers;
+    container.querySelector('#chord-diagram').innerHTML = this._buildSVG(chord.frets);
+    container.querySelector('#chord-fingers').textContent = 'Finger positions: ' + chord.fingers;
     container.querySelector('#chord-tip').textContent = chord.tip;
   },
 
-  _buildDiagram(frets) {
-    // frets string: 6 chars, one per string (low E to high e)
-    // '0' = open, 'x' = muted, '1'-'9' = fret number
+  // Renders a proper SVG chord diagram.
+  // frets: 6-char string, index 0 = low E ... index 5 = high e
+  // Each char: 'x' = mute, '0' = open, '1'-'9' = fret number
+  _buildSVG(frets) {
     const f = frets.split('');
-    const strings = ['e', 'B', 'G', 'D', 'A', 'E']; // high to low (display order)
-    const fretNums = f.map(x => x === 'x' ? null : parseInt(x) || 0);
 
-    // Find fret range
-    const pressed = fretNums.filter(x => x !== null && x > 0);
-    const maxFret = pressed.length ? Math.max(...pressed) : 4;
-    const minFret = pressed.length ? Math.min(...pressed) : 0;
-    const startFret = minFret > 1 ? minFret : 0;
+    // Determine visible fret window
+    const pressed = f.map((v, i) => (v !== 'x' && v !== '0') ? parseInt(v) : 0).filter(v => v > 0);
+    const minPressed = pressed.length ? Math.min(...pressed) : 1;
+    const startFret  = minPressed <= 1 ? 0 : minPressed - 1;  // 0 means show nut
+    const FRETS = 4;   // fret rows shown
+    const STRINGS = 6;
 
-    const FRETS = 4;
-    const NUT = startFret === 0 ? '╔' : ' ';
-    const TOP = startFret === 0 ? '═══════════════════' : '                   ';
+    // SVG layout constants
+    const SX   = 28;   // left margin (room for fret-position label)
+    const SY   = 34;   // top margin (room for X/O markers)
+    const SW   = 13;   // string spacing (px)
+    const FH   = 18;   // fret height (px)
+    const W    = SX + SW * (STRINGS - 1) + 20;
+    const H    = SY + FH * FRETS + 14;
+    const DOT_R = 5;
 
-    let out = `    ${NUT}${TOP}\n`;
+    const sx = i => SX + i * SW;          // x coord of string i (0=low E, 5=high e)
+    const fy = r => SY + r * FH;          // y coord of top of fret row r (0-based)
+    const dotY = r => fy(r) + FH / 2;     // y center of fret row r
 
-    // String order for display: low E (index 5) ... high e (index 0)
-    // f[0] = low E (6th string), f[5] = high e (1st string)
-    const displayOrder = [5, 4, 3, 2, 1, 0]; // low E to high e
-    const stringNames = ['E', 'A', 'D', 'G', 'B', 'e'];
+    const parts = [];
 
-    for (let fret = startFret + 1; fret <= startFret + FRETS; fret++) {
-      let row = `${fret.toString().padStart(2, ' ')}  `;
-      displayOrder.forEach((si, idx) => {
-        const fretVal = f[si];
-        const isX = fretVal === 'x';
-        const fNum = isX ? null : parseInt(fretVal) || 0;
-
-        let marker;
-        if (isX) {
-          marker = idx === 0 ? '×' : '─×';
-        } else if (fNum === fret) {
-          marker = idx === 0 ? '●' : '─●';
-        } else if (fNum === 0 && fret === startFret + 1) {
-          marker = idx === 0 ? '○' : '─○';
-        } else {
-          marker = idx === 0 ? '│' : '──';
-        }
-        row += marker;
-        if (idx < displayOrder.length - 1) row += '';
-      });
-      out += row + ' │\n';
+    // ── Nut or position number ──────────────────────
+    if (startFret === 0) {
+      // Thick nut bar
+      parts.push(`<rect x="${sx(0)}" y="${SY - 3}" width="${SW * (STRINGS - 1)}" height="4" rx="0" fill="#d8d8cf"/>`);
+    } else {
+      parts.push(`<text x="4" y="${dotY(0) + 4}" font-family="JetBrains Mono,monospace" font-size="9" fill="#6a6a60" text-anchor="start">${startFret + 1}fr</text>`);
     }
 
-    return out;
+    // ── Fret lines (horizontal) ─────────────────────
+    for (let r = 0; r <= FRETS; r++) {
+      const y = fy(r);
+      parts.push(`<line x1="${sx(0)}" y1="${y}" x2="${sx(STRINGS - 1)}" y2="${y}" stroke="#3a3a34" stroke-width="1"/>`);
+    }
+
+    // ── String lines (vertical) ─────────────────────
+    for (let i = 0; i < STRINGS; i++) {
+      const x = sx(i);
+      parts.push(`<line x1="${x}" y1="${SY}" x2="${x}" y2="${fy(FRETS)}" stroke="#4a4a44" stroke-width="1.5"/>`);
+    }
+
+    // ── Open / mute markers above nut ───────────────
+    for (let i = 0; i < STRINGS; i++) {
+      const x = sx(i);
+      const y = SY - 16;
+      if (f[i] === 'x') {
+        const d = 4;
+        parts.push(`<line x1="${x-d}" y1="${y-d}" x2="${x+d}" y2="${y+d}" stroke="#ff2d55" stroke-width="1.5" stroke-linecap="square"/>`);
+        parts.push(`<line x1="${x+d}" y1="${y-d}" x2="${x-d}" y2="${y+d}" stroke="#ff2d55" stroke-width="1.5" stroke-linecap="square"/>`);
+      } else if (f[i] === '0') {
+        parts.push(`<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="#d8d8cf" stroke-width="1.5"/>`);
+      }
+    }
+
+    // ── String labels (low E … high e) ──────────────
+    const STRING_NAMES = ['E','A','D','G','B','e'];
+    for (let i = 0; i < STRINGS; i++) {
+      parts.push(`<text x="${sx(i)}" y="${H - 2}" font-family="JetBrains Mono,monospace" font-size="8" fill="#3a3a34" text-anchor="middle">${STRING_NAMES[i]}</text>`);
+    }
+
+    // ── Finger dots ─────────────────────────────────
+    // Detect barre: if 2+ strings land on the same fret, draw a bar across
+    // the span and individual dots on top for other fingers.
+    const fretGroups = {};
+    for (let i = 0; i < STRINGS; i++) {
+      const v = f[i];
+      if (v === 'x' || v === '0') continue;
+      const fn = parseInt(v);
+      if (!fn) continue;
+      const row = fn - startFret - 1;  // 0-based row in visible window
+      if (row < 0 || row >= FRETS) continue;
+      if (!fretGroups[fn]) fretGroups[fn] = [];
+      fretGroups[fn].push(i);
+    }
+
+    for (const [fn, strings] of Object.entries(fretGroups)) {
+      const row  = parseInt(fn) - startFret - 1;
+      const cy   = dotY(row);
+      const isBarre = strings.length >= 2 && (Math.max(...strings) - Math.min(...strings) === strings.length - 1);
+
+      if (isBarre && strings.length >= 2) {
+        // Draw a rounded bar across the barre strings
+        const x1 = sx(Math.min(...strings));
+        const x2 = sx(Math.max(...strings));
+        parts.push(`<rect x="${x1 - DOT_R}" y="${cy - DOT_R}" width="${x2 - x1 + DOT_R * 2}" height="${DOT_R * 2}" rx="${DOT_R}" fill="#ff6a00" opacity="0.9"/>`);
+      } else {
+        // Individual dots
+        for (const si of strings) {
+          parts.push(`<circle cx="${sx(si)}" cy="${cy}" r="${DOT_R}" fill="#ff6a00"/>`);
+          parts.push(`<circle cx="${sx(si)}" cy="${cy}" r="${DOT_R + 3}" fill="none" stroke="rgba(255,106,0,0.25)" stroke-width="1"/>`);
+        }
+      }
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;background:var(--bg2);border:1px solid var(--line2);">${parts.join('')}</svg>`;
   },
 };

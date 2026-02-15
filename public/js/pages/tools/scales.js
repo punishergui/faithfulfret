@@ -35,7 +35,7 @@ Pages.Scales = {
     const app = document.getElementById('app');
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div class="page-title">Scales</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>

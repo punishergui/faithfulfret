@@ -16,7 +16,7 @@ Pages.Progress = {
     const chrono = [...sessions].reverse();
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
         <div class="page-hero__inner">
           <div class="page-title">Progress</div>
         </div>
