@@ -43,6 +43,18 @@ Pages.ToolsHub = {
         title: 'MANUAL WIKI',
         desc: 'Searchable Vypyr X2 docs · diagrams · callouts · backlinks',
       },
+      {
+        href: '#/tools/tuning',
+        icon: '🪛',
+        title: 'TUNING GUIDE',
+        desc: 'Standard tuning reference · Ear + tuner workflow · Vypyr X2 tips',
+      },
+      {
+        href: '#/tools/amp-manual',
+        icon: '📘',
+        title: 'AMP WIKI',
+        desc: 'Searchable Peavey Vypyr X2 quick manual · Presets · Troubleshooting',
+      },
     ];
 
     app.innerHTML = `

@@ -1,4 +1,5 @@
 const CACHE_NAME = 'daily-fret-v3';
+const CACHE_NAME = 'daily-fret-v2';
 const PRECACHE = [
   '/',
   '/index.html',
