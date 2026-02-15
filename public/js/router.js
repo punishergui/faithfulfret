@@ -18,6 +18,9 @@
     { pattern: /^#\/progress$/,                   handler: () => Pages.Progress.render() },
     { pattern: /^#\/manual$/,                     handler: () => Pages.ManualHome.render() },
     { pattern: /^#\/manual\/search(?:\?.*)?$/,   handler: () => Pages.ManualHome.render() },
+    { pattern: /^#\/manual\/new$/,                handler: () => Pages.ManualEditor.render('new') },
+    { pattern: /^#\/manual\/assets$/,             handler: () => Pages.ManualEditor.renderAssets() },
+    { pattern: /^#\/manual\/edit\/(.+)$/,         handler: (m) => Pages.ManualEditor.render(m[1]) },
     { pattern: /^#\/manual\/(.+)$/,              handler: (m) => Pages.ManualArticle.render(m[1]) },
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
@@ -94,7 +97,7 @@
         if (hash.startsWith('#/tools') && href.includes('tools')) link.classList.add('active');
       }
       else if (hash.startsWith('#/manual')) {
-        if (href.includes('resources')) link.classList.add('active');
+        if (href.includes('manual') || href.includes('resources')) link.classList.add('active');
       }
     });
   }
