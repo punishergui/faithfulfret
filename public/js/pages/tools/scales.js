@@ -54,6 +54,17 @@ Pages.Scales = {
         <div class="scale-fretboard" id="scale-fretboard"></div>
         <div class="scale-desc" id="scale-desc"></div>
 
+        <div class="scale-help">
+          <div class="scale-help__title">How to use this tool</div>
+          <ul>
+            <li><strong>Read top → bottom:</strong> top row is high <strong>e</strong>, bottom row is low <strong>E</strong>.</li>
+            <li><strong>Read left → right:</strong> columns are frets 0–5. Fret <strong>0</strong> is open string.</li>
+            <li><strong>Play root notes first</strong> (●), then fill in scale tones (○).</li>
+            <li><strong>Practice sequence:</strong> ascend slowly, descend slowly, then improvise for 60 seconds.</li>
+            <li><strong>Tone idea:</strong> for blues/rock, pair minor pentatonic with a medium gain amp tone.</li>
+          </ul>
+        </div>
+
         <div style="margin-top:24px;background:var(--bg1);border:1px solid var(--line2);padding:16px;">
           <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Legend</div>
           <div style="display:flex;gap:20px;font-family:var(--f-mono);font-size:12px;">
@@ -61,6 +72,10 @@ Pages.Scales = {
             <span><span style="color:var(--text2);">○</span> Scale tone</span>
             <span><span style="color:var(--text3);">─</span> Open string / No note</span>
           </div>
+        </div>
+
+        <div style="margin-top:18px;font-family:var(--f-mono);font-size:10px;color:var(--text3);letter-spacing:.06em;">
+          Further reading: JustinGuitar scale basics, Fender scale exercises, and Marty Music pentatonic practice routines.
         </div>
       </div>
     `;
