@@ -4,7 +4,7 @@ services:
     container_name: daily-fret
     restart: unless-stopped
     ports:
-      - "9999:9999"
+      - "3000:9999"
     volumes:
       - .:/app
       - /app/node_modules

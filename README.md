@@ -20,7 +20,7 @@ node scripts/gen-icons.js
 docker compose up -d
 
 # 4. Open in browser
-# http://YOUR-VM-IP:9999
+# http://YOUR-VM-IP:3000
 
 # 5. (Optional) Install as app
 # Chrome: click the install icon in the address bar
@@ -71,13 +71,13 @@ Check progress:    Click "PROGRESS"
 ## Port / Network
 
 ```
-Default port: 9999
-Access: http://YOUR-VM-IP:9999
+Default mapping: 3000:9999 (host:container)
+Access: http://YOUR-VM-IP:3000
 Remote access: Connect via VPN first, then open URL
-Change port: Edit docker-compose.yml → ports: "XXXX:9999"
+Change host port: Edit docker-compose.yml → ports: "XXXX:9999"
 ```
 
-The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:9999` when on the same network or VPN.
+The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:3000` when on the same network or VPN.
 
 ---
 
@@ -101,7 +101,7 @@ Data is stored in **this browser's IndexedDB**. Use export/import to move data b
 | Database | IndexedDB via `idb` CDN library |
 | Offline | Service Worker (cache-first) |
 | Deploy | Docker + Docker Compose |
-| Port | 9999 |
+| Port | Host `3000` → Container `9999` |
 
 ---
 
