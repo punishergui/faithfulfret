@@ -53,7 +53,7 @@ Pages.Dashboard = {
     const hourTxt = stats.totalHours === 1 ? '1 hour' : `${stats.totalHours} hours`;
 
     return `
-      <div class="page-hero vert-texture" style="position:relative;overflow:hidden;">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');overflow:hidden;">
         <div class="page-hero__inner">
           <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">${Utils.today()}</div>
           <div class="page-title" style="text-shadow:2px 2px 0 rgba(255,106,0,.15);margin-bottom:12px;">${greeting}</div>

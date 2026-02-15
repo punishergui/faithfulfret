@@ -24,7 +24,7 @@ Pages.Gear = {
     });
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
           <div class="page-title">Gear</div>
           <a href="#/gear/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Gear</a>
@@ -57,7 +57,8 @@ Pages.Gear = {
   },
 
   _renderCard(g) {
-    const imgUrl = Utils.gearImage(g.category);
+    // Use uploaded photo if available, otherwise fall back to category Unsplash image
+    const imgUrl = g.imageData || Utils.gearImage(g.category);
     const statusBadge = {
       'Own it':    'df-badge--green',
       'Sold':      'df-badge--red',
@@ -113,7 +114,7 @@ Pages.GearForm = {
     const statuses = ['Own it', 'Sold', 'Wish List', 'On Loan'];
 
     app.innerHTML = `
-      <div class="page-hero vert-texture">
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1568218234742-f0df6cd67c9a?w=1200&q=80');">
         <div class="page-hero__inner">
           <div class="page-title">${isEdit ? 'Edit Gear' : 'Add Gear'}</div>
         </div>
@@ -173,6 +174,18 @@ Pages.GearForm = {
               <label class="df-label" for="g-notes">Notes</label>
               <textarea id="g-notes" name="notes" class="df-input" rows="4" placeholder="Serial number, mods, thoughts...">${gear.notes || ''}</textarea>
             </div>
+            <div class="df-field full-width">
+              <label class="df-label" for="g-image">Photo</label>
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:1px solid var(--line2);cursor:pointer;font-family:var(--f-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);transition:border-color 0.15s;" id="g-image-label">
+                  <input type="file" id="g-image" accept="image/*" style="display:none;">
+                  <span id="g-image-text">${gear.imageData ? 'Change Photo' : '+ Upload Photo'}</span>
+                </label>
+                ${gear.imageData ? `<img id="g-image-preview" src="${gear.imageData}" style="height:60px;width:80px;object-fit:cover;border:1px solid var(--line2);filter:brightness(0.85);" alt="Current photo">` : `<span id="g-image-preview" style="display:none;"></span>`}
+                ${gear.imageData ? `<button type="button" id="g-image-clear" style="font-family:var(--f-mono);font-size:9px;color:var(--red);background:none;border:1px solid rgba(255,45,85,.3);padding:4px 10px;cursor:pointer;letter-spacing:0.06em;">Remove</button>` : ''}
+              </div>
+              <div style="font-family:var(--f-mono);font-size:8px;color:var(--text3);margin-top:6px;letter-spacing:0.06em;">JPG/PNG/WEBP · auto-resized to 800px · stored in browser</div>
+            </div>
           </div>
 
           <div style="margin-top:24px;display:flex;gap:12px;">
@@ -189,21 +202,77 @@ Pages.GearForm = {
       </div>
     `;
 
-    // Form submit
+    // ── Image upload handling ───────────────────────────────────────
+    let pendingImageData = gear.imageData || null;  // holds base64 or null
+
+    const imageInput   = app.querySelector('#g-image');
+    const imagePreview = app.querySelector('#g-image-preview');
+    const imageText    = app.querySelector('#g-image-text');
+    const imageClear   = app.querySelector('#g-image-clear');
+
+    // Resize and convert uploaded file to base64 JPEG (max 800px)
+    function resizeToBase64(file, maxPx = 800) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.round(img.width  * ratio);
+            canvas.height = Math.round(img.height * ratio);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (imageInput) {
+      imageInput.addEventListener('change', async () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+        imageText.textContent = 'Processing...';
+        pendingImageData = await resizeToBase64(file);
+        if (imagePreview) {
+          imagePreview.src   = pendingImageData;
+          imagePreview.style.display = 'inline-block';
+        }
+        imageText.textContent = 'Change Photo';
+      });
+    }
+
+    if (imageClear) {
+      imageClear.addEventListener('click', () => {
+        pendingImageData = null;
+        if (imagePreview) imagePreview.style.display = 'none';
+        if (imageText) imageText.textContent = '+ Upload Photo';
+        imageClear.style.display = 'none';
+      });
+    }
+
+    // ── Form submit ─────────────────────────────────────────────────
     const form = app.querySelector('#gear-form');
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
+      // FormData captures the file input as a File object — remove it,
+      // we handle imageData separately via pendingImageData.
+      delete data['g-image'];
       if (data.price) data.price = parseFloat(data.price);
       Object.keys(data).forEach(k => { if (data[k] === '') delete data[k]; });
       if (!data.name) { alert('Name is required.'); return; }
       if (isEdit) { data.id = gear.id; data.createdAt = gear.createdAt; }
+      // Attach image (base64 string or null to clear)
+      if (pendingImageData) data.imageData = pendingImageData;
       await DB.saveGear(data);
       go('#/gear');
     });
 
-    // Delete
+    // ── Delete ──────────────────────────────────────────────────────
     const deleteBtn = app.querySelector('#delete-gear-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async () => {

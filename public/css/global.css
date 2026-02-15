@@ -1207,6 +1207,37 @@ select.df-input option {
   border-bottom: 1px solid var(--line2);
 }
 
+/* ── Hero with background image ──────────────────────── */
+.page-hero--img {
+  background-size: cover;
+  background-position: center top;
+  position: relative;
+}
+/* Dark gradient scrim so text is always legible */
+.page-hero--img::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10,10,8,0.62) 0%,
+    rgba(10,10,8,0.82) 55%,
+    rgba(10,10,8,0.97) 100%
+  );
+  z-index: 0;
+}
+.page-hero--img .page-hero__inner,
+.page-hero--img .fret-line {
+  position: relative;
+  z-index: 1;
+}
+/* Stronger contrast for hero page title over image */
+.page-hero--img .page-title {
+  text-shadow:
+    2px 2px 0 rgba(0,0,0,0.6),
+    0 0 40px rgba(255,106,0,0.2);
+}
+
 .page-hero__inner {
   max-width: 1200px;
   margin: 0 auto;
