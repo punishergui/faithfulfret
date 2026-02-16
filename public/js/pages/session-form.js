@@ -12,6 +12,9 @@ Pages.SessionForm = {
       session = await DB.getSess(id) || {};
     }
 
+    const ownedGear = (await DB.getAllGear(false)).filter((item) => ['Owned', 'Own it', 'owned'].includes(item.status));
+    const selectedGearIds = new Set(Array.isArray(session.gear) ? session.gear.map((row) => row.id) : []);
+
     const title = isEdit ? 'Edit Session' : 'Log Session';
     const today = Utils.today();
 
@@ -81,6 +84,12 @@ Pages.SessionForm = {
               <textarea id="f-links" name="links" class="df-input" rows="3" placeholder="Label | https://url (one per line)&#10;e.g. JustinGuitar Lesson | https://justinguitar.com/...">${session.links || ''}</textarea>
             </div>
             <div class="df-field full-width">
+              <label class="df-label">Gear Used</label>
+              <div id="session-gear-choices" style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${ownedGear.length ? ownedGear.map((item) => `<button type="button" class="df-btn ${selectedGearIds.has(item.id) ? 'df-btn--primary' : 'df-btn--outline'}" data-gear-id="${item.id}">${item.name}</button>`).join('') : '<span style="color:var(--text3);font-size:12px;">No owned gear available.</span>'}
+              </div>
+            </div>
+            <div class="df-field full-width">
               <label class="df-label" for="f-notes">Notes</label>
               <textarea id="f-notes" name="notes" class="df-input" rows="5" placeholder="Free notes, observations, things to remember...">${session.notes || ''}</textarea>
             </div>
@@ -148,6 +157,16 @@ Pages.SessionForm = {
       Utils.toast?.('Applied last focus');
     });
 
+    const selectedGearIds = new Set(Array.isArray(session.gear) ? session.gear.map((row) => row.id) : []);
+    container.querySelectorAll('[data-gear-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const gearId = btn.getAttribute('data-gear-id');
+        if (selectedGearIds.has(gearId)) selectedGearIds.delete(gearId);
+        else selectedGearIds.add(gearId);
+        btn.classList.toggle('df-btn--primary', selectedGearIds.has(gearId));
+        btn.classList.toggle('df-btn--outline', !selectedGearIds.has(gearId));
+      });
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -179,6 +198,7 @@ Pages.SessionForm = {
       }
 
       const saved = await DB.saveSess(data);
+      await DB.saveSessionGear(saved.id, [...selectedGearIds]);
       if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
       Utils.toast?.('Saved session ✅');
       go(`#/session/${saved.id}`);

@@ -89,12 +89,34 @@
       try { return await api(`/api/gear-items/${id}`); } catch { return null; }
     },
 
-    async getAllGear() {
-      return api('/api/gear-items');
+    async getAllGear(includeLinks = true) {
+      return api(`/api/gear-items?includeLinks=${includeLinks ? 'true' : 'false'}`);
+    },
+
+    async getGearLinks(gearId) {
+      return api(`/api/gear-items/${gearId}/links`);
+    },
+
+    async saveGearLink(gearId, data) {
+      return data.id
+        ? api(`/api/gear-items/${gearId}/links/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api(`/api/gear-items/${gearId}/links`, { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async deleteGearLink(gearId, linkId) {
+      return api(`/api/gear-items/${gearId}/links/${linkId}`, { method: 'DELETE' });
     },
 
     async deleteGear(id) {
       return api(`/api/gear-items/${id}`, { method: 'DELETE' });
+    },
+
+    async saveSessionGear(sessionId, gearIds) {
+      return api(`/api/sessions/${sessionId}/gear`, { method: 'PUT', body: JSON.stringify({ gearIds }) });
+    },
+
+    async getSessionGear(sessionId) {
+      return api(`/api/sessions/${sessionId}/gear`);
     },
 
     // Presets
