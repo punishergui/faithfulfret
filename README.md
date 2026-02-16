@@ -100,7 +100,8 @@ docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /d
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke check after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
-# optional UI smoke check: open Presets and confirm Vypyr X2 selector fields + scoped settings rows load and save
+# optional UI smoke check: open Presets and confirm Vypyr X2 Inst/Stomp/Effects rows appear under their dial blocks,
+# each row has a Type selector, and Amplifiers has an Amp LED Color selector that loads/saves correctly
 ```
 
 How updates work:
