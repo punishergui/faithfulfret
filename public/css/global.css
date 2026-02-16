@@ -2280,3 +2280,134 @@ select.df-input option {
   color: var(--text);
   padding: 8px 10px;
 }
+
+.ql-pill {
+  border: 1px solid var(--line2);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text2);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 999px !important;
+  transition: transform 0.14s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.ql-pill:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent2);
+  color: var(--text);
+}
+
+.ql-pill:active {
+  transform: translateY(0);
+}
+
+.ql-pill.is-active {
+  background: rgba(255, 106, 0, 0.15);
+  border-color: var(--accent);
+  color: var(--accent2);
+  box-shadow: 0 0 0 1px rgba(255, 106, 0, 0.22), 0 0 12px var(--glow);
+}
+
+.ql-msg-link {
+  color: var(--accent2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.heatmap-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line2);
+}
+
+.heatmap-toggle button {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  padding: 6px 10px;
+  border-right: 1px solid var(--line);
+  transition: color .15s ease, background .15s ease;
+}
+
+.heatmap-toggle button:last-child {
+  border-right: none;
+}
+
+.heatmap-toggle button.is-active {
+  color: var(--accent2);
+  background: rgba(255, 106, 0, 0.12);
+}
+
+.ff-heatmap {
+  display: grid;
+  gap: 4px;
+}
+
+.ff-heatmap--compact {
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+}
+
+.ff-heatmap--year {
+  grid-template-columns: repeat(53, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.heatmap-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.035);
+  transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.heatmap-cell:disabled {
+  cursor: default;
+}
+
+.heatmap-cell:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: var(--accent2);
+}
+
+.heatmap-cell.level-0 { background: rgba(255,255,255,0.03); }
+.heatmap-cell.level-1 { background: rgba(255,106,0,0.18); }
+.heatmap-cell.level-2 { background: rgba(255,106,0,0.35); }
+.heatmap-cell.level-3 { background: rgba(255,106,0,0.55); }
+.heatmap-cell.level-4 { background: rgba(255,106,0,0.82); box-shadow: 0 0 10px var(--glow); }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text3);
+  font-family: var(--f-mono);
+  font-size: 10px;
+}
+
+.heatmap-legend .heatmap-cell {
+  width: 12px;
+}
+
+.heatmap-stat {
+  border: 1px solid var(--line2);
+  background: var(--bg1);
+  padding: 10px;
+}
+
+.heatmap-stat span {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+
+.heatmap-stat strong {
+  color: var(--accent2);
+  font-family: var(--f-hero);
+  font-size: 24px;
+  line-height: 1;
+}

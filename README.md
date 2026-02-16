@@ -95,6 +95,8 @@ docker compose -f docker-compose.prod.yml up -d
 
 # Verify DB path after deploy
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
+# optional quick smoke check after deploy
+curl -s http://localhost:3000/api/session-heatmap | head -c 200
 ```
 
 How updates work:

@@ -70,6 +70,10 @@
       return rows.map(normalizeSession);
     },
 
+    async getSessionHeatmap() {
+      return api('/api/session-heatmap');
+    },
+
     async deleteSess(id) {
       return api(`/api/sessions/${id}`, { method: 'DELETE' });
     },

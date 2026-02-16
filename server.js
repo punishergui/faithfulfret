@@ -116,6 +116,7 @@ apiRouter.get('/stats', (req, res) => {
 });
 
 apiRouter.get('/sessions', (req, res) => res.json(Store.listSessions()));
+apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
 apiRouter.post('/sessions', (req, res) => {
   if (!req.body?.date) return res.status(400).json({ error: 'date is required' });
   return res.json(Store.saveSession(req.body));

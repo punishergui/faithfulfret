@@ -7,9 +7,10 @@ Pages.Progress = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const [sessions, stats] = await Promise.all([
+    const [sessions, stats, heatmapDays] = await Promise.all([
       DB.getAllSess(),
       DB.getStats(),
+      DB.getSessionHeatmap(),
     ]);
 
     // Reverse for chronological order (charts)
@@ -27,6 +28,7 @@ Pages.Progress = {
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
         ${this._renderInsightCards(sessions, stats)}
+        ${this._renderYearHeatmap(heatmapDays, stats)}
 
         ${sessions.length >= 2 ? `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;">
@@ -72,6 +74,7 @@ Pages.Progress = {
     }
 
     this._initExportImport(app);
+    this._initYearHeatmap(app);
   },
 
   _renderStatBar(stats) {
@@ -94,6 +97,126 @@ Pages.Progress = {
         `).join('')}
       </div>
     `;
+  },
+
+
+  _renderYearHeatmap(rows = [], stats) {
+    const year = new Date().getFullYear();
+    const years = [...new Set((rows || []).map((row) => Number(String(row.date || '').slice(0, 4))).filter(Boolean))].sort((a, b) => b - a);
+    if (!years.length) years.push(year);
+    if (!years.includes(year)) years.unshift(year);
+
+    const totalMinutes = (rows || []).reduce((sum, row) => sum + Number(row.totalMinutes || 0), 0);
+    const totalSessions = (rows || []).reduce((sum, row) => sum + Number(row.sessionCount || 0), 0);
+
+    return `
+      <div class="df-chart" style="margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <div class="df-chart__title" style="margin-bottom:0;">Practice Activity Heatmap</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <select id="progress-hm-year" class="df-input" style="width:auto;min-width:96px;padding:8px 10px;">
+              ${years.map((y) => `<option value="${y}" ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+            </select>
+            <div class="heatmap-toggle" data-progress-toggle>
+              <button type="button" class="is-active" data-progress-metric="minutes">Minutes</button>
+              <button type="button" data-progress-metric="sessions">Sessions</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="progress-heatmap" data-hm-days='${JSON.stringify(rows || []).replace(/'/g, '&#39;')}' data-progress-year="${year}" data-progress-metric="minutes"></div>
+
+        <div class="heatmap-legend" style="margin-top:10px;">
+          <span>Less</span>
+          <i class="heatmap-cell level-0"></i>
+          <i class="heatmap-cell level-1"></i>
+          <i class="heatmap-cell level-2"></i>
+          <i class="heatmap-cell level-3"></i>
+          <i class="heatmap-cell level-4"></i>
+          <span>More</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px;">
+          <div class="heatmap-stat"><span>Total Minutes</span><strong>${totalMinutes}</strong></div>
+          <div class="heatmap-stat"><span>Total Sessions</span><strong>${totalSessions}</strong></div>
+          <div class="heatmap-stat"><span>Current Streak</span><strong>${stats.currentStreak || 0}d</strong></div>
+          <div class="heatmap-stat"><span>Longest Streak</span><strong>${stats.longestStreak || 0}d</strong></div>
+        </div>
+      </div>
+    `;
+  },
+
+  _initYearHeatmap(container) {
+    const mount = container.querySelector('#progress-heatmap');
+    if (!mount) return;
+
+    const yearSelect = container.querySelector('#progress-hm-year');
+    const parseRows = () => {
+      try { return JSON.parse(mount.getAttribute('data-hm-days') || '[]'); } catch (e) { return []; }
+    };
+
+    const draw = () => {
+      const rows = parseRows();
+      const byDate = new Map(rows.map((row) => [row.date, row]));
+      const year = Number(mount.getAttribute('data-progress-year'));
+      const metric = mount.getAttribute('data-progress-metric') || 'minutes';
+      const start = new Date(`${year}-01-01T12:00:00`);
+      const end = new Date(`${year}-12-31T12:00:00`);
+      const totalDays = Math.floor((end - start) / 86400000) + 1;
+      const cells = [];
+      const values = [];
+
+      for (let i = 0; i < totalDays; i += 1) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const date = d.toISOString().slice(0, 10);
+        const row = byDate.get(date);
+        const minutes = Number(row?.totalMinutes || 0);
+        const sessionCount = Number(row?.sessionCount || 0);
+        const value = metric === 'sessions' ? sessionCount : minutes;
+        if (value > 0) values.push(value);
+        cells.push({ date, value, minutes, sessionCount, sessionId: row?.sessionId || '' });
+      }
+
+      const max = values.length ? Math.max(...values) : 0;
+      mount.innerHTML = `
+        <div class="ff-heatmap ff-heatmap--year">
+          ${cells.map((cell) => {
+            const level = this._heatLevel(cell.value, max);
+            const title = `${cell.date} • ${cell.minutes}m • ${cell.sessionCount} session${cell.sessionCount === 1 ? '' : 's'}`;
+            return `<button type="button" class="heatmap-cell level-${level}" ${cell.sessionId ? `data-session-id="${cell.sessionId}"` : 'disabled'} title="${title}" aria-label="${title}"></button>`;
+          }).join('')}
+        </div>
+      `;
+
+      mount.querySelectorAll('[data-session-id]').forEach((btn) => {
+        btn.addEventListener('click', () => go(`#/session/${btn.getAttribute('data-session-id')}`));
+      });
+    };
+
+    yearSelect?.addEventListener('change', () => {
+      mount.setAttribute('data-progress-year', yearSelect.value);
+      draw();
+    });
+
+    container.querySelectorAll('[data-progress-metric]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        mount.setAttribute('data-progress-metric', btn.getAttribute('data-progress-metric'));
+        container.querySelectorAll('[data-progress-metric]').forEach((el) => el.classList.toggle('is-active', el === btn));
+        draw();
+      });
+    });
+
+    draw();
+  },
+
+  _heatLevel(value, max) {
+    if (!value || !max) return 0;
+    const ratio = value / max;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
   },
 
   _renderBarChart(container, data) {
