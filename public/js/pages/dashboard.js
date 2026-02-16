@@ -263,7 +263,7 @@ Pages.Dashboard = {
         Utils.toast?.('Failed to save quick session', 'error');
       }
     });
-  },,
+  },
 
   _renderCalendar(allDates, year, month) {
     const now = new Date();
