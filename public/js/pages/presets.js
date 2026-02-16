@@ -187,13 +187,14 @@ Pages.Presets = {
     return compact.length > 100 ? `${compact.slice(0, 100)}…` : compact;
   },
 
-  renderDialField(name, label, value, options, helperText = '') {
+  renderDialField(name, label, value, options, helperText = '', extraContent = '') {
     return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
       <label class="df-label">${label}</label>
       <select name="${name}" class="df-input" style="margin-top:6px;">
         ${options.map((option) => `<option value="${option}" ${option === value ? 'selected' : ''}>${option}</option>`).join('')}
       </select>
       ${helperText ? `<p style="margin-top:6px;font-size:12px;color:var(--text2);">${helperText}</p>` : ''}
+      ${extraContent}
     </div>`;
   },
 
@@ -409,7 +410,15 @@ Pages.Presets = {
             <p style="margin-top:6px;font-size:12px;color:var(--text2);">Banks A–D contain four presets each; the color indicates which of the four.</p>
 
             <div style="margin-top:10px;display:grid;gap:8px;">
-              ${this.renderDialField('v2_instStompLabel', 'Inst/Stomp Dial', settings.vypyrX2.instStompLabel, this.instStompOptions, '* indicates Monophonic Effect')}
+              ${this.renderDialField('v2_instStompLabel', 'Inst/Stomp Dial', settings.vypyrX2.instStompLabel, this.instStompOptions, '* indicates Monophonic Effect', `
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2);">
+                  <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                    <strong style="font-size:13px;">Inst/Stomp Settings Rows</strong>
+                    <button type="button" class="df-btn" id="add-v2-inst-row">+ Add Inst/Stomp Settings Row</button>
+                  </div>
+                  <div id="v2-inst-rows" style="margin-top:8px;"></div>
+                </div>
+              `)}
               <div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
                 <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
                   <div class="df-field"><label class="df-label">Amplifiers Dial</label>
@@ -422,23 +431,15 @@ Pages.Presets = {
                 <p style="margin-top:6px;font-size:12px;color:var(--text2);">Hold for tuner (hardware)</p>
                 <p style="margin-top:4px;font-size:12px;color:var(--text2);">Green = cleanest, Orange = crunch, Red = most gain</p>
               </div>
-              ${this.renderDialField('v2_effectsLabel', 'Effects Dial', settings.vypyrX2.effectsLabel, this.effectsDialOptions, '* indicates Monophonic Effect')}
-            </div>
-
-            <div style="margin-top:6px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                <strong style="font-size:13px;">Inst/Stomp Settings Rows</strong>
-                <button type="button" class="df-btn" id="add-v2-inst-row">+ Add Inst/Stomp Settings Row</button>
-              </div>
-              <div id="v2-inst-rows" style="margin-top:8px;"></div>
-            </div>
-
-            <div style="margin-top:6px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                <strong style="font-size:13px;">Effects Settings Rows</strong>
-                <button type="button" class="df-btn" id="add-v2-effects-row">+ Add Effects Settings Row</button>
-              </div>
-              <div id="v2-effects-rows" style="margin-top:8px;"></div>
+              ${this.renderDialField('v2_effectsLabel', 'Effects Dial', settings.vypyrX2.effectsLabel, this.effectsDialOptions, '* indicates Monophonic Effect', `
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2);">
+                  <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                    <strong style="font-size:13px;">Effects Settings Rows</strong>
+                    <button type="button" class="df-btn" id="add-v2-effects-row">+ Add Effects Settings Row</button>
+                  </div>
+                  <div id="v2-effects-rows" style="margin-top:8px;"></div>
+                </div>
+              `)}
             </div>
 
             <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
