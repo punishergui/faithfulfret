@@ -164,6 +164,24 @@ const one = (sql, v) => db.prepare(sql).get(v);
 const run = (sql, v) => db.prepare(sql).run(v);
 
 const listSessions = () => all('SELECT * FROM sessions ORDER BY date DESC, createdAt DESC');
+
+const listSessionDailyTotals = () => all(`
+  SELECT
+    s1.date AS date,
+    COALESCE(SUM(COALESCE(s1.durationMinutes, 0)), 0) AS totalMinutes,
+    COUNT(*) AS sessionCount,
+    (
+      SELECT s2.id
+      FROM sessions s2
+      WHERE s2.date = s1.date
+      ORDER BY s2.createdAt DESC
+      LIMIT 1
+    ) AS sessionId
+  FROM sessions s1
+  WHERE s1.date IS NOT NULL
+  GROUP BY s1.date
+  ORDER BY s1.date DESC
+`);
 const getSession = (id) => one('SELECT * FROM sessions WHERE id = ?', id);
 const saveSession = (data) => { const row = coerceSession(data); Q.upsertSession.run(row); return getSession(row.id); };
 const deleteSession = (id) => run('DELETE FROM sessions WHERE id = ?', id);
@@ -185,4 +203,4 @@ const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
 const clearAll = () => db.exec('DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
-module.exports = { dbPath, listSessions, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };

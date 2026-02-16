@@ -10,12 +10,14 @@ Pages.Dashboard = {
     let stats;
     let sessions;
     let resources;
+    let heatmapDays;
 
     try {
-      [stats, sessions, resources] = await Promise.all([
+      [stats, sessions, resources, heatmapDays] = await Promise.all([
         DB.getStats(),
         DB.getAllSess(),
         DB.getAllResources(),
+        DB.getSessionHeatmap(),
       ]);
     } catch (error) {
       app.innerHTML = `
@@ -54,6 +56,7 @@ Pages.Dashboard = {
           <div>
             
             ${this._renderQuickLog(today)}
+            ${this._renderCompactHeatmap(heatmapDays, today)}
             ${this._renderCalendar(stats.allDates)}
             ${topResources.length ? this._renderTopResources(topResources) : ''}
           </div>
@@ -64,6 +67,7 @@ Pages.Dashboard = {
     this._initStatCounters(app, stats);
     this._initCalendarNav(app, stats.allDates);
     this._initQuickLog(app, today);
+    this._initDashboardHeatmap(app);
 
     // Stagger reveal
     setTimeout(() => Utils.staggerReveal(app, '.session-row', 0), 50);
@@ -160,18 +164,12 @@ Pages.Dashboard = {
       }).join('')}
     </div>`;
   },
-
-
-  // __FF_QUICK_LOG__
-  // __FF_QUICK_LOG__
-
-  // __FF_QUICK_LOG__
-  // __FF_QUICK_LOG__
   _renderQuickLog(today) {
     let lastFocus = '';
     let lastMinutes = 20;
     try { lastFocus = (localStorage.getItem('df:lastFocus') || '').trim(); } catch (e) {}
     try { lastMinutes = parseInt(localStorage.getItem('df:lastMinutes') || '20', 10) || 20; } catch (e) {}
+    if (![10, 20, 30, 45, 60].includes(lastMinutes)) lastMinutes = 20;
 
     const focuses = ['Chords','Scales','Strumming','Picking','Worship Set','Metronome','Song Practice','Technique','Ear Training'];
 
@@ -186,11 +184,14 @@ Pages.Dashboard = {
           <label class="df-label">Minutes</label>
           <input type="hidden" id="ql-minutes" value="${lastMinutes}">
           <div class="df-pillrow" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;" aria-label="Quick minutes">
-            ${[10,20,30,45,'60+'].map(m => `
-              <button type="button" class="df-btn df-btn--outline" data-ql-min="${m}" style="font-size:11px;padding:8px 12px;border-radius:999px;">
-                ${m}
-              </button>
-            `).join('')}
+            ${[10,20,30,45,'60+'].map(m => {
+              const val = m === '60+' ? 60 : m;
+              return `
+                <button type="button" class="ql-pill ${val === lastMinutes ? 'is-active' : ''}" data-ql-min="${m}">
+                  ${m}
+                </button>
+              `;
+            }).join('')}
           </div>
         </div>
 
@@ -218,7 +219,6 @@ Pages.Dashboard = {
     `;
   },
 
-  // __FF_QUICK_LOG__
   _initQuickLog(container, today) {
     const root = container;
     const msg = root.querySelector('#ql-msg');
@@ -226,18 +226,26 @@ Pages.Dashboard = {
     const focusEl = root.querySelector('#ql-focus');
     const ytEl = root.querySelector('#ql-yt');
 
-    // minutes pills
+    const updatePillState = (value) => {
+      root.querySelectorAll('[data-ql-min]').forEach((btn) => {
+        let pillValue = btn.getAttribute('data-ql-min');
+        if (pillValue === '60+') pillValue = '60';
+        btn.classList.toggle('is-active', String(value) === String(pillValue));
+      });
+    };
+
+    if (minutesEl?.value) updatePillState(minutesEl.value);
+
     root.querySelectorAll('[data-ql-min]').forEach(btn => {
       btn.addEventListener('click', () => {
         let m = btn.getAttribute('data-ql-min');
         if (m === '60+') m = '60';
         if (minutesEl) minutesEl.value = m;
+        updatePillState(m);
         try { localStorage.setItem('df:lastMinutes', String(m)); } catch(e) {}
-        Utils.toast?.(`Quick minutes: ${m}m`);
       });
     });
 
-    // save
     root.querySelector('#ql-save')?.addEventListener('click', async () => {
       const minutes = parseInt((minutesEl?.value || '0'), 10) || 0;
       if (!minutes) return Utils.toast?.('Pick minutes first', 'error');
@@ -257,12 +265,96 @@ Pages.Dashboard = {
         const saved = await DB.saveSess(data);
         if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch(e) {} }
         Utils.toast?.('Saved quick session ✅');
-        if (msg) { msg.style.display = 'block'; msg.textContent = 'Saved. Tap to edit →'; msg.onclick = () => go(`#/log/${saved.id}`); }
+        if (msg) {
+          msg.style.display = 'block';
+          msg.innerHTML = `Saved — <button type="button" class="ql-msg-link">Edit →</button>`;
+          msg.querySelector('.ql-msg-link')?.addEventListener('click', () => go(`#/log/${saved.id}`));
+        }
       } catch (e) {
         console.error(e);
         Utils.toast?.('Failed to save quick session', 'error');
       }
     });
+  },
+
+  _renderCompactHeatmap(rows = [], today, initialMetric = 'minutes') {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    return `
+      <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Practice Pulse · 90 Days</div>
+          <div class="heatmap-toggle" data-heatmap-toggle>
+            <button type="button" class="is-active" data-hm-metric="minutes">Minutes</button>
+            <button type="button" data-hm-metric="sessions">Sessions</button>
+          </div>
+        </div>
+        <div id="dashboard-heatmap" data-hm-days='${JSON.stringify(safeRows).replace(/'/g, '&#39;')}' data-hm-today="${today}" data-hm-range="90" data-hm-metric="${initialMetric}"></div>
+      </div>
+    `;
+  },
+
+  _initDashboardHeatmap(container) {
+    const mount = container.querySelector('#dashboard-heatmap');
+    if (!mount) return;
+
+    const raw = mount.getAttribute('data-hm-days') || '[]';
+    let rows = [];
+    try { rows = JSON.parse(raw); } catch (e) { rows = []; }
+    const byDate = new Map(rows.map((row) => [row.date, row]));
+
+    const draw = () => {
+      const metric = mount.getAttribute('data-hm-metric') || 'minutes';
+      const today = new Date(`${mount.getAttribute('data-hm-today')}T12:00:00`);
+      const range = parseInt(mount.getAttribute('data-hm-range') || '90', 10);
+      const cells = [];
+      const values = [];
+
+      for (let i = range - 1; i >= 0; i -= 1) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const date = d.toISOString().slice(0, 10);
+        const row = byDate.get(date);
+        const minutes = Number(row?.totalMinutes || 0);
+        const sessionCount = Number(row?.sessionCount || 0);
+        const value = metric === 'sessions' ? sessionCount : minutes;
+        if (value > 0) values.push(value);
+        cells.push({ date, value, minutes, sessionCount, sessionId: row?.sessionId || '' });
+      }
+
+      const max = values.length ? Math.max(...values) : 0;
+      mount.innerHTML = `
+        <div class="ff-heatmap ff-heatmap--compact">
+          ${cells.map((cell) => {
+            const level = this._heatLevel(cell.value, max);
+            const title = `${cell.date} • ${cell.minutes}m • ${cell.sessionCount} session${cell.sessionCount === 1 ? '' : 's'}`;
+            return `<button type="button" class="heatmap-cell level-${level}" ${cell.sessionId ? `data-session-id="${cell.sessionId}"` : 'disabled'} title="${title}" aria-label="${title}"></button>`;
+          }).join('')}
+        </div>
+      `;
+
+      mount.querySelectorAll('[data-session-id]').forEach((btn) => {
+        btn.addEventListener('click', () => go(`#/session/${btn.getAttribute('data-session-id')}`));
+      });
+    };
+
+    container.querySelectorAll('[data-hm-metric]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        mount.setAttribute('data-hm-metric', btn.getAttribute('data-hm-metric'));
+        container.querySelectorAll('[data-hm-metric]').forEach((el) => el.classList.toggle('is-active', el === btn));
+        draw();
+      });
+    });
+
+    draw();
+  },
+
+  _heatLevel(value, max) {
+    if (!value || !max) return 0;
+    const ratio = value / max;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
   },
 
   _renderCalendar(allDates, year, month) {
