@@ -164,65 +164,44 @@ Pages.Dashboard = {
   // __FF_QUICK_LOG__
   // __FF_QUICK_LOG__
   // __FF_QUICK_LOG__
+  // __FF_QUICK_LOG__
   _renderQuickLog(today) {
     let lastFocus = '';
+    let lastMinutes = 20;
     try { lastFocus = (localStorage.getItem('df:lastFocus') || '').trim(); } catch (e) {}
+    try { lastMinutes = parseInt(localStorage.getItem('df:lastMinutes') || '20', 10) || 20; } catch (e) {}
 
-    const presets = [
-      '— Select —',
-      'Chords',
-      'Scales',
-      'Strumming',
-      'Picking',
-      'Metronome',
-      'Worship Set',
-      'Song Practice',
-      'Technique',
-      'Ear Training'
-    ];
+    const focuses = ['Chords','Scales','Strumming','Picking','Worship Set','Metronome','Song Practice','Technique','Ear Training'];
 
     return `
-      <div class="card" style="margin-bottom:18px;padding:16px;border:1px solid var(--line);background:rgba(0,0,0,.25);">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-          <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">
-            Quick Log
-          </div>
-          <div style="font-family:var(--f-mono);font-size:11px;color:var(--text3);">${today}</div>
+      <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
         </div>
 
-        <form id="df-quicklog-form" style="display:grid;gap:12px;">
-          <div class="df-field">
-            <label class="df-label" for="ql-focus">Focus</label>
-            <select id="ql-focus" name="focus" class="df-input">
-              ${presets.map(opt => {
-                const val = opt === '— Select —' ? '' : opt;
-                const sel = (val && lastFocus && val === lastFocus) ? 'selected' : '';
-                return `<option value="${val}" ${sel}>${opt}</option>`;
-              }).join('')}
-            </select>
-            <div style="margin-top:8px;color:var(--text3);font-size:12px;">
-              Tip: it remembers your last focus.
-            </div>
-          </div>
+        <div class="df-field" style="margin-bottom:10px;">
+          <label class="df-label" for="ql-focus">Focus</label>
+          <select id="ql-focus" class="df-input">
+            <option value="">— Select —</option>
+            ${focuses.map(f => `<option value="${f}" ${lastFocus===f?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
 
-          <div class="df-field">
-            <label class="df-label" for="ql-yt">YouTube URL (or ID)</label>
-            <input id="ql-yt" name="youtube" type="text" class="df-input" placeholder="Paste URL or ID">
-            <div style="margin-top:8px;color:var(--text3);font-size:12px;">
-              We’ll extract the ID automatically.
-            </div>
-          </div>
+        <div class="df-field" style="margin-bottom:12px;">
+          <label class="df-label" for="ql-yt">YouTube URL (or ID)</label>
+          <input id="ql-yt" class="df-input" type="text" placeholder="Paste YouTube link or ID">
+        </div>
 
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:2px;">
-            <button type="submit" class="df-btn df-btn--primary" style="flex:1;min-width:180px;">Save Quick Log</button>
-            <a href="#/log" class="df-btn df-btn--outline" style="flex:1;min-width:180px;text-align:center;">Full Log Form</a>
-          </div>
+        <button type="button" id="ql-save" class="df-btn df-btn--primary df-btn--full">Save Quick Log</button>
 
-          <div id="ql-err" style="display:none;margin-top:6px;padding:10px 12px;border:1px solid #ff3b30;border-radius:12px;background:rgba(0,0,0,.35);color:#fff;font-family:system-ui;"></div>
-        </form>
+        <div style="margin-top:8px;color:var(--text3);font-size:11px;">
+          Tip: hit save now — you can edit details later.
+        </div>
       </div>
     `;
   },
+
   _initQuickLog(container, today) {
     const form = container.querySelector('#df-quicklog-form');
     if (!form) return;
