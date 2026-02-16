@@ -1,7 +1,74 @@
+import { VYPYRX2_PANEL_MAP } from '../lib/vypyrx2-panel-map.js';
+
 window.Pages = window.Pages || {};
 
 Pages.Presets = {
   fxBlocks: ['noiseGate', 'overdrive', 'delay', 'reverb', 'modulation'],
+  encoderColors: ['green', 'yellow', 'red'],
+  toneClockLabels: ['7:30', '9:00', '10:30', '12:00', '1:30', '3:00', '4:30'],
+
+  clamp(value, min, max) {
+    return Math.min(max, Math.max(min, Number(value) || 0));
+  },
+
+  defaultVypyrX2() {
+    return {
+      encoders: {
+        instStomp: { index: 0, color: 'green' },
+        amp: { index: 0, channel: 'green' },
+        effects: { index: 0, color: 'green' },
+      },
+      knobs: {
+        preGain: 0,
+        low: 0,
+        mid: 0,
+        high: 0,
+        postGain: 0,
+      },
+      bank: 0,
+      status: {
+        looper: false,
+        edit: false,
+        tempo: false,
+      },
+    };
+  },
+
+  normalizeVypyrX2(raw) {
+    const defaults = this.defaultVypyrX2();
+    const parsed = raw && typeof raw === 'object' ? raw : {};
+    const normalized = {
+      encoders: {
+        instStomp: {
+          index: this.clamp(parsed.encoders?.instStomp?.index, 0, 11),
+          color: this.encoderColors.includes(parsed.encoders?.instStomp?.color) ? parsed.encoders.instStomp.color : defaults.encoders.instStomp.color,
+        },
+        amp: {
+          index: this.clamp(parsed.encoders?.amp?.index, 0, 11),
+          channel: this.encoderColors.includes(parsed.encoders?.amp?.channel) ? parsed.encoders.amp.channel : defaults.encoders.amp.channel,
+        },
+        effects: {
+          index: this.clamp(parsed.encoders?.effects?.index, 0, 11),
+          color: this.encoderColors.includes(parsed.encoders?.effects?.color) ? parsed.encoders.effects.color : defaults.encoders.effects.color,
+        },
+      },
+      knobs: {
+        preGain: this.clamp(parsed.knobs?.preGain, 0, 6),
+        low: this.clamp(parsed.knobs?.low, 0, 6),
+        mid: this.clamp(parsed.knobs?.mid, 0, 6),
+        high: this.clamp(parsed.knobs?.high, 0, 6),
+        postGain: this.clamp(parsed.knobs?.postGain, 0, 6),
+      },
+      bank: this.clamp(parsed.bank, 0, 3),
+      status: {
+        looper: Boolean(parsed.status?.looper),
+        edit: Boolean(parsed.status?.edit),
+        tempo: Boolean(parsed.status?.tempo),
+      },
+    };
+
+    return normalized;
+  },
 
   defaultSettings() {
     return {
@@ -27,6 +94,7 @@ Pages.Presets = {
       notes: '',
       tags: [],
       imagePath: '',
+      vypyrX2: this.defaultVypyrX2(),
     };
   },
 
@@ -62,6 +130,7 @@ Pages.Presets = {
       tags: Array.isArray(parsed.tags) ? parsed.tags : defaults.tags,
       notes: parsed.notes || '',
       imagePath: parsed.imagePath || '',
+      vypyrX2: this.normalizeVypyrX2(parsed.vypyrX2),
     };
   },
 
@@ -78,6 +147,47 @@ Pages.Presets = {
     const settings = this.parseSettings(p.settings);
     if (settings.tags.length) return settings.tags.join(', ');
     return p.tags || '—';
+  },
+
+  getNotesPreview(notes) {
+    const compact = String(notes || '').trim().replace(/\s+/g, ' ');
+    if (!compact) return 'No notes yet.';
+    return compact.length > 100 ? `${compact.slice(0, 100)}…` : compact;
+  },
+
+  renderRingDots(points, activeIndex, color) {
+    return points.map((point, index) => `<span class="amp-dot ${index === activeIndex ? `is-on ${color}` : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`).join('');
+  },
+
+  renderSingleDots(dots, activeKey, color = 'blue') {
+    return Object.entries(dots)
+      .map(([key, point]) => `<span class="amp-dot ${key === activeKey ? `is-on ${color}` : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`)
+      .join('');
+  },
+
+  renderStatusDots(status) {
+    return Object.entries(VYPYRX2_PANEL_MAP.status)
+      .map(([key, point]) => `<span class="amp-dot ${status[key] ? 'is-on yellow' : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`)
+      .join('');
+  },
+
+  renderVypyrX2Overlay(vypyrX2Settings, compact = false) {
+    const normalized = this.normalizeVypyrX2(vypyrX2Settings);
+    const cls = compact ? 'amp-panel amp-panel--compact' : 'amp-panel';
+
+    return `<div class="${cls}">
+      <img class="amp-panel__bg" src="/img/amps/vypyrx2-top.png" alt="Peavey Vypyr X2 top panel">
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.instStomp, normalized.encoders.instStomp.index, normalized.encoders.instStomp.color)}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.amp, normalized.encoders.amp.index, normalized.encoders.amp.channel)}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.effects, normalized.encoders.effects.index, normalized.encoders.effects.color)}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.preGain, normalized.knobs.preGain, 'blue')}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.low, normalized.knobs.low, 'blue')}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.mid, normalized.knobs.mid, 'blue')}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.high, normalized.knobs.high, 'blue')}
+      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.postGain, normalized.knobs.postGain, 'blue')}
+      ${this.renderSingleDots(VYPYRX2_PANEL_MAP.bank, String(normalized.bank), 'blue')}
+      ${this.renderStatusDots(normalized.status)}
+    </div>`;
   },
 
   async render() {
@@ -126,11 +236,14 @@ Pages.Presets = {
         </div>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">Amp: ${this.escapeHtml(p.ampModel || '—')} · ${this.escapeHtml(settings.channel || '—')}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:6px;">Gain: Pre ${settings.gain.pre} / Post ${settings.gain.post}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:6px;">EQ: L ${settings.eq.low} · M ${settings.eq.mid} · H ${settings.eq.high}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:6px;">Tags: ${this.escapeHtml(this.prettyTags(p))}</div>
-      ${settings.imagePath ? `<img src="${settings.imagePath}" alt="Preset amp" style="margin-top:8px;width:100%;max-height:160px;object-fit:cover;border:1px solid var(--line2);" />` : ''}
-      <pre style="white-space:pre-wrap;color:var(--text3);font-size:11px;margin-top:8px;">${this.escapeHtml(JSON.stringify(settings, null, 2))}</pre>
+      <div style="margin-top:8px;">${this.renderVypyrX2Overlay(settings.vypyrX2, true)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:8px;">Tags: ${this.escapeHtml(this.prettyTags(p))}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px;">Notes: ${this.escapeHtml(this.getNotesPreview(settings.notes))}</div>
+      ${settings.imagePath ? `<img src="${settings.imagePath}" alt="Preset amp" style="margin-top:8px;width:100%;max-height:120px;object-fit:cover;border:1px solid var(--line2);" />` : ''}
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text2);">Advanced JSON</summary>
+        <pre style="white-space:pre-wrap;color:var(--text2);font-size:11px;margin-top:6px;">${this.escapeHtml(JSON.stringify(settings, null, 2))}</pre>
+      </details>
     </div>`;
   },
 
@@ -159,6 +272,35 @@ Pages.Presets = {
       notes: String(fd.get('notes') || ''),
       tags,
       imagePath: String(fd.get('imagePath') || ''),
+      vypyrX2: this.normalizeVypyrX2({
+        encoders: {
+          instStomp: {
+            index: Number(fd.get('v2_inst_index') || 0),
+            color: String(fd.get('v2_inst_color') || 'green'),
+          },
+          amp: {
+            index: Number(fd.get('v2_amp_index') || 0),
+            channel: String(fd.get('v2_amp_channel') || 'green'),
+          },
+          effects: {
+            index: Number(fd.get('v2_fx_index') || 0),
+            color: String(fd.get('v2_fx_color') || 'green'),
+          },
+        },
+        knobs: {
+          preGain: Number(fd.get('v2_knob_preGain') || 0),
+          low: Number(fd.get('v2_knob_low') || 0),
+          mid: Number(fd.get('v2_knob_mid') || 0),
+          high: Number(fd.get('v2_knob_high') || 0),
+          postGain: Number(fd.get('v2_knob_postGain') || 0),
+        },
+        bank: Number(fd.get('v2_bank') || 0),
+        status: {
+          looper: fd.get('v2_status_looper') === 'on',
+          edit: fd.get('v2_status_edit') === 'on',
+          tempo: fd.get('v2_status_tempo') === 'on',
+        },
+      }),
     };
 
     this.fxBlocks.forEach((key) => {
@@ -188,6 +330,34 @@ Pages.Presets = {
     return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);margin-bottom:8px;">
       <label class="df-label" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><input type="checkbox" name="fx_${key}_enabled" ${block.enabled ? 'checked' : ''}> ${label}</label>
       <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));">${params}</div>
+    </div>`;
+  },
+
+  renderEncoderFieldset(label, key, model, helperText) {
+    return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+      <strong style="font-size:13px;">${label}</strong>
+      <p style="margin-top:4px;font-size:12px;color:var(--text2);">${helperText}</p>
+      <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+        <div class="df-field"><label class="df-label">LED Position</label>
+          <select name="v2_${key}_index" class="df-input">
+            ${Array.from({ length: 12 }, (_, i) => `<option value="${i}" ${model.index === i ? 'selected' : ''}>${i + 1} of 12</option>`).join('')}
+          </select>
+        </div>
+        <div class="df-field"><label class="df-label">Color</label>
+          <select name="v2_${key}_${key === 'amp' ? 'channel' : 'color'}" class="df-input">
+            ${this.encoderColors.map((color) => `<option value="${color}" ${String(model[key === 'amp' ? 'channel' : 'color']) === color ? 'selected' : ''}>${color}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  renderToneKnobControl(label, key, value) {
+    return `<div class="df-field">
+      <label class="df-label">${label}</label>
+      <select name="v2_knob_${key}" class="df-input">
+        ${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${value === index ? 'selected' : ''}>${clock}</option>`).join('')}
+      </select>
     </div>`;
   },
 
@@ -231,6 +401,43 @@ Pages.Presets = {
           </div>
 
           <div class="full-width" style="border-top:1px solid var(--line2);padding-top:10px;">
+            <strong>Vypyr X2 Panel</strong>
+            <p style="margin-top:4px;font-size:12px;color:var(--text2);">Use the selectors below to match what you see on the real amp panel.</p>
+            <div id="vypyrx2-overlay-preview" style="margin-top:10px;"></div>
+            <div style="margin-top:10px;display:grid;gap:8px;">
+              ${this.renderEncoderFieldset('Inst/Stomp', 'inst', settings.vypyrX2.encoders.instStomp, 'This matches the LED ring on the amp. Pick the lit LED position you see.')}
+              ${this.renderEncoderFieldset('Amp', 'amp', settings.vypyrX2.encoders.amp, 'This matches the AMP selector ring and channel color on the amp.')}
+              ${this.renderEncoderFieldset('Effects', 'fx', settings.vypyrX2.encoders.effects, 'This matches the LED ring on the amp. Pick the lit LED position you see.')}
+            </div>
+            <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+              <strong style="font-size:13px;">Tone Knobs</strong>
+              <p style="margin-top:4px;font-size:12px;color:var(--text2);">7-position clock selector (7:30 to 4:30, no 6 o'clock LED).</p>
+              <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+                ${this.renderToneKnobControl('Pre', 'preGain', settings.vypyrX2.knobs.preGain)}
+                ${this.renderToneKnobControl('Low', 'low', settings.vypyrX2.knobs.low)}
+                ${this.renderToneKnobControl('Mid', 'mid', settings.vypyrX2.knobs.mid)}
+                ${this.renderToneKnobControl('High', 'high', settings.vypyrX2.knobs.high)}
+                ${this.renderToneKnobControl('Post', 'postGain', settings.vypyrX2.knobs.postGain)}
+              </div>
+            </div>
+            <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+              <div class="df-field"><label class="df-label">Bank</label>
+                <select name="v2_bank" class="df-input">
+                  ${[1, 2, 3, 4].map((label, index) => `<option value="${index}" ${settings.vypyrX2.bank === index ? 'selected' : ''}>Bank ${label}</option>`).join('')}
+                </select>
+                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Pick the active bank LED shown on your amp.</p>
+              </div>
+              <div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+                <strong style="font-size:13px;">Status LEDs</strong>
+                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Toggle LEDs that are currently lit.</p>
+                <div style="margin-top:8px;display:grid;gap:6px;">
+                  ${['looper', 'edit', 'tempo'].map((key) => `<label class="df-label" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="v2_status_${key}" ${settings.vypyrX2.status[key] ? 'checked' : ''}> ${key[0].toUpperCase() + key.slice(1)}</label>`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="full-width" style="border-top:1px solid var(--line2);padding-top:10px;">
             <strong>FX Blocks</strong>
             <div style="margin-top:8px;">${this.fxBlocks.map((key) => this.renderFxBlock(key, settings.fx[key])).join('')}</div>
           </div>
@@ -266,6 +473,19 @@ Pages.Presets = {
     const uploadBtn = wrap.querySelector('#upload-preset-image');
     const statusEl = wrap.querySelector('#preset-image-status');
     const previewEl = wrap.querySelector('#preset-image-preview');
+    const overlayPreview = wrap.querySelector('#vypyrx2-overlay-preview');
+
+    const refreshOverlay = () => {
+      const draftSettings = this.settingsFromForm(form);
+      overlayPreview.innerHTML = this.renderVypyrX2Overlay(draftSettings.vypyrX2);
+    };
+
+    refreshOverlay();
+    form.querySelectorAll('select,input[type="checkbox"]').forEach((input) => {
+      if (String(input.name || '').startsWith('v2_')) {
+        input.addEventListener('change', refreshOverlay);
+      }
+    });
 
     uploadBtn.addEventListener('click', async () => {
       const file = form.imageFile.files[0];
