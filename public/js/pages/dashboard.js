@@ -52,6 +52,7 @@ Pages.Dashboard = {
             </div>
           </div>
           <div>
+            
             ${this._renderQuickLog(today)}
             ${this._renderCalendar(stats.allDates)}
             ${topResources.length ? this._renderTopResources(topResources) : ''}
@@ -163,7 +164,7 @@ Pages.Dashboard = {
 
   // __FF_QUICK_LOG__
   // __FF_QUICK_LOG__
-  // __FF_QUICK_LOG__
+
   // __FF_QUICK_LOG__
   _renderQuickLog(today) {
     let lastFocus = '';
@@ -177,7 +178,7 @@ Pages.Dashboard = {
       <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
-          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">${lastMinutes}m default</div>
         </div>
 
         <div class="df-field" style="margin-bottom:10px;">
@@ -193,77 +194,46 @@ Pages.Dashboard = {
           <input id="ql-yt" class="df-input" type="text" placeholder="Paste YouTube link or ID">
         </div>
 
-        <button type="button" id="ql-save" class="df-btn df-btn--primary df-btn--full">Save Quick Log</button>
-
-        <div style="margin-top:8px;color:var(--text3);font-size:11px;">
-          Tip: hit save now — you can edit details later.
-        </div>
+        <button type="button" id="ql-save" class="df-btn df-btn--primary df-btn--full">Save</button>
+        <div style="margin-top:8px;color:var(--text3);font-size:11px;">Save now, edit details later.</div>
       </div>
     `;
   },
 
+  // __FF_QUICK_LOG__
   _initQuickLog(container, today) {
-    const form = container.querySelector('#df-quicklog-form');
-    if (!form) return;
+    const btn = container.querySelector('#ql-save');
+    if (!btn) return;
 
-    const focusEl = form.querySelector('#ql-focus');
-    const ytEl = form.querySelector('#ql-yt');
-    const errEl = form.querySelector('#ql-err');
+    btn.addEventListener('click', async () => {
+      const focus = (container.querySelector('#ql-focus')?.value || '').trim();
+      const ytRaw = (container.querySelector('#ql-yt')?.value || '').trim();
 
-    function showErr(msg) {
-      if (!errEl) return alert(msg);
-      errEl.style.display = 'block';
-      errEl.textContent = msg;
-    }
-    function clearErr() {
-      if (!errEl) return;
-      errEl.style.display = 'none';
-      errEl.textContent = '';
-    }
+      let minutes = 20;
+      try { minutes = parseInt(localStorage.getItem('df:lastMinutes') || '20', 10) || 20; } catch (e) {}
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      clearErr();
-
-      const focus = (focusEl?.value || '').trim();
-      let videoId = (ytEl?.value || '').trim();
-
-      if (!focus && !videoId) {
-        return showErr('Add a Focus or a YouTube link (or both).');
+      let videoId = '';
+      if (ytRaw) {
+        videoId = (Utils.extractYouTubeId && Utils.extractYouTubeId(ytRaw)) || ytRaw;
+        videoId = videoId.trim();
       }
 
-      if (videoId) {
-        const extracted = Utils.extractYouTubeId?.(videoId);
-        videoId = extracted || videoId;
-      }
-
-      const data = { date: today };
+      const data = { date: today, minutes };
       if (focus) data.focus = focus;
       if (videoId) data.videoId = videoId;
 
       try {
         const saved = await DB.saveSess(data);
-
         if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch (e) {} }
-
-        Utils.toast?.('Quick log saved ✅');
-
-        // Stay on dashboard, but refresh stats/recent list
-        Pages.Dashboard.render();
-
-        // Optional: clear YouTube field for next quick log
-        if (ytEl) ytEl.value = '';
-
-        // If you prefer to jump straight into editing, uncomment:
-        // go(`#/session/${saved.id}`);
-      } catch (err) {
-        console.error(err);
-        showErr(String(err?.message || err || 'Failed to save'));
-        Utils.toast?.('Save failed', 'error');
+        try { localStorage.setItem('df:lastMinutes', String(minutes)); } catch (e) {}
+        Utils.toast?.('Saved ✅');
+        go(`#/session/${saved.id}`);
+      } catch (e) {
+        console.error(e);
+        Utils.toast?.('Quick log failed', 'error');
       }
     });
   },
-
 
   _renderCalendar(allDates, year, month) {
     const now = new Date();
