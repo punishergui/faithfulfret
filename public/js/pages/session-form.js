@@ -25,6 +25,7 @@ Pages.SessionForm = {
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
         <form id="session-form" novalidate>
+          <div id="form-error" style="display:none;margin-bottom:14px;padding:12px 14px;border:1px solid #ff3b30;border-radius:12px;background:rgba(0,0,0,.35);color:#fff;font-family:system-ui;"></div>
           <div class="form-grid">
             <div class="df-field">
               <label class="df-label" for="f-date">Date *</label>
@@ -60,7 +61,7 @@ Pages.SessionForm = {
               <textarea id="f-win" name="win" class="df-input" rows="3" placeholder="What did you nail today? What clicked?">${session.win || ''}</textarea>
             </div>
             <div class="df-field full-width">
-              <label class="df-label" for="f-video">YouTube Video ID</label>
+              <label class="df-label" for="f-video">YouTube Video ID (or URL)</label>
               <input type="text" id="f-video" name="videoId" class="df-input" value="${session.videoId || ''}" placeholder="e.g. dQw4w9WgXcQ (just the ID, not the full URL)">
             </div>
             <div class="df-field full-width">
@@ -97,6 +98,47 @@ Pages.SessionForm = {
 
   _initForm(container, session, isEdit) {
     const form = container.querySelector('#session-form');
+    // __FF_SESSIONFORM_UX__
+    const errBox = container.querySelector('#form-error');
+    const lastFocusKey = 'df:lastFocus';
+
+    function showError(msg) {
+      if (!errBox) return alert(msg);
+      errBox.style.display = 'block';
+      errBox.textContent = msg;
+    }
+    function clearError() {
+      if (!errBox) return;
+      errBox.style.display = 'none';
+      errBox.textContent = '';
+    }
+
+    // Quick duration pills
+    container.querySelectorAll('[data-min]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = btn.getAttribute('data-min');
+        const minutes = container.querySelector('#f-minutes');
+        if (minutes) {
+          minutes.value = m;
+          minutes.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        Utils.toast?.(`Set duration to ${m}m`);
+      });
+    });
+
+    // Use last focus
+    const useLast = container.querySelector('#use-last-focus');
+    useLast?.addEventListener('click', () => {
+      const last = localStorage.getItem(lastFocusKey) || '';
+      if (!last) return Utils.toast?.('No previous focus found', 'error');
+      const f = container.querySelector('#f-focus');
+      if (f) {
+        f.value = last;
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      Utils.toast?.('Applied last focus');
+    });
+
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -119,10 +161,8 @@ Pages.SessionForm = {
         if (data[k] === '') delete data[k];
       });
 
-      if (!data.date) {
-        alert('Date is required.');
-        return;
-      }
+      if (!data.date) return showError('Date is required.');
+      if (!data.minutes) return showError('Duration (minutes) is required.');
 
       if (isEdit) {
         data.id = session.id;
@@ -130,6 +170,8 @@ Pages.SessionForm = {
       }
 
       const saved = await DB.saveSess(data);
+      if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
+      Utils.toast?.('Saved session ✅');
       go(`#/session/${saved.id}`);
     });
 

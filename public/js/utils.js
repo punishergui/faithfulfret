@@ -131,3 +131,32 @@ window.Utils = {
     });
   },
 };
+
+// __FF_TOAST__
+// Simple toast notifications: Utils.toast("Saved", "success"|"error")
+window.Utils = window.Utils || {};
+Utils.toast = Utils.toast || function(message, type = 'success', ms = 2400) {
+  const id = 'df-toast-root';
+  let root = document.getElementById(id);
+  if (!root) {
+    root = document.createElement('div');
+    root.id = id;
+    root.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:420px;';
+    document.body.appendChild(root);
+  }
+
+  const el = document.createElement('div');
+  const border = type === 'error' ? '#ff3b30' : '#ff6a00';
+  el.style.cssText =
+    'padding:12px 14px;border-radius:12px;border:1px solid ' + border +
+    ';background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.35);';
+  el.textContent = message;
+
+  root.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    el.style.transition = 'opacity 220ms ease, transform 220ms ease';
+    setTimeout(() => el.remove(), 260);
+  }, ms);
+};
