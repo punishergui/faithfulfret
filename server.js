@@ -118,7 +118,16 @@ apiRouter.get('/stats', (req, res) => {
   res.json(buildStats());
 });
 
-apiRouter.get('/sessions', (req, res) => res.json(Store.listSessions()));
+apiRouter.get('/sessions', (req, res) => {
+  const sessions = Store.listSessions();
+  const gearRows = Store.listSessionGearBySessionIds(sessions.map((row) => row.id));
+  const bySession = {};
+  gearRows.forEach((row) => {
+    if (!bySession[row.sessionId]) bySession[row.sessionId] = [];
+    bySession[row.sessionId].push({ id: row.id, name: row.name, category: row.category, status: row.status });
+  });
+  res.json(sessions.map((row) => ({ ...row, gear: bySession[row.id] || [] })));
+});
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
 apiRouter.post('/sessions', (req, res) => {
   if (!req.body?.date) return res.status(400).json({ error: 'date is required' });
@@ -127,7 +136,7 @@ apiRouter.post('/sessions', (req, res) => {
 apiRouter.get('/sessions/:id', (req, res) => {
   const row = Store.getSession(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
-  res.json(row);
+  res.json({ ...row, gear: Store.listSessionGear(req.params.id) });
 });
 apiRouter.put('/sessions/:id', (req, res) => {
   const saved = Store.saveSession({ ...req.body, id: req.params.id });
@@ -138,7 +147,10 @@ apiRouter.delete('/sessions/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-apiRouter.get('/gear-items', (req, res) => res.json(Store.listGear()));
+apiRouter.get('/gear-items', (req, res) => {
+  const includeLinks = req.query.includeLinks !== 'false';
+  res.json(Store.listGear(includeLinks));
+});
 apiRouter.post('/gear-items', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
   return res.json(Store.saveGear(req.body));
@@ -146,13 +158,35 @@ apiRouter.post('/gear-items', (req, res) => {
 apiRouter.get('/gear-items/:id', (req, res) => {
   const row = Store.getGear(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
-  res.json(row);
+  res.json({ ...row, linksList: Store.getGearLinks(req.params.id) });
 });
 apiRouter.put('/gear-items/:id', (req, res) => res.json(Store.saveGear({ ...req.body, id: req.params.id })));
 apiRouter.delete('/gear-items/:id', (req, res) => {
   Store.deleteGear(req.params.id);
   res.json({ ok: true });
 });
+
+apiRouter.get('/gear-items/:id/links', (req, res) => res.json(Store.getGearLinks(req.params.id)));
+apiRouter.post('/gear-items/:id/links', (req, res) => {
+  if (!req.body?.url) return res.status(400).json({ error: 'url is required' });
+  return res.json(Store.saveGearLink({ ...req.body, gearId: req.params.id }));
+});
+apiRouter.put('/gear-items/:id/links/:linkId', (req, res) => {
+  const links = Store.getGearLinks(req.params.id);
+  const existing = links.find((row) => row.id === req.params.linkId);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  return res.json(Store.saveGearLink({ ...existing, ...req.body, id: req.params.linkId, gearId: req.params.id }));
+});
+apiRouter.delete('/gear-items/:id/links/:linkId', (req, res) => {
+  Store.deleteGearLink(req.params.linkId);
+  res.json({ ok: true });
+});
+
+apiRouter.put('/sessions/:id/gear', (req, res) => {
+  const gearIds = Array.isArray(req.body?.gearIds) ? req.body.gearIds : [];
+  res.json(Store.saveSessionGear(req.params.id, gearIds));
+});
+apiRouter.get('/sessions/:id/gear', (req, res) => res.json(Store.listSessionGear(req.params.id)));
 
 apiRouter.get('/presets', (req, res) => res.json(Store.listPresets()));
 apiRouter.post('/presets', (req, res) => {
@@ -278,7 +312,9 @@ apiRouter.delete('/resources/:id', (req, res) => {
 apiRouter.get('/export', (req, res) => {
   res.json({
     sessions: Store.listSessions(),
-    gear: Store.listGear(),
+    gear: Store.listGear(false),
+    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link }))),
+    session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
     resources: Store.listResources(),
     presets: Store.listPresets(),
     exportedAt: new Date().toISOString(),
@@ -289,7 +325,21 @@ apiRouter.post('/import', (req, res) => {
   const payload = req.body || {};
   Store.clearAll();
   for (const row of (payload.sessions || [])) Store.saveSession(row);
-  for (const row of (payload.gear || [])) Store.saveGear(row);
+  for (const row of (payload.gear || [])) {
+    const saved = Store.saveGear(row);
+    if (Array.isArray(row.linksList) && row.linksList.length) {
+      Store.replaceGearLinks(saved.id, row.linksList);
+    }
+  }
+  for (const row of (payload.gear_links || [])) Store.saveGearLink(row);
+  const sessionGear = payload.session_gear || payload.sessionGear || [];
+  const grouped = {};
+  sessionGear.forEach((row) => {
+    if (!row?.sessionId || !row?.gearId) return;
+    if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
+    grouped[row.sessionId].push(row.gearId);
+  });
+  Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
   for (const row of (payload.resources || [])) Store.saveResource(row);
   for (const row of (payload.presets || [])) Store.savePreset(row);
   res.json({ ok: true });

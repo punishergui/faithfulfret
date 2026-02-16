@@ -49,6 +49,20 @@ CREATE TABLE IF NOT EXISTS gear_items (
   manualUrl TEXT,
   imageData TEXT
 );
+CREATE TABLE IF NOT EXISTS gear_links (
+  id TEXT PRIMARY KEY,
+  gearId TEXT NOT NULL,
+  label TEXT,
+  url TEXT,
+  price REAL,
+  lastChecked TEXT,
+  note TEXT
+);
+CREATE TABLE IF NOT EXISTS session_gear (
+  sessionId TEXT NOT NULL,
+  gearId TEXT NOT NULL,
+  PRIMARY KEY (sessionId, gearId)
+);
 CREATE TABLE IF NOT EXISTS presets (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -67,6 +81,24 @@ CREATE TABLE IF NOT EXISTS resources (
   createdAt INTEGER NOT NULL
 );
 `);
+
+function ensureColumn(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((row) => row.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+ensureColumn('gear_items', 'boughtDate', 'TEXT');
+ensureColumn('gear_items', 'boughtPrice', 'REAL');
+ensureColumn('gear_items', 'boughtFrom', 'TEXT');
+ensureColumn('gear_items', 'tax', 'REAL');
+ensureColumn('gear_items', 'shipping', 'REAL');
+ensureColumn('gear_items', 'soldDate', 'TEXT');
+ensureColumn('gear_items', 'soldPrice', 'REAL');
+ensureColumn('gear_items', 'soldFees', 'REAL');
+ensureColumn('gear_items', 'soldWhere', 'TEXT');
+ensureColumn('gear_items', 'soldShipping', 'REAL');
 
 const uid = () => `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -92,11 +124,21 @@ function coerceSession(input = {}) {
   };
 }
 function coerceGear(input = {}) {
+  const statusMap = {
+    'Own it': 'Owned',
+    owned: 'Owned',
+    'Wish List': 'Wishlist',
+    wishlist: 'Wishlist',
+    watching: 'Watching',
+    'On Loan': 'Watching',
+    sold: 'Sold',
+  };
+  const nextStatus = statusMap[input.status] || input.status || 'Owned';
   return {
     id: input.id || uid(),
     name: input.name,
     type: input.type || input.category || '',
-    status: input.status || 'owned',
+    status: nextStatus,
     pricePaid: n(input.pricePaid ?? input.price),
     priceSold: n(input.priceSold),
     vendor: input.vendor || '',
@@ -112,6 +154,28 @@ function coerceGear(input = {}) {
     mfrUrl: input.mfrUrl || '',
     manualUrl: input.manualUrl || '',
     imageData: input.imageData || null,
+    boughtDate: input.boughtDate || input.dateAcquired || '',
+    boughtPrice: n(input.boughtPrice ?? input.pricePaid ?? input.price),
+    boughtFrom: input.boughtFrom || input.vendor || '',
+    tax: n(input.tax),
+    shipping: n(input.shipping),
+    soldDate: input.soldDate || '',
+    soldPrice: n(input.soldPrice ?? input.priceSold),
+    soldFees: n(input.soldFees),
+    soldWhere: input.soldWhere || '',
+    soldShipping: n(input.soldShipping),
+  };
+}
+
+function coerceGearLink(input = {}) {
+  return {
+    id: input.id || uid(),
+    gearId: input.gearId,
+    label: input.label || '',
+    url: input.url || '',
+    price: n(input.price),
+    lastChecked: input.lastChecked || '',
+    note: input.note || '',
   };
 }
 function coercePreset(input = {}) {
@@ -145,12 +209,17 @@ const Q = {
       date=excluded.date,title=excluded.title,durationMinutes=excluded.durationMinutes,youtubeId=excluded.youtubeId,focusTag=excluded.focusTag,
       notes=excluded.notes,bpm=excluded.bpm,dayNumber=excluded.dayNumber,focus=excluded.focus,mood=excluded.mood,win=excluded.win,
       checklist=excluded.checklist,links=excluded.links,videoId=excluded.videoId`),
-  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,mfrUrl,manualUrl,imageData)
-    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:mfrUrl,:manualUrl,:imageData)
+  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping)
+    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name,type=excluded.type,status=excluded.status,pricePaid=excluded.pricePaid,priceSold=excluded.priceSold,vendor=excluded.vendor,
       links=excluded.links,notes=excluded.notes,category=excluded.category,brand=excluded.brand,model=excluded.model,price=excluded.price,
-      dateAcquired=excluded.dateAcquired,buyUrl=excluded.buyUrl,mfrUrl=excluded.mfrUrl,manualUrl=excluded.manualUrl,imageData=excluded.imageData`),
+      dateAcquired=excluded.dateAcquired,buyUrl=excluded.buyUrl,mfrUrl=excluded.mfrUrl,manualUrl=excluded.manualUrl,imageData=excluded.imageData,
+      boughtDate=excluded.boughtDate,boughtPrice=excluded.boughtPrice,boughtFrom=excluded.boughtFrom,tax=excluded.tax,shipping=excluded.shipping,
+      soldDate=excluded.soldDate,soldPrice=excluded.soldPrice,soldFees=excluded.soldFees,soldWhere=excluded.soldWhere,soldShipping=excluded.soldShipping`),
+  upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note)
+    VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note)
+    ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note`),
   upsertPreset: db.prepare(`INSERT INTO presets (id,name,ampModel,settings,tags,createdAt)
     VALUES (:id,:name,:ampModel,:settings,:tags,:createdAt)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name,ampModel=excluded.ampModel,settings=excluded.settings,tags=excluded.tags`),
@@ -184,12 +253,68 @@ const listSessionDailyTotals = () => all(`
 `);
 const getSession = (id) => one('SELECT * FROM sessions WHERE id = ?', id);
 const saveSession = (data) => { const row = coerceSession(data); Q.upsertSession.run(row); return getSession(row.id); };
-const deleteSession = (id) => run('DELETE FROM sessions WHERE id = ?', id);
+const deleteSession = (id) => {
+  run('DELETE FROM session_gear WHERE sessionId = ?', id);
+  return run('DELETE FROM sessions WHERE id = ?', id);
+};
 
-const listGear = () => all('SELECT * FROM gear_items ORDER BY createdAt DESC');
+const listGear = (includeLinks = true) => {
+  const rows = all('SELECT * FROM gear_items ORDER BY createdAt DESC');
+  if (!includeLinks) return rows;
+  return rows.map((row) => ({ ...row, linksList: getGearLinks(row.id) }));
+};
 const getGear = (id) => one('SELECT * FROM gear_items WHERE id = ?', id);
 const saveGear = (data) => { const row = coerceGear(data); Q.upsertGear.run(row); return getGear(row.id); };
-const deleteGear = (id) => run('DELETE FROM gear_items WHERE id = ?', id);
+const deleteGear = (id) => {
+  run('DELETE FROM gear_links WHERE gearId = ?', id);
+  run('DELETE FROM session_gear WHERE gearId = ?', id);
+  return run('DELETE FROM gear_items WHERE id = ?', id);
+};
+
+const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY lastChecked DESC, id DESC').all(gearId);
+const saveGearLink = (data) => {
+  const row = coerceGearLink(data);
+  if (!row.gearId) throw new Error('gearId is required');
+  Q.upsertGearLink.run(row);
+  return row;
+};
+const deleteGearLink = (id) => run('DELETE FROM gear_links WHERE id = ?', id);
+const replaceGearLinks = (gearId, links = []) => {
+  const tx = db.transaction((targetGearId, nextLinks) => {
+    run('DELETE FROM gear_links WHERE gearId = ?', targetGearId);
+    nextLinks.forEach((link) => saveGearLink({ ...link, gearId: targetGearId }));
+  });
+  tx(gearId, links);
+  return getGearLinks(gearId);
+};
+
+const saveSessionGear = (sessionId, gearIds = []) => {
+  const tx = db.transaction((targetSessionId, ids) => {
+    run('DELETE FROM session_gear WHERE sessionId = ?', targetSessionId);
+    const insert = db.prepare('INSERT OR IGNORE INTO session_gear (sessionId, gearId) VALUES (?, ?)');
+    [...new Set(ids.filter(Boolean))].forEach((gearId) => insert.run(targetSessionId, gearId));
+  });
+  tx(sessionId, gearIds);
+  return listSessionGear(sessionId);
+};
+const listSessionGear = (sessionId) => db.prepare(`
+  SELECT g.*
+  FROM session_gear sg
+  JOIN gear_items g ON g.id = sg.gearId
+  WHERE sg.sessionId = ?
+  ORDER BY g.name COLLATE NOCASE ASC
+`).all(sessionId);
+const listSessionGearBySessionIds = (sessionIds = []) => {
+  if (!sessionIds.length) return [];
+  const placeholders = sessionIds.map(() => '?').join(',');
+  return db.prepare(`
+    SELECT sg.sessionId, g.id, g.name, g.category, g.status
+    FROM session_gear sg
+    JOIN gear_items g ON g.id = sg.gearId
+    WHERE sg.sessionId IN (${placeholders})
+    ORDER BY g.name COLLATE NOCASE ASC
+  `).all(...sessionIds);
+};
 
 const listPresets = () => all('SELECT * FROM presets ORDER BY createdAt DESC');
 const getPreset = (id) => one('SELECT * FROM presets WHERE id = ?', id);
@@ -201,6 +326,6 @@ const getResource = (id) => one('SELECT * FROM resources WHERE id = ?', id);
 const saveResource = (data) => { const row = coerceResource(data); Q.upsertResource.run(row); return getResource(row.id); };
 const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
-const clearAll = () => db.exec('DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
+const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
-module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, saveSessionGear, listSessionGear, listSessionGearBySessionIds, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };

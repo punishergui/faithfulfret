@@ -34,6 +34,7 @@ Pages.SessionSingle = {
       ${this._renderVideo(session, prevSession, nextSession, todaySession, today)}
       <div class="session-body">
         <div class="session-main">
+          ${session.gear?.length ? this._renderGear(session.gear) : ''}
           ${session.win ? this._renderWin(session.win) : ''}
           ${session.notes ? this._renderNotes(session.notes) : ''}
           ${session.links ? this._renderLinks(session.links) : ''}
@@ -129,6 +130,18 @@ Pages.SessionSingle = {
       <div style="max-width:700px;margin:24px auto;padding:0 24px;">
         ${nav}
         <div class="session-video__placeholder">// NO VIDEO LOGGED</div>
+      </div>
+    `;
+  },
+
+
+  _renderGear(gear = []) {
+    return `
+      <div style="margin-bottom:16px;padding:12px;border:1px solid var(--line2);background:var(--bg1);">
+        <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Used</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${gear.map((item) => `<span class="df-badge df-badge--muted">${item.name}</span>`).join('')}
+        </div>
       </div>
     `;
   },

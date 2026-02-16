@@ -96,6 +96,12 @@ docker compose -f docker-compose.prod.yml up -d
 
 # Verify DB path after deploy
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
+# Syntax checks for key app files after deploy
+docker exec -it daily-fret sh -lc "node --check /app/server.js"
+docker exec -it daily-fret sh -lc "node --check /app/data-store.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-form.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
 # Verify presets editor script syntax in running container
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke check after deploy
