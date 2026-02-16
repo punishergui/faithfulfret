@@ -8,6 +8,7 @@ Pages.Presets = {
   instStompOptions: ['Bypass', 'Acs 1/2', '12Str/7Str', 'Res/Sit', 'Evio*/Syn*', 'Bari/Bss*', 'Rmd/Slap', 'Achr/Uvb', 'Wah/Slice', 'Aphs/Aflg', 'Comp/Bst', 'Tsc/Fuzz'],
   ampDialOptions: ['Budda', '6506', '6534', 'XXX', 'Classic', 'Butcher', 'British', 'Peavy(Base)', 'Trace(Bass)', 'Ecous(Acous)', 'Trace(Acous)', 'Twn'],
   effectsDialOptions: ['Bypass', 'Chorus', 'Env', 'Filtr', 'Comp Bst', 'Flanger', 'M.O.G.*', 'Pitch Shifter', 'Reverse', 'Rot. Spkr', 'Phaser', 'Octaver*', 'Tremelo'],
+  ampLedColorOptions: ['green', 'orange', 'red'],
 
   clamp(value, min, max) {
     return Math.min(max, Math.max(min, Number(value) || 0));
@@ -21,9 +22,10 @@ Pages.Presets = {
     return this.toneClockLabels[this.clamp(index, 0, this.toneClockLabels.length - 1)] || this.toneClockLabels[3];
   },
 
-  defaultVypyrRow() {
+  defaultVypyrRow(label = '') {
     return {
       uid: this.makeUid(),
+      label,
       p1: 3,
       p2: 3,
       delayFeedback: 3,
@@ -32,12 +34,13 @@ Pages.Presets = {
     };
   },
 
-  normalizeVypyrRows(rows) {
+  normalizeVypyrRows(rows, fallbackLabel, options) {
     if (!Array.isArray(rows)) return [];
     return rows
       .filter((row) => row && typeof row === 'object')
       .map((row) => ({
         uid: row.uid || this.makeUid(),
+        label: options.includes(row.label) ? row.label : fallbackLabel,
         p1: this.clamp(row.p1, 0, 6),
         p2: this.clamp(row.p2, 0, 6),
         delayFeedback: this.clamp(row.delayFeedback, 0, 6),
@@ -52,6 +55,7 @@ Pages.Presets = {
       slotColor: 'Red',
       instStompLabel: this.instStompOptions[0],
       ampLabel: this.ampDialOptions[0],
+      ampLedColor: this.ampLedColorOptions[0],
       effectsLabel: this.effectsDialOptions[0],
       tone: {
         pre: 3,
@@ -78,6 +82,7 @@ Pages.Presets = {
       slotColor: this.slotColors.includes(parsed.slotColor) ? parsed.slotColor : defaults.slotColor,
       instStompLabel: this.instStompOptions.includes(parsed.instStompLabel) ? parsed.instStompLabel : this.instStompOptions[legacyInstIndex],
       ampLabel: this.ampDialOptions.includes(parsed.ampLabel) ? parsed.ampLabel : this.ampDialOptions[legacyAmpIndex],
+      ampLedColor: this.ampLedColorOptions.includes(parsed.ampLedColor) ? parsed.ampLedColor : defaults.ampLedColor,
       effectsLabel: this.effectsDialOptions.includes(parsed.effectsLabel) ? parsed.effectsLabel : this.effectsDialOptions[legacyEffectsIndex],
       tone: {
         pre: this.clamp(parsed.tone?.pre ?? parsed.knobs?.preGain, 0, 6),
@@ -86,8 +91,8 @@ Pages.Presets = {
         high: this.clamp(parsed.tone?.high ?? parsed.knobs?.high, 0, 6),
         post: this.clamp(parsed.tone?.post ?? parsed.knobs?.postGain, 0, 6),
       },
-      instStompRows: this.normalizeVypyrRows(parsed.instStompRows || parsed.effectRows),
-      effectsRows: this.normalizeVypyrRows(parsed.effectsRows),
+      instStompRows: this.normalizeVypyrRows(parsed.instStompRows || parsed.effectRows, this.instStompOptions.includes(parsed.instStompLabel) ? parsed.instStompLabel : this.instStompOptions[legacyInstIndex], this.instStompOptions),
+      effectsRows: this.normalizeVypyrRows(parsed.effectsRows, this.effectsDialOptions.includes(parsed.effectsLabel) ? parsed.effectsLabel : this.effectsDialOptions[legacyEffectsIndex], this.effectsDialOptions),
     };
   },
 
@@ -201,8 +206,11 @@ Pages.Presets = {
     </div>`;
   },
 
-  renderVypyrRow(scope, row) {
+  renderVypyrRow(scope, row, rowLabel, labelOptions) {
     return `<div data-v2-row="${scope}" data-uid="${this.escapeHtml(row.uid)}" style="border:1px solid var(--line2);padding:10px;background:var(--bg0);display:grid;gap:8px;margin-bottom:8px;">
+      <div class="df-field"><label class="df-label">${rowLabel}</label>
+        <select name="${scope}_label" class="df-input">${labelOptions.map((option) => `<option value="${option}" ${row.label === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
+      </div>
       <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
         <div class="df-field"><label class="df-label">P1</label>
           <select name="${scope}_p1" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.p1 === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
@@ -224,13 +232,13 @@ Pages.Presets = {
     </div>`;
   },
 
-  bindScopedRows(form, scope, initialRows, wrapId, addBtnId, emptyText) {
+  bindScopedRows(form, scope, initialRows, wrapId, addBtnId, emptyText, rowLabel, labelOptions, defaultLabel) {
     const rowsWrap = form.querySelector(`#${wrapId}`);
     const addBtn = form.querySelector(`#${addBtnId}`);
     let rows = [...initialRows];
 
     const renderRows = () => {
-      rowsWrap.innerHTML = rows.length ? rows.map((row) => this.renderVypyrRow(scope, row)).join('') : `<div style="font-size:12px;color:var(--text2);">${emptyText}</div>`;
+      rowsWrap.innerHTML = rows.length ? rows.map((row) => this.renderVypyrRow(scope, row, rowLabel, labelOptions)).join('') : `<div style="font-size:12px;color:var(--text2);">${emptyText}</div>`;
       rowsWrap.querySelectorAll('[data-remove-v2-row]').forEach((btn) => {
         btn.addEventListener('click', () => {
           rows = rows.filter((row) => row.uid !== btn.dataset.removeV2Row);
@@ -240,7 +248,7 @@ Pages.Presets = {
     };
 
     addBtn.addEventListener('click', () => {
-      rows.push(this.defaultVypyrRow());
+      rows.push(this.defaultVypyrRow(defaultLabel));
       renderRows();
     });
 
@@ -252,6 +260,7 @@ Pages.Presets = {
     form.querySelectorAll(`[data-v2-row="${scope}"]`).forEach((rowEl) => {
       rows.push({
         uid: rowEl.dataset.uid || this.makeUid(),
+        label: String(rowEl.querySelector(`[name="${scope}_label"]`)?.value || ''),
         p1: Number(rowEl.querySelector(`[name="${scope}_p1"]`)?.value || 0),
         p2: Number(rowEl.querySelector(`[name="${scope}_p2"]`)?.value || 0),
         delayFeedback: Number(rowEl.querySelector(`[name="${scope}_delayFeedback"]`)?.value || 0),
@@ -259,13 +268,13 @@ Pages.Presets = {
         reverbLevel: Number(rowEl.querySelector(`[name="${scope}_reverbLevel"]`)?.value || 0),
       });
     });
-    return this.normalizeVypyrRows(rows);
+    return rows;
   },
 
   renderVypyrSummary(v2) {
     return `<div style="font-size:12px;color:var(--text2);display:grid;gap:4px;">
       <div>Bank ${this.escapeHtml(v2.bankLetter)} · Slot ${this.escapeHtml(v2.slotColor)}</div>
-      <div>Inst/Stomp ${this.escapeHtml(v2.instStompLabel)} · Amp ${this.escapeHtml(v2.ampLabel)} · Effects ${this.escapeHtml(v2.effectsLabel)}</div>
+      <div>Inst/Stomp ${this.escapeHtml(v2.instStompLabel)} · Amp ${this.escapeHtml(v2.ampLabel)} (${this.escapeHtml(v2.ampLedColor)}) · Effects ${this.escapeHtml(v2.effectsLabel)}</div>
       <div>Pre ${this.toneLabel(v2.tone.pre)} · Low ${this.toneLabel(v2.tone.low)} · Mid ${this.toneLabel(v2.tone.mid)} · High ${this.toneLabel(v2.tone.high)} · Post ${this.toneLabel(v2.tone.post)}</div>
       <div>Inst/Stomp rows: ${v2.instStompRows.length} · Effects rows: ${v2.effectsRows.length}</div>
     </div>`;
@@ -313,6 +322,7 @@ Pages.Presets = {
         slotColor: String(fd.get('v2_slotColor') || 'Red'),
         instStompLabel: String(fd.get('v2_instStompLabel') || this.instStompOptions[0]),
         ampLabel: String(fd.get('v2_ampLabel') || this.ampDialOptions[0]),
+        ampLedColor: String(fd.get('v2_ampLedColor') || this.ampLedColorOptions[0]),
         effectsLabel: String(fd.get('v2_effectsLabel') || this.effectsDialOptions[0]),
         tone: {
           pre: Number(fd.get('v2_tone_pre') || 0),
@@ -400,8 +410,35 @@ Pages.Presets = {
 
             <div style="margin-top:10px;display:grid;gap:8px;">
               ${this.renderDialField('v2_instStompLabel', 'Inst/Stomp Dial', settings.vypyrX2.instStompLabel, this.instStompOptions, '* indicates Monophonic Effect')}
-              ${this.renderDialField('v2_ampLabel', 'Amplifiers Dial', settings.vypyrX2.ampLabel, this.ampDialOptions, 'Hold for tuner (hardware)')}
+              <div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+                <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+                  <div class="df-field"><label class="df-label">Amplifiers Dial</label>
+                    <select name="v2_ampLabel" class="df-input">${this.ampDialOptions.map((option) => `<option value="${option}" ${option === settings.vypyrX2.ampLabel ? 'selected' : ''}>${option}</option>`).join('')}</select>
+                  </div>
+                  <div class="df-field"><label class="df-label">Amp LED Color</label>
+                    <select name="v2_ampLedColor" class="df-input">${this.ampLedColorOptions.map((option) => `<option value="${option}" ${option === settings.vypyrX2.ampLedColor ? 'selected' : ''}>${option}</option>`).join('')}</select>
+                  </div>
+                </div>
+                <p style="margin-top:6px;font-size:12px;color:var(--text2);">Hold for tuner (hardware)</p>
+                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Green = cleanest, Orange = crunch, Red = most gain</p>
+              </div>
               ${this.renderDialField('v2_effectsLabel', 'Effects Dial', settings.vypyrX2.effectsLabel, this.effectsDialOptions, '* indicates Monophonic Effect')}
+            </div>
+
+            <div style="margin-top:6px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <strong style="font-size:13px;">Inst/Stomp Settings Rows</strong>
+                <button type="button" class="df-btn" id="add-v2-inst-row">+ Add Inst/Stomp Settings Row</button>
+              </div>
+              <div id="v2-inst-rows" style="margin-top:8px;"></div>
+            </div>
+
+            <div style="margin-top:6px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <strong style="font-size:13px;">Effects Settings Rows</strong>
+                <button type="button" class="df-btn" id="add-v2-effects-row">+ Add Effects Settings Row</button>
+              </div>
+              <div id="v2-effects-rows" style="margin-top:8px;"></div>
             </div>
 
             <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
@@ -416,21 +453,6 @@ Pages.Presets = {
               </div>
             </div>
 
-            <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                <strong style="font-size:13px;">Inst/Stomp Settings Rows</strong>
-                <button type="button" class="df-btn" id="add-v2-inst-row">+ Add Inst/Stomp Settings Row</button>
-              </div>
-              <div id="v2-inst-rows" style="margin-top:8px;"></div>
-            </div>
-
-            <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                <strong style="font-size:13px;">Effects Settings Rows</strong>
-                <button type="button" class="df-btn" id="add-v2-effects-row">+ Add Effects Settings Row</button>
-              </div>
-              <div id="v2-effects-rows" style="margin-top:8px;"></div>
-            </div>
           </div>
 
           <div class="df-field full-width"><label class="df-label">Tags (comma separated)</label><input name="tags" class="df-input" value="${this.escapeHtml(settings.tags.join(', '))}"></div>
@@ -460,8 +482,8 @@ Pages.Presets = {
     const statusEl = wrap.querySelector('#preset-image-status');
     const previewEl = wrap.querySelector('#preset-image-preview');
 
-    this.bindScopedRows(form, 'v2_instStompRow', settings.vypyrX2.instStompRows, 'v2-inst-rows', 'add-v2-inst-row', 'No Inst/Stomp settings rows yet.');
-    this.bindScopedRows(form, 'v2_effectsRow', settings.vypyrX2.effectsRows, 'v2-effects-rows', 'add-v2-effects-row', 'No effects settings rows yet.');
+    this.bindScopedRows(form, 'v2_instStompRow', settings.vypyrX2.instStompRows, 'v2-inst-rows', 'add-v2-inst-row', 'No Inst/Stomp settings rows yet.', 'Inst/Stomp Type', this.instStompOptions, settings.vypyrX2.instStompLabel);
+    this.bindScopedRows(form, 'v2_effectsRow', settings.vypyrX2.effectsRows, 'v2-effects-rows', 'add-v2-effects-row', 'No effects settings rows yet.', 'Effect Type', this.effectsDialOptions, settings.vypyrX2.effectsLabel);
 
     ampModelEl.addEventListener('change', () => {
       vypyrSection.style.display = ampModelEl.value === 'Vypyr X2' ? '' : 'none';
