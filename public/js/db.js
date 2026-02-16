@@ -112,6 +112,9 @@
     async deletePreset(id) {
       return api(`/api/presets/${id}`, { method: 'DELETE' });
     },
+    async uploadPresetImage(payload) {
+      return api('/api/preset-image', { method: 'POST', body: JSON.stringify(payload) });
+    },
 
     // Resources legacy
     async saveResource(data) {

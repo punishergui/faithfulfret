@@ -67,6 +67,7 @@ docker compose -f docker-compose.prod.yml up -d
 curl -s http://127.0.0.1:3000/api/health | jq
 curl -s http://127.0.0.1:3000/api/sessions | jq
 curl -s http://127.0.0.1:3000/api/stats | jq
+curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
 curl -s http://127.0.0.1:3000/ | head -n 20
 ```
 
@@ -154,11 +155,13 @@ docker compose -f docker-compose.prod.yml up -d
 ### Data safety (important)
 
 - App data is stored in SQLite: `/data/faithfulfret.sqlite`.
-- In both dev and prod compose files, `./data:/data` is mounted, so data persists across restarts/updates.
-- Backup the DB file directly:
+- Preset images are stored in `/data/presets` and served from `/media/presets/*`.
+- In both dev and prod compose files, `./data:/data` is mounted, so DB + preset images persist across restarts/updates.
+- Backup the DB file and preset media directly:
 
 ```bash
 cp ./data/faithfulfret.sqlite ./data/faithfulfret.sqlite.backup-$(date +%Y%m%d-%H%M%S)
+cp -R ./data/presets ./data/presets.backup-$(date +%Y%m%d-%H%M%S)
 ```
 
 - You can also export/import JSON from the `Progress` page for portability between environments.

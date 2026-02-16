@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { execSync, exec } = require('child_process');
 const https = require('https');
 const Store = require('./data-store');
@@ -7,8 +8,10 @@ const Store = require('./data-store');
 const app = express();
 const apiRouter = express.Router();
 const PORT = process.env.PORT || 9999;
+const presetMediaDir = '/data/presets';
+if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 function gitExec(cmd) {
   try {
@@ -165,6 +168,97 @@ apiRouter.put('/presets/:id', (req, res) => res.json(Store.savePreset({ ...req.b
 apiRouter.delete('/presets/:id', (req, res) => {
   Store.deletePreset(req.params.id);
   res.json({ ok: true });
+});
+
+function sanitizeFileName(name) {
+  return String(name || 'preset-image')
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) || 'preset-image';
+}
+
+function extensionFromMime(mimeType) {
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  return map[String(mimeType || '').toLowerCase()] || 'jpg';
+}
+
+function savePresetImageFromBuffer({ fileName, mimeType, buffer }) {
+  const ext = extensionFromMime(mimeType);
+  const safeBase = sanitizeFileName(fileName).replace(/\.[^/.]+$/, '');
+  const finalName = `${Date.now()}-${safeBase}.${ext}`;
+  const fullPath = path.join(presetMediaDir, finalName);
+  fs.writeFileSync(fullPath, buffer);
+  return { filePath: `/media/presets/${finalName}` };
+}
+
+function parseMultipartImage(req) {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=([^;]+)/i);
+    if (!boundaryMatch) return reject(new Error('multipart boundary missing'));
+    const boundary = `--${boundaryMatch[1]}`;
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks);
+        const bodyStr = body.toString('binary');
+        const start = bodyStr.indexOf(boundary);
+        if (start < 0) throw new Error('multipart body missing boundary');
+        const fileNameMatch = bodyStr.match(/filename="([^"]+)"/i);
+        const mimeMatch = bodyStr.match(/Content-Type:\s*([^\r\n]+)/i);
+        const headerEnd = bodyStr.indexOf('\r\n\r\n');
+        if (headerEnd < 0) throw new Error('multipart file header invalid');
+        const dataStart = headerEnd + 4;
+        const dataEnd = bodyStr.lastIndexOf(`\r\n${boundary}--`);
+        if (dataEnd < 0) throw new Error('multipart file data invalid');
+        const fileBinary = bodyStr.slice(dataStart, dataEnd);
+        resolve({
+          fileName: fileNameMatch ? fileNameMatch[1] : 'preset-image',
+          mimeType: mimeMatch ? mimeMatch[1].trim() : 'image/jpeg',
+          buffer: Buffer.from(fileBinary, 'binary'),
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+apiRouter.post('/preset-image', async (req, res) => {
+  try {
+    const contentType = req.headers['content-type'] || '';
+
+    if (contentType.includes('multipart/form-data')) {
+      const image = await parseMultipartImage(req);
+      return res.json(savePresetImageFromBuffer(image));
+    }
+
+    const fileName = req.body?.fileName || 'preset-image';
+    const mimeType = req.body?.mimeType || 'image/jpeg';
+    let dataBase64 = req.body?.dataBase64 || '';
+
+    if (typeof dataBase64 === 'string' && dataBase64.startsWith('data:')) {
+      const parts = dataBase64.split(',');
+      if (parts.length === 2) dataBase64 = parts[1];
+    }
+
+    if (!dataBase64) return res.status(400).json({ error: 'image data is required' });
+
+    const buffer = Buffer.from(dataBase64, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'invalid image payload' });
+
+    return res.json(savePresetImageFromBuffer({ fileName, mimeType, buffer }));
+  } catch (e) {
+    return res.status(400).json({ error: e.message || 'failed to save preset image' });
+  }
 });
 
 // Keep existing resources features
@@ -328,6 +422,7 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: 'not found' });
 });
 
+app.use('/media/presets', express.static(presetMediaDir));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route
