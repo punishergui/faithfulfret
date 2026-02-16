@@ -7,11 +7,23 @@
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+
     if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || `Request failed: ${res.status}`);
+      throw new Error(text || `Request failed: ${res.status}`);
     }
-    return res.json();
+
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Expected JSON response from ${path} but received ${contentType || 'unknown content type'}`);
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON response from ${path}`);
+    }
   }
 
   function normalizeSession(row) {
@@ -114,63 +126,7 @@
     },
 
     async getStats() {
-      const sessions = await this.getAllSess();
-      const count = sessions.length;
-      const totalMinutes = sessions.reduce((s, x) => s + (x.minutes || 0), 0);
-      const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
-      const bpms = sessions.filter(x => x.bpm).map(x => x.bpm);
-      const maxBPM = bpms.length ? Math.max(...bpms) : 0;
-      const avgBPM = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0;
-
-      const allDates = sessions.map(s => s.date).filter(Boolean).sort().reverse();
-      const uniqueDatesDesc = [...new Set(allDates)];
-      const uniqueDatesAsc = [...uniqueDatesDesc].reverse();
-
-      const toDate = (ymd) => new Date(`${ymd}T12:00:00`);
-      const dayDiff = (a, b) => Math.round((toDate(a) - toDate(b)) / 86400000);
-
-      let currentStreak = 0;
-      const today = new Date().toISOString().split('T')[0];
-      if (uniqueDatesDesc.length) {
-        const first = uniqueDatesDesc[0];
-        const offset = dayDiff(today, first);
-        if (offset === 0 || offset === 1) {
-          currentStreak = 1;
-          for (let i = 1; i < uniqueDatesDesc.length; i++) {
-            if (dayDiff(uniqueDatesDesc[i - 1], uniqueDatesDesc[i]) === 1) currentStreak++;
-            else break;
-          }
-        }
-      }
-
-      let longestStreak = 0;
-      let run = 0;
-      for (let i = 0; i < uniqueDatesAsc.length; i++) {
-        if (i === 0) run = 1;
-        else if (dayDiff(uniqueDatesAsc[i], uniqueDatesAsc[i - 1]) === 1) run++;
-        else run = 1;
-        if (run > longestStreak) longestStreak = run;
-      }
-
-      const lastSessionDate = uniqueDatesDesc[0] || null;
-      const daysSinceLastSession = lastSessionDate ? Math.max(0, dayDiff(today, lastSessionDate)) : null;
-
-      const sessionsPerWeek = count ? Math.round((count / Math.max(1, new Set(uniqueDatesDesc.map(d => d.slice(0, 8))).size / 7)) * 10) / 10 : 0;
-
-      return {
-        count,
-        totalMinutes,
-        totalHours,
-        maxBPM,
-        avgBPM,
-        streak: currentStreak,
-        currentStreak,
-        longestStreak,
-        lastSessionDate,
-        daysSinceLastSession,
-        allDates,
-        sessionsPerWeek,
-      };
+      return api('/api/stats');
     },
 
     async exportAll() {

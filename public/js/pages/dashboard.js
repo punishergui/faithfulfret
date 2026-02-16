@@ -7,11 +7,28 @@ Pages.Dashboard = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const [stats, sessions, resources] = await Promise.all([
-      DB.getStats(),
-      DB.getAllSess(),
-      DB.getAllResources(),
-    ]);
+    let stats;
+    let sessions;
+    let resources;
+
+    try {
+      [stats, sessions, resources] = await Promise.all([
+        DB.getStats(),
+        DB.getAllSess(),
+        DB.getAllResources(),
+      ]);
+    } catch (error) {
+      app.innerHTML = `
+        <div class="page-wrap" style="padding:32px 24px;">
+          <div class="card" style="border:1px solid #b91c1c;background:rgba(185,28,28,0.12);padding:16px;">
+            <div style="font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#fecaca;margin-bottom:8px;">Dashboard failed to load</div>
+            <div style="color:#fee2e2;font-family:var(--f-mono);font-size:12px;line-height:1.5;">${String(error?.message || error).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))}</div>
+            <div style="margin-top:12px;"><button class="df-btn" onclick="Pages.Dashboard.render()">Retry</button></div>
+          </div>
+        </div>
+      `;
+      return;
+    }
 
     const recent = sessions.slice(0, 6);
     const today = Utils.today();
