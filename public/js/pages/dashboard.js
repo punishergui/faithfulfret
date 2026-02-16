@@ -163,7 +163,24 @@ Pages.Dashboard = {
 
   // __FF_QUICK_LOG__
   // __FF_QUICK_LOG__
+  // __FF_QUICK_LOG__
   _renderQuickLog(today) {
+    let lastFocus = '';
+    try { lastFocus = (localStorage.getItem('df:lastFocus') || '').trim(); } catch (e) {}
+
+    const presets = [
+      '— Select —',
+      'Chords',
+      'Scales',
+      'Strumming',
+      'Picking',
+      'Metronome',
+      'Worship Set',
+      'Song Practice',
+      'Technique',
+      'Ear Training'
+    ];
+
     return `
       <div class="card" style="margin-bottom:18px;padding:16px;border:1px solid var(--line);background:rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
@@ -173,24 +190,30 @@ Pages.Dashboard = {
           <div style="font-family:var(--f-mono);font-size:11px;color:var(--text3);">${today}</div>
         </div>
 
-        <form id="df-quicklog-form" style="display:grid;gap:10px;">
+        <form id="df-quicklog-form" style="display:grid;gap:12px;">
           <div class="df-field">
-            <label class="df-label" for="ql-minutes">Minutes *</label>
-            <input id="ql-minutes" name="minutes" type="number" min="1" max="999" class="df-input" placeholder="e.g. 15" required>
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-              ${[5,10,15,20,30,45,60].map(m => `
-                <button type="button" class="df-btn df-btn--outline" data-ql-min="${m}" style="font-size:11px;padding:8px 12px;border-radius:999px;">${m}m</button>
-              `).join('')}
+            <label class="df-label" for="ql-focus">Focus</label>
+            <select id="ql-focus" name="focus" class="df-input">
+              ${presets.map(opt => {
+                const val = opt === '— Select —' ? '' : opt;
+                const sel = (val && lastFocus && val === lastFocus) ? 'selected' : '';
+                return `<option value="${val}" ${sel}>${opt}</option>`;
+              }).join('')}
+            </select>
+            <div style="margin-top:8px;color:var(--text3);font-size:12px;">
+              Tip: it remembers your last focus.
             </div>
           </div>
 
           <div class="df-field">
-            <label class="df-label" for="ql-yt">YouTube URL (optional)</label>
-            <input id="ql-yt" name="youtube" type="text" class="df-input" placeholder="Paste URL or ID (optional)">
-            <div style="margin-top:8px;color:var(--text3);font-size:12px;">We’ll extract the ID automatically.</div>
+            <label class="df-label" for="ql-yt">YouTube URL (or ID)</label>
+            <input id="ql-yt" name="youtube" type="text" class="df-input" placeholder="Paste URL or ID">
+            <div style="margin-top:8px;color:var(--text3);font-size:12px;">
+              We’ll extract the ID automatically.
+            </div>
           </div>
 
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:2px;">
             <button type="submit" class="df-btn df-btn--primary" style="flex:1;min-width:180px;">Save Quick Log</button>
             <a href="#/log" class="df-btn df-btn--outline" style="flex:1;min-width:180px;text-align:center;">Full Log Form</a>
           </div>
@@ -204,7 +227,7 @@ Pages.Dashboard = {
     const form = container.querySelector('#df-quicklog-form');
     if (!form) return;
 
-    const minutesEl = form.querySelector('#ql-minutes');
+    const focusEl = form.querySelector('#ql-focus');
     const ytEl = form.querySelector('#ql-yt');
     const errEl = form.querySelector('#ql-err');
 
@@ -219,34 +242,41 @@ Pages.Dashboard = {
       errEl.textContent = '';
     }
 
-    form.querySelectorAll('[data-ql-min]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const m = btn.getAttribute('data-ql-min');
-        if (minutesEl) minutesEl.value = m;
-        Utils.toast?.(`Minutes set to ${m}m`);
-      });
-    });
-
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       clearErr();
 
-      const minutes = parseInt((minutesEl?.value || '').trim(), 10);
-      if (!minutes || minutes < 1) return showErr('Minutes is required.');
-
+      const focus = (focusEl?.value || '').trim();
       let videoId = (ytEl?.value || '').trim();
+
+      if (!focus && !videoId) {
+        return showErr('Add a Focus or a YouTube link (or both).');
+      }
+
       if (videoId) {
         const extracted = Utils.extractYouTubeId?.(videoId);
         videoId = extracted || videoId;
       }
 
-      const data = { date: today, minutes };
+      const data = { date: today };
+      if (focus) data.focus = focus;
       if (videoId) data.videoId = videoId;
 
       try {
-        await DB.saveSess(data);
+        const saved = await DB.saveSess(data);
+
+        if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch (e) {} }
+
         Utils.toast?.('Quick log saved ✅');
+
+        // Stay on dashboard, but refresh stats/recent list
         Pages.Dashboard.render();
+
+        // Optional: clear YouTube field for next quick log
+        if (ytEl) ytEl.value = '';
+
+        // If you prefer to jump straight into editing, uncomment:
+        // go(`#/session/${saved.id}`);
       } catch (err) {
         console.error(err);
         showErr(String(err?.message || err || 'Failed to save'));
