@@ -128,3 +128,38 @@
 
   window.Router = { navigate, updateNav };
 })();
+
+
+// __FF_ROUTER_BOOTSTRAP__
+// Ensure initial route renders even when URL has no hash.
+(function () {
+  function ensureDefaultHash() {
+    if (!location.hash || location.hash === '#') {
+      location.hash = '#/dashboard';
+    }
+  }
+
+  function runRouterOnceReady() {
+    try {
+      ensureDefaultHash();
+      // router function name varies; try common exports:
+      if (typeof window.router === 'function') return window.router();
+      if (typeof window.route === 'function') return window.route();
+      if (typeof window.renderRoute === 'function') return window.renderRoute();
+      // If router is defined in module scope, fall back to dispatching events.
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    } catch (e) {
+      // If anything goes wrong, at least don't leave a blank screen with no clue
+      const app = document.getElementById('app');
+      if (app) app.innerHTML = '<div style="padding:16px;border:1px solid #ff6a00;border-radius:12px">Router failed to start. Open DevTools → Console.</div>';
+      console.error(e);
+    }
+  }
+
+  // Run after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runRouterOnceReady, { once: true });
+  } else {
+    runRouterOnceReady();
+  }
+})();
