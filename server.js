@@ -5,9 +5,9 @@ const https = require('https');
 const Store = require('./data-store');
 
 const app = express();
+const apiRouter = express.Router();
 const PORT = process.env.PORT || 9999;
 
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 function gitExec(cmd) {
@@ -48,79 +48,139 @@ function fetchJson(url, headers) {
   });
 }
 
+function buildStats() {
+  const sessions = Store.listSessions();
+  const count = sessions.length;
+  const totalMinutes = sessions.reduce((sum, row) => sum + (Number(row.durationMinutes) || 0), 0);
+  const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+  const bpms = sessions.map((row) => Number(row.bpm) || 0).filter(Boolean);
+  const maxBPM = bpms.length ? Math.max(...bpms) : 0;
+  const avgBPM = bpms.length ? Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length) : 0;
 
+  const allDates = sessions.map((row) => row.date).filter(Boolean).sort().reverse();
+  const uniqueDatesDesc = [...new Set(allDates)];
+  const uniqueDatesAsc = [...uniqueDatesDesc].reverse();
+  const toDate = (ymd) => new Date(`${ymd}T12:00:00`);
+  const dayDiff = (a, b) => Math.round((toDate(a) - toDate(b)) / 86400000);
+  const today = new Date().toISOString().split('T')[0];
+
+  let currentStreak = 0;
+  if (uniqueDatesDesc.length) {
+    const offset = dayDiff(today, uniqueDatesDesc[0]);
+    if (offset === 0 || offset === 1) {
+      currentStreak = 1;
+      for (let i = 1; i < uniqueDatesDesc.length; i += 1) {
+        if (dayDiff(uniqueDatesDesc[i - 1], uniqueDatesDesc[i]) === 1) currentStreak += 1;
+        else break;
+      }
+    }
+  }
+
+  let longestStreak = 0;
+  let run = 0;
+  for (let i = 0; i < uniqueDatesAsc.length; i += 1) {
+    if (i === 0) run = 1;
+    else if (dayDiff(uniqueDatesAsc[i], uniqueDatesAsc[i - 1]) === 1) run += 1;
+    else run = 1;
+    if (run > longestStreak) longestStreak = run;
+  }
+
+  const lastSessionDate = uniqueDatesDesc[0] || null;
+  const daysSinceLastSession = lastSessionDate ? Math.max(0, dayDiff(today, lastSessionDate)) : null;
+  const weeksTracked = new Set(uniqueDatesDesc.map((d) => `${d.slice(0, 4)}-${d.slice(5, 7)}-${Math.ceil(Number(d.slice(8, 10)) / 7)}`)).size;
+  const sessionsPerWeek = count ? Math.round((count / Math.max(1, weeksTracked)) * 10) / 10 : 0;
+
+  return {
+    count,
+    totalMinutes,
+    totalHours,
+    maxBPM,
+    avgBPM,
+    streak: currentStreak,
+    currentStreak,
+    longestStreak,
+    lastSessionDate,
+    daysSinceLastSession,
+    allDates,
+    sessionsPerWeek,
+  };
+}
 
 // Data API
-app.get('/api/health', (req, res) => {
+apiRouter.get('/health', (req, res) => {
   res.json({ ok: true, db: Store.dbPath });
 });
 
-app.get('/api/sessions', (req, res) => res.json(Store.listSessions()));
-app.post('/api/sessions', (req, res) => {
+apiRouter.get('/stats', (req, res) => {
+  res.json(buildStats());
+});
+
+apiRouter.get('/sessions', (req, res) => res.json(Store.listSessions()));
+apiRouter.post('/sessions', (req, res) => {
   if (!req.body?.date) return res.status(400).json({ error: 'date is required' });
   return res.json(Store.saveSession(req.body));
 });
-app.get('/api/sessions/:id', (req, res) => {
+apiRouter.get('/sessions/:id', (req, res) => {
   const row = Store.getSession(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(row);
 });
-app.put('/api/sessions/:id', (req, res) => {
+apiRouter.put('/sessions/:id', (req, res) => {
   const saved = Store.saveSession({ ...req.body, id: req.params.id });
   res.json(saved);
 });
-app.delete('/api/sessions/:id', (req, res) => {
+apiRouter.delete('/sessions/:id', (req, res) => {
   Store.deleteSession(req.params.id);
   res.json({ ok: true });
 });
 
-app.get('/api/gear-items', (req, res) => res.json(Store.listGear()));
-app.post('/api/gear-items', (req, res) => {
+apiRouter.get('/gear-items', (req, res) => res.json(Store.listGear()));
+apiRouter.post('/gear-items', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
   return res.json(Store.saveGear(req.body));
 });
-app.get('/api/gear-items/:id', (req, res) => {
+apiRouter.get('/gear-items/:id', (req, res) => {
   const row = Store.getGear(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(row);
 });
-app.put('/api/gear-items/:id', (req, res) => res.json(Store.saveGear({ ...req.body, id: req.params.id })));
-app.delete('/api/gear-items/:id', (req, res) => {
+apiRouter.put('/gear-items/:id', (req, res) => res.json(Store.saveGear({ ...req.body, id: req.params.id })));
+apiRouter.delete('/gear-items/:id', (req, res) => {
   Store.deleteGear(req.params.id);
   res.json({ ok: true });
 });
 
-app.get('/api/presets', (req, res) => res.json(Store.listPresets()));
-app.post('/api/presets', (req, res) => {
+apiRouter.get('/presets', (req, res) => res.json(Store.listPresets()));
+apiRouter.post('/presets', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
   res.json(Store.savePreset(req.body));
 });
-app.get('/api/presets/:id', (req, res) => {
+apiRouter.get('/presets/:id', (req, res) => {
   const row = Store.getPreset(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(row);
 });
-app.put('/api/presets/:id', (req, res) => res.json(Store.savePreset({ ...req.body, id: req.params.id })));
-app.delete('/api/presets/:id', (req, res) => {
+apiRouter.put('/presets/:id', (req, res) => res.json(Store.savePreset({ ...req.body, id: req.params.id })));
+apiRouter.delete('/presets/:id', (req, res) => {
   Store.deletePreset(req.params.id);
   res.json({ ok: true });
 });
 
 // Keep existing resources features
-app.get('/api/resources', (req, res) => res.json(Store.listResources()));
-app.post('/api/resources', (req, res) => res.json(Store.saveResource(req.body || {})));
-app.get('/api/resources/:id', (req, res) => {
+apiRouter.get('/resources', (req, res) => res.json(Store.listResources()));
+apiRouter.post('/resources', (req, res) => res.json(Store.saveResource(req.body || {})));
+apiRouter.get('/resources/:id', (req, res) => {
   const row = Store.getResource(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(row);
 });
-app.put('/api/resources/:id', (req, res) => res.json(Store.saveResource({ ...req.body, id: req.params.id })));
-app.delete('/api/resources/:id', (req, res) => {
+apiRouter.put('/resources/:id', (req, res) => res.json(Store.saveResource({ ...req.body, id: req.params.id })));
+apiRouter.delete('/resources/:id', (req, res) => {
   Store.deleteResource(req.params.id);
   res.json({ ok: true });
 });
 
-app.get('/api/export', (req, res) => {
+apiRouter.get('/export', (req, res) => {
   res.json({
     sessions: Store.listSessions(),
     gear: Store.listGear(),
@@ -130,7 +190,7 @@ app.get('/api/export', (req, res) => {
   });
 });
 
-app.post('/api/import', (req, res) => {
+apiRouter.post('/import', (req, res) => {
   const payload = req.body || {};
   Store.clearAll();
   for (const row of (payload.sessions || [])) Store.saveSession(row);
@@ -141,7 +201,7 @@ app.post('/api/import', (req, res) => {
 });
 
 // GET /api/version
-app.get('/api/version', async (req, res) => {
+apiRouter.get('/version', async (req, res) => {
   const local = gitExec('git rev-parse HEAD');
   if (!local) {
     return res.json({ local: 'no-git', updateAvailable: false });
@@ -175,7 +235,7 @@ app.get('/api/version', async (req, res) => {
 });
 
 
-app.get('/api/update/help', (req, res) => {
+apiRouter.get('/update/help', (req, res) => {
   const currentBranch = gitExec('git rev-parse --abbrev-ref HEAD') || 'main';
   const remote = gitExec(`git config branch.${currentBranch}.remote`) || 'origin';
   const mergeRef = gitExec(`git config branch.${currentBranch}.merge`) || `refs/heads/${currentBranch}`;
@@ -206,7 +266,7 @@ app.get('/api/update/help', (req, res) => {
 });
 
 // POST /api/update
-app.post('/api/update', (req, res) => {
+apiRouter.post('/update', (req, res) => {
   try {
     const currentBranch = gitExec('git rev-parse --abbrev-ref HEAD') || 'main';
     const remote = gitExec(`git config branch.${currentBranch}.remote`) || 'origin';
@@ -262,7 +322,12 @@ app.post('/api/update', (req, res) => {
   }
 });
 
+app.use('/api', apiRouter);
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not found' });
+});
 
+app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route
 app.get('*', (req, res) => {

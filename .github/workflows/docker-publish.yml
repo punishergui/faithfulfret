@@ -2,7 +2,7 @@ name: Build and publish Docker image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "rewrite-app" ]
     tags: [ "v*" ]
 
 permissions:
@@ -35,8 +35,40 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_name == 'rewrite-app' }}
+            type=ref,event=branch
             type=ref,event=tag
+
+      - name: Build image (load for smoke test)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: faithfulfret:ci-smoke
+
+      - name: Smoke test container endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ./data
+          docker run -d --rm --name faithfulfret-smoke -p 3000:9999 -v "$PWD/data:/data" faithfulfret:ci-smoke
+          trap 'docker logs faithfulfret-smoke || true; docker stop faithfulfret-smoke || true' EXIT
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:3000/api/health | jq -e '.ok == true and (.db | type == "string")' >/dev/null
+          curl -fsS http://127.0.0.1:3000/api/sessions | jq -e 'type == "array"' >/dev/null
+          curl -fsS http://127.0.0.1:3000/api/stats | tee /tmp/stats.json | jq -e 'type == "object" and has("count") and has("totalHours")' >/dev/null
+          if grep -Eqi '<!doctype html|<html' /tmp/stats.json; then
+            echo '/api/stats returned HTML unexpectedly'
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:3000/ | grep -Eqi '<script'
 
       - name: Build and push
         uses: docker/build-push-action@v6

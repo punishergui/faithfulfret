@@ -29,6 +29,59 @@ docker compose up -d
 
 ---
 
+
+## RUNBOOK (Docker + GHCR)
+
+- **Required Node version:** Node.js `22.x` for local non-Docker runs (Docker image is pinned to `node:22.14.0-alpine`).
+- **Port mapping remains:** host `3000` -> container `9999`.
+
+### Build locally
+
+```bash
+docker build --platform linux/amd64 -t faithfulfret:local .
+```
+
+### Run locally with Docker
+
+```bash
+mkdir -p ./data
+docker run --rm -d --name faithfulfret-local -p 3000:9999 -v "$PWD/data:/data" faithfulfret:local
+```
+
+### Run via compose (dev)
+
+```bash
+docker compose up -d --build
+```
+
+### Run via compose (prod / GHCR)
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Verify endpoints
+
+```bash
+curl -s http://127.0.0.1:3000/api/health | jq
+curl -s http://127.0.0.1:3000/api/sessions | jq
+curl -s http://127.0.0.1:3000/api/stats | jq
+curl -s http://127.0.0.1:3000/ | head -n 20
+```
+
+### Rollback / pin a known-good image tag
+
+```bash
+# 1) update docker-compose.prod.yml image tag to a known good version
+# image: ghcr.io/punishergui/faithfulfret:vX.Y.Z
+
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
 ## Deployment / Updates
 
 Production uses prebuilt GHCR images and Watchtower auto-updates.
@@ -149,7 +202,7 @@ Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still us
 
 | Layer | Tech |
 |-------|------|
-| Server | Node.js + Express |
+| Server | Node.js 22 + Express |
 | Frontend | Vanilla JS (ES6 modules, zero build tools) |
 | Database | SQLite (`/data/faithfulfret.sqlite`) via `better-sqlite3` |
 | Offline | Service Worker (cache-first) |
