@@ -166,6 +166,7 @@ Pages.Dashboard = {
   // __FF_QUICK_LOG__
 
   // __FF_QUICK_LOG__
+  // __FF_QUICK_LOG__
   _renderQuickLog(today) {
     let lastFocus = '';
     let lastMinutes = 20;
@@ -178,62 +179,91 @@ Pages.Dashboard = {
       <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
-          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">${lastMinutes}m default</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
         </div>
 
-        <div class="df-field" style="margin-bottom:10px;">
-          <label class="df-label" for="ql-focus">Focus</label>
+        <div class="df-field" style="margin-bottom:12px;">
+          <label class="df-label">Minutes</label>
+          <input type="hidden" id="ql-minutes" value="${lastMinutes}">
+          <div class="df-pillrow" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;" aria-label="Quick minutes">
+            ${[10,20,30,45,'60+'].map(m => `
+              <button type="button" class="df-btn df-btn--outline" data-ql-min="${m}" style="font-size:11px;padding:8px 12px;border-radius:999px;">
+                ${m}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="df-field" style="margin-bottom:12px;">
+          <label class="df-label">Focus</label>
           <select id="ql-focus" class="df-input">
-            <option value="">— Select —</option>
-            ${focuses.map(f => `<option value="${f}" ${lastFocus===f?'selected':''}>${f}</option>`).join('')}
+            <option value="">— Optional —</option>
+            ${focuses.map(f => `<option value="${f}" ${f===lastFocus?'selected':''}>${f}</option>`).join('')}
           </select>
         </div>
 
         <div class="df-field" style="margin-bottom:12px;">
-          <label class="df-label" for="ql-yt">YouTube URL (or ID)</label>
-          <input id="ql-yt" class="df-input" type="text" placeholder="Paste YouTube link or ID">
+          <label class="df-label">YouTube URL (optional)</label>
+          <input id="ql-yt" class="df-input" placeholder="Paste YouTube URL or ID">
+          <div style="margin-top:8px;color:var(--text3);font-size:12px;">Saves a minimal session now — you can edit details later.</div>
         </div>
 
-        <button type="button" id="ql-save" class="df-btn df-btn--primary df-btn--full">Save</button>
-        <div style="margin-top:8px;color:var(--text3);font-size:11px;">Save now, edit details later.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" id="ql-save" class="df-btn df-btn--primary" style="flex:1;">Save Quick Session</button>
+          <a href="#/log" class="df-btn df-btn--outline">Full Form</a>
+        </div>
+
+        <div id="ql-msg" style="display:none;margin-top:10px;color:var(--text3);font-size:12px;font-family:var(--f-mono);"></div>
       </div>
     `;
   },
 
   // __FF_QUICK_LOG__
   _initQuickLog(container, today) {
-    const btn = container.querySelector('#ql-save');
-    if (!btn) return;
+    const root = container;
+    const msg = root.querySelector('#ql-msg');
+    const minutesEl = root.querySelector('#ql-minutes');
+    const focusEl = root.querySelector('#ql-focus');
+    const ytEl = root.querySelector('#ql-yt');
 
-    btn.addEventListener('click', async () => {
-      const focus = (container.querySelector('#ql-focus')?.value || '').trim();
-      const ytRaw = (container.querySelector('#ql-yt')?.value || '').trim();
+    // minutes pills
+    root.querySelectorAll('[data-ql-min]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        let m = btn.getAttribute('data-ql-min');
+        if (m === '60+') m = '60';
+        if (minutesEl) minutesEl.value = m;
+        try { localStorage.setItem('df:lastMinutes', String(m)); } catch(e) {}
+        Utils.toast?.(`Quick minutes: ${m}m`);
+      });
+    });
 
-      let minutes = 20;
-      try { minutes = parseInt(localStorage.getItem('df:lastMinutes') || '20', 10) || 20; } catch (e) {}
-
-      let videoId = '';
-      if (ytRaw) {
-        videoId = (Utils.extractYouTubeId && Utils.extractYouTubeId(ytRaw)) || ytRaw;
-        videoId = videoId.trim();
-      }
+    // save
+    root.querySelector('#ql-save')?.addEventListener('click', async () => {
+      const minutes = parseInt((minutesEl?.value || '0'), 10) || 0;
+      if (!minutes) return Utils.toast?.('Pick minutes first', 'error');
 
       const data = { date: today, minutes };
+
+      const focus = (focusEl?.value || '').trim();
       if (focus) data.focus = focus;
-      if (videoId) data.videoId = videoId;
+
+      const yt = (ytEl?.value || '').trim();
+      if (yt) {
+        const extracted = Utils.extractYouTubeId?.(yt);
+        data.videoId = extracted || yt;
+      }
 
       try {
         const saved = await DB.saveSess(data);
-        if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch (e) {} }
-        try { localStorage.setItem('df:lastMinutes', String(minutes)); } catch (e) {}
-        Utils.toast?.('Saved ✅');
-        go(`#/session/${saved.id}`);
+        if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch(e) {} }
+        Utils.toast?.('Saved quick session ✅');
+        if (msg) { msg.style.display = 'block'; msg.textContent = 'Saved. Tap to edit →'; msg.onclick = () => go(`#/log/${saved.id}`); }
       } catch (e) {
         console.error(e);
-        Utils.toast?.('Quick log failed', 'error');
+        Utils.toast?.('Failed to save quick session', 'error');
       }
     });
-  },
+  },,
 
   _renderCalendar(allDates, year, month) {
     const now = new Date();
