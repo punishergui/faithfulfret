@@ -96,9 +96,11 @@ docker compose -f docker-compose.prod.yml up -d
 
 # Verify DB path after deploy
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
+# Verify presets editor script syntax in running container
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke check after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
-# optional UI smoke check: open Presets and confirm Vypyr X2 selector fields + effect rows load and save
+# optional UI smoke check: open Presets and confirm Vypyr X2 selector fields + scoped settings rows load and save
 ```
 
 How updates work:
