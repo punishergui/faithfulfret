@@ -2411,3 +2411,64 @@ select.df-input option {
   font-size: 24px;
   line-height: 1;
 }
+
+
+/* Presets: Vypyr X2 panel overlay */
+.amp-panel {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  border: 1px solid var(--line2);
+  background: #0b0b09;
+  overflow: hidden;
+}
+
+.amp-panel--compact {
+  max-width: 320px;
+}
+
+.amp-panel__bg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.amp-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.45;
+}
+
+.amp-panel--compact .amp-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.amp-dot.is-on {
+  opacity: 1;
+}
+
+.amp-dot.green.is-on {
+  background: #69ff8c;
+  box-shadow: 0 0 8px rgba(105, 255, 140, 0.85);
+}
+
+.amp-dot.yellow.is-on {
+  background: #ffe066;
+  box-shadow: 0 0 8px rgba(255, 224, 102, 0.85);
+}
+
+.amp-dot.red.is-on {
+  background: #ff6d74;
+  box-shadow: 0 0 8px rgba(255, 109, 116, 0.85);
+}
+
+.amp-dot.blue.is-on {
+  background: #6ab9ff;
+  box-shadow: 0 0 8px rgba(106, 185, 255, 0.8);
+}

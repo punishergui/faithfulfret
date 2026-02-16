@@ -98,6 +98,7 @@ docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
 # optional quick smoke check after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
+# optional UI smoke check: open Presets and confirm Vypyr X2 panel overlay updates when selectors change
 ```
 
 How updates work:
