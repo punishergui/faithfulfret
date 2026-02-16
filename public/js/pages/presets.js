@@ -22,6 +22,21 @@ Pages.Presets = {
     return this.toneClockLabels[this.clamp(index, 0, this.toneClockLabels.length - 1)] || this.toneClockLabels[3];
   },
 
+  normalizeRowKnobValue(value) {
+    if (value === '' || value === null || value === undefined) return -1;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) return -1;
+    if (parsed < 0) return -1;
+    return this.clamp(parsed, 0, 6);
+  },
+
+  renderRowKnobOptions(value) {
+    return [
+      `<option value="-1" ${value === -1 ? 'selected' : ''}>Off</option>`,
+      ...this.toneClockLabels.map((clock, index) => `<option value="${index}" ${value === index ? 'selected' : ''}>${clock}</option>`),
+    ].join('');
+  },
+
   defaultVypyrRow(label = '') {
     return {
       uid: this.makeUid(),
@@ -41,11 +56,11 @@ Pages.Presets = {
       .map((row) => ({
         uid: row.uid || this.makeUid(),
         label: options.includes(row.label) ? row.label : fallbackLabel,
-        p1: this.clamp(row.p1, 0, 6),
-        p2: this.clamp(row.p2, 0, 6),
-        delayFeedback: this.clamp(row.delayFeedback, 0, 6),
-        delayLevel: this.clamp(row.delayLevel, 0, 6),
-        reverbLevel: this.clamp(row.reverbLevel, 0, 6),
+        p1: this.normalizeRowKnobValue(row.p1),
+        p2: this.normalizeRowKnobValue(row.p2),
+        delayFeedback: this.normalizeRowKnobValue(row.delayFeedback),
+        delayLevel: this.normalizeRowKnobValue(row.delayLevel),
+        reverbLevel: this.normalizeRowKnobValue(row.reverbLevel),
       }));
   },
 
@@ -214,19 +229,19 @@ Pages.Presets = {
       </div>
       <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
         <div class="df-field"><label class="df-label">P1</label>
-          <select name="${scope}_p1" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.p1 === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+          <select name="${scope}_p1" class="df-input">${this.renderRowKnobOptions(row.p1)}</select>
         </div>
         <div class="df-field"><label class="df-label">P2</label>
-          <select name="${scope}_p2" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.p2 === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+          <select name="${scope}_p2" class="df-input">${this.renderRowKnobOptions(row.p2)}</select>
         </div>
         <div class="df-field"><label class="df-label">Delay Feedback</label>
-          <select name="${scope}_delayFeedback" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.delayFeedback === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+          <select name="${scope}_delayFeedback" class="df-input">${this.renderRowKnobOptions(row.delayFeedback)}</select>
         </div>
         <div class="df-field"><label class="df-label">Delay Level</label>
-          <select name="${scope}_delayLevel" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.delayLevel === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+          <select name="${scope}_delayLevel" class="df-input">${this.renderRowKnobOptions(row.delayLevel)}</select>
         </div>
         <div class="df-field"><label class="df-label">Reverb Level</label>
-          <select name="${scope}_reverbLevel" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.reverbLevel === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+          <select name="${scope}_reverbLevel" class="df-input">${this.renderRowKnobOptions(row.reverbLevel)}</select>
         </div>
       </div>
       <div><button type="button" class="df-btn df-btn--danger" data-remove-v2-row="${this.escapeHtml(row.uid)}" data-row-scope="${scope}">Remove row</button></div>
@@ -262,11 +277,11 @@ Pages.Presets = {
       rows.push({
         uid: rowEl.dataset.uid || this.makeUid(),
         label: String(rowEl.querySelector(`[name="${scope}_label"]`)?.value || ''),
-        p1: Number(rowEl.querySelector(`[name="${scope}_p1"]`)?.value || 0),
-        p2: Number(rowEl.querySelector(`[name="${scope}_p2"]`)?.value || 0),
-        delayFeedback: Number(rowEl.querySelector(`[name="${scope}_delayFeedback"]`)?.value || 0),
-        delayLevel: Number(rowEl.querySelector(`[name="${scope}_delayLevel"]`)?.value || 0),
-        reverbLevel: Number(rowEl.querySelector(`[name="${scope}_reverbLevel"]`)?.value || 0),
+        p1: this.normalizeRowKnobValue(rowEl.querySelector(`[name="${scope}_p1"]`)?.value),
+        p2: this.normalizeRowKnobValue(rowEl.querySelector(`[name="${scope}_p2"]`)?.value),
+        delayFeedback: this.normalizeRowKnobValue(rowEl.querySelector(`[name="${scope}_delayFeedback"]`)?.value),
+        delayLevel: this.normalizeRowKnobValue(rowEl.querySelector(`[name="${scope}_delayLevel"]`)?.value),
+        reverbLevel: this.normalizeRowKnobValue(rowEl.querySelector(`[name="${scope}_reverbLevel"]`)?.value),
       });
     });
     return rows;

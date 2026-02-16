@@ -102,6 +102,7 @@ docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
 # optional UI smoke check: open Presets and confirm Vypyr X2 Inst/Stomp/Effects rows render inside the same dial card/box,
 # each row has a Type selector, and Amplifiers has an Amp LED Color selector that loads/saves correctly
+# and P1/P2/Delay Feedback/Delay Level/Reverb Level dropdowns include an Off option and persist after save
 ```
 
 How updates work:
