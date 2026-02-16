@@ -1,14 +1,21 @@
-import { VYPYRX2_PANEL_MAP } from '../lib/vypyrx2-panel-map.js';
-
 window.Pages = window.Pages || {};
 
 Pages.Presets = {
   fxBlocks: ['noiseGate', 'overdrive', 'delay', 'reverb', 'modulation'],
   encoderColors: ['green', 'yellow', 'red'],
+  instStompColors: ['red', 'green'],
+  ampChannelColors: ['green', 'orange', 'yellow', 'red'],
+  effectTypes: ['Delay', 'Reverb', 'Chorus', 'Phaser', 'Flanger', 'Tremolo', 'Octaver', 'Pitch Shifter', 'Rotary', 'Filter', 'Compressor', 'Noise Gate', 'Overdrive'],
+  bankOptions: ['A', 'B', 'C', 'D'],
+  slotColors: ['red', 'orange', 'yellow', 'green'],
   toneClockLabels: ['7:30', '9:00', '10:30', '12:00', '1:30', '3:00', '4:30'],
 
   clamp(value, min, max) {
     return Math.min(max, Math.max(min, Number(value) || 0));
+  },
+
+  makeUid() {
+    return `fx_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   },
 
   defaultVypyrX2() {
@@ -19,33 +26,52 @@ Pages.Presets = {
         effects: { index: 0, color: 'green' },
       },
       knobs: {
-        preGain: 0,
-        low: 0,
-        mid: 0,
-        high: 0,
-        postGain: 0,
+        preGain: 3,
+        low: 3,
+        mid: 3,
+        high: 3,
+        postGain: 3,
       },
-      bank: 0,
+      bank: 'A',
+      slotColor: 'green',
       status: {
         looper: false,
         edit: false,
         tempo: false,
       },
+      effectRows: [],
     };
+  },
+
+  normalizeVypyrX2EffectRows(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => ({
+        uid: row.uid || this.makeUid(),
+        effect: this.effectTypes.includes(row.effect) ? row.effect : 'Delay',
+        p1: this.clamp(row.p1, 0, 6),
+        p2: this.clamp(row.p2, 0, 6),
+        delayFeedback: this.clamp(row.delayFeedback, 0, 6),
+        delayLevel: this.clamp(row.delayLevel, 0, 6),
+        reverbLevel: this.clamp(row.reverbLevel, 0, 6),
+      }));
   },
 
   normalizeVypyrX2(raw) {
     const defaults = this.defaultVypyrX2();
     const parsed = raw && typeof raw === 'object' ? raw : {};
-    const normalized = {
+    const legacyBank = Number.isInteger(parsed.bank) ? this.bankOptions[this.clamp(parsed.bank, 0, 3)] : null;
+
+    return {
       encoders: {
         instStomp: {
           index: this.clamp(parsed.encoders?.instStomp?.index, 0, 11),
-          color: this.encoderColors.includes(parsed.encoders?.instStomp?.color) ? parsed.encoders.instStomp.color : defaults.encoders.instStomp.color,
+          color: this.instStompColors.includes(parsed.encoders?.instStomp?.color) ? parsed.encoders.instStomp.color : defaults.encoders.instStomp.color,
         },
         amp: {
           index: this.clamp(parsed.encoders?.amp?.index, 0, 11),
-          channel: this.encoderColors.includes(parsed.encoders?.amp?.channel) ? parsed.encoders.amp.channel : defaults.encoders.amp.channel,
+          channel: this.ampChannelColors.includes(parsed.encoders?.amp?.channel) ? parsed.encoders.amp.channel : defaults.encoders.amp.channel,
         },
         effects: {
           index: this.clamp(parsed.encoders?.effects?.index, 0, 11),
@@ -59,15 +85,15 @@ Pages.Presets = {
         high: this.clamp(parsed.knobs?.high, 0, 6),
         postGain: this.clamp(parsed.knobs?.postGain, 0, 6),
       },
-      bank: this.clamp(parsed.bank, 0, 3),
+      bank: this.bankOptions.includes(parsed.bank) ? parsed.bank : (legacyBank || defaults.bank),
+      slotColor: this.slotColors.includes(parsed.slotColor) ? parsed.slotColor : defaults.slotColor,
       status: {
         looper: Boolean(parsed.status?.looper),
         edit: Boolean(parsed.status?.edit),
         tempo: Boolean(parsed.status?.tempo),
       },
+      effectRows: this.normalizeVypyrX2EffectRows(parsed.effectRows),
     };
-
-    return normalized;
   },
 
   defaultSettings() {
@@ -155,74 +181,46 @@ Pages.Presets = {
     return compact.length > 100 ? `${compact.slice(0, 100)}…` : compact;
   },
 
-  renderRingDots(points, activeIndex, color) {
-    return points.map((point, index) => `<span class="amp-dot ${index === activeIndex ? `is-on ${color}` : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`).join('');
+  toneLabel(index) {
+    return this.toneClockLabels[this.clamp(index, 0, this.toneClockLabels.length - 1)] || this.toneClockLabels[3];
   },
 
-  renderSingleDots(dots, activeKey, color = 'blue') {
-    return Object.entries(dots)
-      .map(([key, point]) => `<span class="amp-dot ${key === activeKey ? `is-on ${color}` : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`)
-      .join('');
-  },
-
-  renderStatusDots(status) {
-    return Object.entries(VYPYRX2_PANEL_MAP.status)
-      .map(([key, point]) => `<span class="amp-dot ${status[key] ? 'is-on yellow' : ''}" style="left:${point.x * 100}%;top:${point.y * 100}%;"></span>`)
-      .join('');
-  },
-
-  renderVypyrX2Overlay(vypyrX2Settings, compact = false) {
-    const normalized = this.normalizeVypyrX2(vypyrX2Settings);
-    const cls = compact ? 'amp-panel amp-panel--compact' : 'amp-panel';
-
-    return `<div class="${cls}">
-      <img class="amp-panel__bg" src="/img/amps/vypyrx2-top.png" alt="Peavey Vypyr X2 top panel">
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.instStomp, normalized.encoders.instStomp.index, normalized.encoders.instStomp.color)}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.amp, normalized.encoders.amp.index, normalized.encoders.amp.channel)}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.encoders.effects, normalized.encoders.effects.index, normalized.encoders.effects.color)}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.preGain, normalized.knobs.preGain, 'blue')}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.low, normalized.knobs.low, 'blue')}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.mid, normalized.knobs.mid, 'blue')}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.high, normalized.knobs.high, 'blue')}
-      ${this.renderRingDots(VYPYRX2_PANEL_MAP.knobs.postGain, normalized.knobs.postGain, 'blue')}
-      ${this.renderSingleDots(VYPYRX2_PANEL_MAP.bank, String(normalized.bank), 'blue')}
-      ${this.renderStatusDots(normalized.status)}
+  renderVypyrSummary(v2) {
+    return `<div style="font-size:12px;color:var(--text2);display:grid;gap:4px;">
+      <div><strong>Vypyr X2:</strong> Bank ${this.escapeHtml(v2.bank)} · Slot ${this.escapeHtml(v2.slotColor)}</div>
+      <div>Inst/Stomp ${v2.encoders.instStomp.index + 1}/12 (${this.escapeHtml(v2.encoders.instStomp.color)}) · Amp ${v2.encoders.amp.index + 1}/12 (${this.escapeHtml(v2.encoders.amp.channel)}) · Effects ${v2.encoders.effects.index + 1}/12 (${this.escapeHtml(v2.encoders.effects.color)})</div>
+      <div>Pre ${this.toneLabel(v2.knobs.preGain)} · Low ${this.toneLabel(v2.knobs.low)} · Mid ${this.toneLabel(v2.knobs.mid)} · High ${this.toneLabel(v2.knobs.high)} · Post ${this.toneLabel(v2.knobs.postGain)}</div>
+      <div>Effect rows: ${v2.effectRows.length}</div>
     </div>`;
   },
 
-  async render() {
-    const app = document.getElementById('app');
-    const presets = await DB.getAllPresets();
+  renderToneKnobControl(label, key, value) {
+    return `<div class="df-field">
+      <label class="df-label">${label}</label>
+      <select name="v2_knob_${key}" class="df-input">
+        ${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${value === index ? 'selected' : ''}>${clock}</option>`).join('')}
+      </select>
+    </div>`;
+  },
 
-    app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&q=80');">
-        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
-          <div class="page-title">Presets</div>
-          <button id="new-preset-btn" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Preset</button>
+  renderEncoderFieldset(label, key, model, helperText, colors) {
+    const colorField = key === 'amp' ? 'channel' : 'color';
+    return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+      <strong style="font-size:13px;">${label}</strong>
+      <p style="margin-top:4px;font-size:12px;color:var(--text2);">${helperText}</p>
+      <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+        <div class="df-field"><label class="df-label">Position</label>
+          <select name="v2_${key}_index" class="df-input">
+            ${Array.from({ length: 12 }, (_, i) => `<option value="${i}" ${model.index === i ? 'selected' : ''}>${i + 1} of 12</option>`).join('')}
+          </select>
         </div>
-        <div class="fret-line"></div>
+        <div class="df-field"><label class="df-label">Color</label>
+          <select name="v2_${key}_${colorField}" class="df-input">
+            ${colors.map((color) => `<option value="${color}" ${String(model[colorField]) === color ? 'selected' : ''}>${color}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      <div class="page-wrap" style="padding:24px;">
-        <div id="preset-form-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--line2);padding:14px;background:var(--bg1);"></div>
-        ${presets.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">${presets.map((preset) => this.card(preset)).join('')}</div>` : '<div class="empty-state"><div class="empty-state__title">No presets yet</div><div class="empty-state__text">Save amp settings you want to reuse.</div></div>'}
-      </div>
-    `;
-
-    app.querySelector('#new-preset-btn')?.addEventListener('click', () => this.showForm());
-    app.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.del;
-      if (confirm('Delete preset?')) {
-        await DB.deletePreset(id);
-        this.render();
-      }
-    }));
-
-    app.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.dataset.edit;
-      const preset = await DB.getPreset(id);
-      this.showForm(preset);
-      document.getElementById('preset-form-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }));
+    </div>`;
   },
 
   card(p) {
@@ -236,15 +234,31 @@ Pages.Presets = {
         </div>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">Amp: ${this.escapeHtml(p.ampModel || '—')} · ${this.escapeHtml(settings.channel || '—')}</div>
-      <div style="margin-top:8px;">${this.renderVypyrX2Overlay(settings.vypyrX2, true)}</div>
+      <div style="margin-top:8px;">${this.renderVypyrSummary(settings.vypyrX2)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:8px;">Tags: ${this.escapeHtml(this.prettyTags(p))}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">Notes: ${this.escapeHtml(this.getNotesPreview(settings.notes))}</div>
       ${settings.imagePath ? `<img src="${settings.imagePath}" alt="Preset amp" style="margin-top:8px;width:100%;max-height:120px;object-fit:cover;border:1px solid var(--line2);" />` : ''}
       <details style="margin-top:8px;">
-        <summary style="cursor:pointer;font-size:12px;color:var(--text2);">Advanced JSON</summary>
+        <summary style="cursor:pointer;font-size:12px;color:var(--text2);">Raw data</summary>
         <pre style="white-space:pre-wrap;color:var(--text2);font-size:11px;margin-top:6px;">${this.escapeHtml(JSON.stringify(settings, null, 2))}</pre>
       </details>
     </div>`;
+  },
+
+  collectEffectRows(form) {
+    const rows = [];
+    form.querySelectorAll('[data-effect-row]').forEach((rowEl) => {
+      rows.push({
+        uid: rowEl.dataset.uid || this.makeUid(),
+        effect: String(rowEl.querySelector('[name="v2_effect_type"]')?.value || 'Delay'),
+        p1: Number(rowEl.querySelector('[name="v2_effect_p1"]')?.value || 0),
+        p2: Number(rowEl.querySelector('[name="v2_effect_p2"]')?.value || 0),
+        delayFeedback: Number(rowEl.querySelector('[name="v2_effect_delayFeedback"]')?.value || 0),
+        delayLevel: Number(rowEl.querySelector('[name="v2_effect_delayLevel"]')?.value || 0),
+        reverbLevel: Number(rowEl.querySelector('[name="v2_effect_reverbLevel"]')?.value || 0),
+      });
+    });
+    return this.normalizeVypyrX2EffectRows(rows);
   },
 
   settingsFromForm(form) {
@@ -294,12 +308,14 @@ Pages.Presets = {
           high: Number(fd.get('v2_knob_high') || 0),
           postGain: Number(fd.get('v2_knob_postGain') || 0),
         },
-        bank: Number(fd.get('v2_bank') || 0),
+        bank: String(fd.get('v2_bank') || 'A'),
+        slotColor: String(fd.get('v2_slotColor') || 'green'),
         status: {
           looper: fd.get('v2_status_looper') === 'on',
           edit: fd.get('v2_status_edit') === 'on',
           tempo: fd.get('v2_status_tempo') === 'on',
         },
+        effectRows: this.collectEffectRows(form),
       }),
     };
 
@@ -333,32 +349,106 @@ Pages.Presets = {
     </div>`;
   },
 
-  renderEncoderFieldset(label, key, model, helperText) {
-    return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-      <strong style="font-size:13px;">${label}</strong>
-      <p style="margin-top:4px;font-size:12px;color:var(--text2);">${helperText}</p>
-      <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
-        <div class="df-field"><label class="df-label">LED Position</label>
-          <select name="v2_${key}_index" class="df-input">
-            ${Array.from({ length: 12 }, (_, i) => `<option value="${i}" ${model.index === i ? 'selected' : ''}>${i + 1} of 12</option>`).join('')}
+  renderEffectRow(row) {
+    return `<div data-effect-row data-uid="${this.escapeHtml(row.uid)}" style="border:1px solid var(--line2);padding:10px;background:var(--bg0);display:grid;gap:8px;margin-bottom:8px;">
+      <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+        <div class="df-field"><label class="df-label">Effect</label>
+          <select name="v2_effect_type" class="df-input">
+            ${this.effectTypes.map((effect) => `<option value="${effect}" ${row.effect === effect ? 'selected' : ''}>${effect}</option>`).join('')}
           </select>
         </div>
-        <div class="df-field"><label class="df-label">Color</label>
-          <select name="v2_${key}_${key === 'amp' ? 'channel' : 'color'}" class="df-input">
-            ${this.encoderColors.map((color) => `<option value="${color}" ${String(model[key === 'amp' ? 'channel' : 'color']) === color ? 'selected' : ''}>${color}</option>`).join('')}
-          </select>
+        <div class="df-field"><label class="df-label">P1</label>
+          <select name="v2_effect_p1" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.p1 === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+        </div>
+        <div class="df-field"><label class="df-label">P2</label>
+          <select name="v2_effect_p2" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.p2 === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+        </div>
+        <div class="df-field"><label class="df-label">Delay Feedback</label>
+          <select name="v2_effect_delayFeedback" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.delayFeedback === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+        </div>
+        <div class="df-field"><label class="df-label">Delay Level</label>
+          <select name="v2_effect_delayLevel" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.delayLevel === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
+        </div>
+        <div class="df-field"><label class="df-label">Reverb Level</label>
+          <select name="v2_effect_reverbLevel" class="df-input">${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${row.reverbLevel === index ? 'selected' : ''}>${clock}</option>`).join('')}</select>
         </div>
       </div>
+      <div><button type="button" class="df-btn df-btn--danger" data-remove-effect="${this.escapeHtml(row.uid)}">Remove row</button></div>
     </div>`;
   },
 
-  renderToneKnobControl(label, key, value) {
-    return `<div class="df-field">
-      <label class="df-label">${label}</label>
-      <select name="v2_knob_${key}" class="df-input">
-        ${this.toneClockLabels.map((clock, index) => `<option value="${index}" ${value === index ? 'selected' : ''}>${clock}</option>`).join('')}
-      </select>
-    </div>`;
+  bindEffectRows(form, settings) {
+    const rowsWrap = form.querySelector('#vypyrx2-effect-rows');
+    const addBtn = form.querySelector('#add-vypyrx2-effect-row');
+    let rows = [...settings.vypyrX2.effectRows];
+
+    const renderRows = () => {
+      rowsWrap.innerHTML = rows.length
+        ? rows.map((row) => this.renderEffectRow(row)).join('')
+        : '<div style="font-size:12px;color:var(--text2);">No effect rows yet.</div>';
+
+      rowsWrap.querySelectorAll('[data-remove-effect]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          rows = rows.filter((row) => row.uid !== btn.dataset.removeEffect);
+          renderRows();
+        });
+      });
+    };
+
+    addBtn.addEventListener('click', () => {
+      rows.push({
+        uid: this.makeUid(),
+        effect: 'Delay',
+        p1: 3,
+        p2: 3,
+        delayFeedback: 3,
+        delayLevel: 3,
+        reverbLevel: 3,
+      });
+      renderRows();
+    });
+
+    renderRows();
+  },
+
+  async render() {
+    const app = document.getElementById('app');
+    const presets = await DB.getAllPresets();
+
+    app.innerHTML = `
+      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&q=80');">
+        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+          <div class="page-title">Presets</div>
+          <button id="new-preset-btn" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Preset</button>
+        </div>
+        <div class="fret-line"></div>
+      </div>
+      <div class="page-wrap" style="padding:24px;">
+        <div style="border:1px solid var(--line2);padding:12px;background:var(--bg1);margin-bottom:12px;">
+          <strong style="font-size:13px;">Vypyr X2 Top Panel Reference</strong>
+          <p style="margin-top:4px;font-size:12px;color:var(--text2);">Reference only. Use selectors in the editor to capture panel state.</p>
+          <img src="/img/amps/vypyrx2-top.png" alt="Vypyr X2 top panel" style="margin-top:8px;max-width:100%;height:auto;border:1px solid var(--line2);">
+        </div>
+        <div id="preset-form-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--line2);padding:14px;background:var(--bg1);"></div>
+        ${presets.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">${presets.map((preset) => this.card(preset)).join('')}</div>` : '<div class="empty-state"><div class="empty-state__title">No presets yet</div><div class="empty-state__text">Save amp settings you want to reuse.</div></div>'}
+      </div>
+    `;
+
+    app.querySelector('#new-preset-btn')?.addEventListener('click', () => this.showForm());
+    app.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.del;
+      if (confirm('Delete preset?')) {
+        await DB.deletePreset(id);
+        this.render();
+      }
+    }));
+
+    app.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', async (e) => {
+      const id = e.currentTarget.dataset.edit;
+      const preset = await DB.getPreset(id);
+      this.showForm(preset);
+      document.getElementById('preset-form-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
   },
 
   showForm(existing = null) {
@@ -371,6 +461,13 @@ Pages.Presets = {
       <form id="preset-form">
         <input type="hidden" name="id" value="${this.escapeHtml(existing?.id || '')}">
         <input type="hidden" name="imagePath" value="${this.escapeHtml(settings.imagePath || '')}">
+        <input type="hidden" name="gainPre" value="${settings.gain.pre}">
+        <input type="hidden" name="gainPost" value="${settings.gain.post}">
+        <input type="hidden" name="eqLow" value="${settings.eq.low}">
+        <input type="hidden" name="eqMid" value="${settings.eq.mid}">
+        <input type="hidden" name="eqHigh" value="${settings.eq.high}">
+        <input type="hidden" name="eqPresence" value="${settings.eq.presence}">
+        <input type="hidden" name="eqResonance" value="${settings.eq.resonance}">
         <div class="form-grid" style="gap:12px;">
           <div class="df-field"><label class="df-label">Preset Name</label><input name="name" class="df-input" required value="${this.escapeHtml(existing?.name || '')}"></div>
           <div class="df-field"><label class="df-label">Amp Model</label><input name="ampModel" class="df-input" value="${this.escapeHtml(existing?.ampModel || '')}"></div>
@@ -382,58 +479,53 @@ Pages.Presets = {
           </div>
 
           <div class="full-width" style="border-top:1px solid var(--line2);padding-top:10px;">
-            <strong>Gain Staging</strong>
-            <div class="form-grid" style="margin-top:8px;">
-              <div class="df-field"><label class="df-label">Gain (Pre)</label><input type="number" name="gainPre" class="df-input" value="${settings.gain.pre}"></div>
-              <div class="df-field"><label class="df-label">Gain (Post)</label><input type="number" name="gainPost" class="df-input" value="${settings.gain.post}"></div>
-            </div>
-          </div>
-
-          <div class="full-width" style="border-top:1px solid var(--line2);padding-top:10px;">
-            <strong>EQ</strong>
-            <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));">
-              <div class="df-field"><label class="df-label">Low</label><input type="number" name="eqLow" class="df-input" value="${settings.eq.low}"></div>
-              <div class="df-field"><label class="df-label">Mid</label><input type="number" name="eqMid" class="df-input" value="${settings.eq.mid}"></div>
-              <div class="df-field"><label class="df-label">High</label><input type="number" name="eqHigh" class="df-input" value="${settings.eq.high}"></div>
-              <div class="df-field"><label class="df-label">Presence</label><input type="number" name="eqPresence" class="df-input" value="${settings.eq.presence}"></div>
-              <div class="df-field"><label class="df-label">Resonance</label><input type="number" name="eqResonance" class="df-input" value="${settings.eq.resonance}"></div>
-            </div>
-          </div>
-
-          <div class="full-width" style="border-top:1px solid var(--line2);padding-top:10px;">
             <strong>Vypyr X2 Panel</strong>
-            <p style="margin-top:4px;font-size:12px;color:var(--text2);">Use the selectors below to match what you see on the real amp panel.</p>
-            <div id="vypyrx2-overlay-preview" style="margin-top:10px;"></div>
+            <p style="margin-top:4px;font-size:12px;color:var(--text2);">Selector-only editor for beginner-friendly input.</p>
+            <img src="/img/amps/vypyrx2-top.png" alt="Vypyr X2 top panel reference" style="margin-top:8px;max-width:100%;height:auto;border:1px solid var(--line2);">
             <div style="margin-top:10px;display:grid;gap:8px;">
-              ${this.renderEncoderFieldset('Inst/Stomp', 'inst', settings.vypyrX2.encoders.instStomp, 'This matches the LED ring on the amp. Pick the lit LED position you see.')}
-              ${this.renderEncoderFieldset('Amp', 'amp', settings.vypyrX2.encoders.amp, 'This matches the AMP selector ring and channel color on the amp.')}
-              ${this.renderEncoderFieldset('Effects', 'fx', settings.vypyrX2.encoders.effects, 'This matches the LED ring on the amp. Pick the lit LED position you see.')}
+              ${this.renderEncoderFieldset('Inst/Stomp', 'inst', settings.vypyrX2.encoders.instStomp, 'Select ring position + LED color.', this.instStompColors)}
+              ${this.renderEncoderFieldset('Amp', 'amp', settings.vypyrX2.encoders.amp, 'Select ring position + channel color.', this.ampChannelColors)}
+              ${this.renderEncoderFieldset('Effects', 'fx', settings.vypyrX2.encoders.effects, 'Select ring position + LED color.', this.encoderColors)}
             </div>
             <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
-              <strong style="font-size:13px;">Tone Knobs</strong>
-              <p style="margin-top:4px;font-size:12px;color:var(--text2);">7-position clock selector (7:30 to 4:30, no 6 o'clock LED).</p>
+              <strong style="font-size:13px;">Tone Ring Selectors</strong>
+              <p style="margin-top:4px;font-size:12px;color:var(--text2);">7-position clock selector (stored internally as 0..6).</p>
               <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
-                ${this.renderToneKnobControl('Pre', 'preGain', settings.vypyrX2.knobs.preGain)}
+                ${this.renderToneKnobControl('Pre Gain', 'preGain', settings.vypyrX2.knobs.preGain)}
                 ${this.renderToneKnobControl('Low', 'low', settings.vypyrX2.knobs.low)}
                 ${this.renderToneKnobControl('Mid', 'mid', settings.vypyrX2.knobs.mid)}
                 ${this.renderToneKnobControl('High', 'high', settings.vypyrX2.knobs.high)}
-                ${this.renderToneKnobControl('Post', 'postGain', settings.vypyrX2.knobs.postGain)}
+                ${this.renderToneKnobControl('Post Gain', 'postGain', settings.vypyrX2.knobs.postGain)}
               </div>
             </div>
             <div class="form-grid" style="margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
               <div class="df-field"><label class="df-label">Bank</label>
                 <select name="v2_bank" class="df-input">
-                  ${[1, 2, 3, 4].map((label, index) => `<option value="${index}" ${settings.vypyrX2.bank === index ? 'selected' : ''}>Bank ${label}</option>`).join('')}
+                  ${this.bankOptions.map((bank) => `<option value="${bank}" ${settings.vypyrX2.bank === bank ? 'selected' : ''}>${bank}</option>`).join('')}
                 </select>
-                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Pick the active bank LED shown on your amp.</p>
+              </div>
+              <div class="df-field"><label class="df-label">Slot</label>
+                <select name="v2_slotColor" class="df-input">
+                  ${this.slotColors.map((slot) => `<option value="${slot}" ${settings.vypyrX2.slotColor === slot ? 'selected' : ''}>${slot}</option>`).join('')}
+                </select>
+                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Banks A–D are the four banks. Slot colors are the four presets per bank.</p>
               </div>
               <div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
                 <strong style="font-size:13px;">Status LEDs</strong>
-                <p style="margin-top:4px;font-size:12px;color:var(--text2);">Toggle LEDs that are currently lit.</p>
+                <p style="margin-top:4px;font-size:12px;color:var(--text2);">LED currently lit on panel (optional).</p>
                 <div style="margin-top:8px;display:grid;gap:6px;">
-                  ${['looper', 'edit', 'tempo'].map((key) => `<label class="df-label" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="v2_status_${key}" ${settings.vypyrX2.status[key] ? 'checked' : ''}> ${key[0].toUpperCase() + key.slice(1)}</label>`).join('')}
+                  <label class="df-label" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="v2_status_looper" ${settings.vypyrX2.status.looper ? 'checked' : ''}> Looper</label>
+                  <label class="df-label" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="v2_status_edit" ${settings.vypyrX2.status.edit ? 'checked' : ''}> Edit Mode</label>
+                  <label class="df-label" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="v2_status_tempo" ${settings.vypyrX2.status.tempo ? 'checked' : ''}> Tap Tempo</label>
                 </div>
               </div>
+            </div>
+            <div style="margin-top:10px;border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <strong style="font-size:13px;">Effects (Edit Mode Parameters)</strong>
+                <button type="button" class="df-btn" id="add-vypyrx2-effect-row">+ Add Effect</button>
+              </div>
+              <div id="vypyrx2-effect-rows" style="margin-top:8px;"></div>
             </div>
           </div>
 
@@ -473,19 +565,8 @@ Pages.Presets = {
     const uploadBtn = wrap.querySelector('#upload-preset-image');
     const statusEl = wrap.querySelector('#preset-image-status');
     const previewEl = wrap.querySelector('#preset-image-preview');
-    const overlayPreview = wrap.querySelector('#vypyrx2-overlay-preview');
 
-    const refreshOverlay = () => {
-      const draftSettings = this.settingsFromForm(form);
-      overlayPreview.innerHTML = this.renderVypyrX2Overlay(draftSettings.vypyrX2);
-    };
-
-    refreshOverlay();
-    form.querySelectorAll('select,input[type="checkbox"]').forEach((input) => {
-      if (String(input.name || '').startsWith('v2_')) {
-        input.addEventListener('change', refreshOverlay);
-      }
-    });
+    this.bindEffectRows(form, settings);
 
     uploadBtn.addEventListener('click', async () => {
       const file = form.imageFile.files[0];
