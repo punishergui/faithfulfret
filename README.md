@@ -98,7 +98,7 @@ docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
 # optional quick smoke check after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
-# optional UI smoke check: open Presets and confirm Vypyr X2 panel overlay updates when selectors change
+# optional UI smoke check: open Presets and confirm Vypyr X2 selector fields + effect rows load and save
 ```
 
 How updates work:
@@ -111,7 +111,7 @@ Rollback (pin a version tag):
 1. Publish a tag from GitHub (`vX.Y.Z`) so GHCR has an immutable image.
 2. Pin `docker-compose.prod.yml` to that exact tag (`image: ghcr.io/punishergui/faithfulfret:vX.Y.Z`).
 3. Redeploy with compose pull/up.
-4. Keep the previous known-good tag noted so you can pin back instantly if needed.
+4. Keep the previous known-good tag noted so you can pin back instantly if needed (rollback path).
 
 
 ```bash
