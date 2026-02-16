@@ -138,5 +138,6 @@
     },
   };
 
+  window.__DB_READY__ = true;
   window.dispatchEvent(new Event('db-ready'));
 })();

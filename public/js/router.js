@@ -100,8 +100,15 @@
   // ── DB-ready guard ────────────────────────────────────────────────
   // db.js opens IndexedDB asynchronously. We must not render any page
   // that calls DB until window.DB is fully initialised.
-  let dbReady = false;
+  // __FF_DB_READY_FLAG__
+  let dbReady = !!window.__DB_READY__;
+
   let pendingHash = null;
+
+  // If DB became ready before router loaded, catch up now
+  if (window.__DB_READY__) {
+    dbReady = true;
+  }
 
   window.addEventListener('db-ready', () => {
     dbReady = true;
