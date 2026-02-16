@@ -32,9 +32,17 @@ Pages.SessionForm = {
               <input type="date" id="f-date" name="date" class="df-input" value="${session.date || today}" required>
             </div>
             <div class="df-field">
-              <label class="df-label" for="f-minutes">Duration (minutes)</label>
-              <input type="number" id="f-minutes" name="minutes" class="df-input" value="${session.minutes || ''}" min="1" max="999" placeholder="e.g. 30">
-            </div>
+              <label class="df-label">Duration</label>
+              <input type="hidden" id="f-minutes" name="minutes" value="">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" aria-label="Quick duration">
+                ${[10,20,30,45,'60+'].map(m => `
+                  <button type="button" class="df-btn df-btn--outline" data-min="${m}" style="font-size:11px;padding:8px 12px;border-radius:999px;">
+                    ${m}
+                  </button>
+                `).join('')}
+              </div>
+              <div style="margin-top:8px;color:var(--text3);font-size:12px;">Tap a time. You can edit later.</div>
+</div>
             <div class="df-field">
               <label class="df-label" for="f-bpm">Peak BPM</label>
               <input type="number" id="f-bpm" name="bpm" class="df-input" value="${session.bpm || ''}" min="20" max="300" placeholder="e.g. 80">
