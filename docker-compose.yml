@@ -1,14 +1,13 @@
 services:
   daily-fret:
-    build: .
+    image: ghcr.io/punishergui/faithfulfret:rewrite-app
     container_name: daily-fret
     restart: unless-stopped
+    pull_policy: always
     ports:
       - "3000:9999"
-    volumes:
-      - ./data:/data
-      - .:/app
-      - /app/node_modules
     environment:
       - PORT=9999
       - NODE_ENV=production
+    volumes:
+      - /data:/data
