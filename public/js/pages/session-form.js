@@ -116,7 +116,8 @@ Pages.SessionForm = {
     // Quick duration pills
     container.querySelectorAll('[data-min]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const m = btn.getAttribute('data-min');
+        let m = btn.getAttribute('data-min');
+        if (m === '60+') m = 60;
         const minutes = container.querySelector('#f-minutes');
         if (minutes) {
           minutes.value = m;
