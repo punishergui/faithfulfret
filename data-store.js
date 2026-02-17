@@ -113,6 +113,22 @@ CREATE TABLE IF NOT EXISTS resources (
 
 function ensureSchema() {
   db.exec(BASE_SCHEMA_SQL);
+
+  // gear_items column migrations (idempotent)
+ensureColumn('gear_items', 'boughtDate', 'TEXT');
+ensureColumn('gear_items', 'boughtPrice', 'REAL');
+ensureColumn('gear_items', 'boughtFrom', 'TEXT');
+ensureColumn('gear_items', 'tax', 'REAL');
+ensureColumn('gear_items', 'shipping', 'REAL');
+ensureColumn('gear_items', 'soldDate', 'TEXT');
+ensureColumn('gear_items', 'soldPrice', 'REAL');
+ensureColumn('gear_items', 'soldFees', 'REAL');
+ensureColumn('gear_items', 'soldWhere', 'TEXT');
+ensureColumn('gear_items', 'soldShipping', 'REAL');
+ensureColumn('gear_items', 'targetPrice', 'REAL');
+ensureColumn('gear_items', 'priority', 'TEXT');
+ensureColumn('gear_items', 'desiredCondition', 'TEXT');
+ensureColumn('gear_items', 'primaryUrl', 'TEXT');
 }
 
 function openDb() {
@@ -137,20 +153,6 @@ function ensureColumn(table, column, definition) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
-ensureColumn('gear_items', 'boughtDate', 'TEXT');
-ensureColumn('gear_items', 'boughtPrice', 'REAL');
-ensureColumn('gear_items', 'boughtFrom', 'TEXT');
-ensureColumn('gear_items', 'tax', 'REAL');
-ensureColumn('gear_items', 'shipping', 'REAL');
-ensureColumn('gear_items', 'soldDate', 'TEXT');
-ensureColumn('gear_items', 'soldPrice', 'REAL');
-ensureColumn('gear_items', 'soldFees', 'REAL');
-ensureColumn('gear_items', 'soldWhere', 'TEXT');
-ensureColumn('gear_items', 'soldShipping', 'REAL');
-ensureColumn('gear_items', 'targetPrice', 'REAL');
-ensureColumn('gear_items', 'priority', 'TEXT');
-ensureColumn('gear_items', 'desiredCondition', 'TEXT');
-ensureColumn('gear_items', 'primaryUrl', 'TEXT');
 ensureColumn('gear_links', 'isPrimary', 'INTEGER DEFAULT 0');
 
 const LEGACY_PRIMARY_KEY = 'primary';
