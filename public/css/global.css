@@ -7,13 +7,17 @@
   --bg1:     #0f0f0d;
   --bg2:     #141412;
   --bg3:     #1c1c19;
+  --card:    #181814;
+  --card2:   #20201b;
   --bg4:     #242420;
   --line:    rgba(255,255,255,0.06);
   --line2:   rgba(255,255,255,0.10);
   --line3:   rgba(255,255,255,0.16);
   --text:    #d8d8cf;
+  --text1:   #d8d8cf;
   --text2:   #6a6a60;
   --text3:   #3a3a34;
+  --border1: rgba(255,255,255,0.08);
   --accent:  #ff6a00;
   --accent2: #ff9a40;
   --glow:    rgba(255,106,0,0.20);
@@ -25,6 +29,94 @@
   --f-hero:  'Archivo Black', sans-serif;
   --f-mono:  'JetBrains Mono', monospace;
   --f-body:  'Mulish', sans-serif;
+
+  --tex-bg: none;
+  --tex-card: none;
+  --tex-card2: none;
+  --tex-opacity: 0.05;
+  --tex-blend: soft-light;
+  --tex-scale: 512px 512px;
+  --theme-top-glow: none;
+}
+
+html[data-theme="shed"] {
+  --bg1: #0f0f0d;
+  --bg2: #161612;
+  --bg3: #1d1d18;
+  --card: #181814;
+  --card2: #20201b;
+  --accent: #ff6a00;
+  --glow: rgba(255,106,0,0.2);
+  --text: #d8d8cf;
+  --text1: #d8d8cf;
+  --text2: #9d9d90;
+  --text3: #737365;
+  --line: rgba(255,255,255,0.06);
+  --line2: rgba(255,255,255,0.1);
+  --border1: rgba(255,255,255,0.08);
+  --tex-bg: url('/img/textures/tex1.png');
+  --tex-card: url('/img/textures/tex4.png');
+  --tex-card2: url('/img/textures/tex9.png');
+}
+
+html[data-theme="faithful"] {
+  --bg1: #14100d;
+  --bg2: #1b1611;
+  --bg3: #251d16;
+  --card: #1f1913;
+  --card2: #2a2219;
+  --accent: #c9a96e;
+  --glow: rgba(201,169,110,0.24);
+  --text: #e9ddca;
+  --text1: #e9ddca;
+  --text2: #c4b391;
+  --text3: #9f8b67;
+  --line: rgba(201,169,110,0.14);
+  --line2: rgba(201,169,110,0.24);
+  --border1: rgba(201,169,110,0.2);
+  --theme-top-glow: radial-gradient(circle at 50% -10%, rgba(201,169,110,0.25), rgba(0,0,0,0) 60%);
+  --tex-bg: url('/img/textures/tex2.png');
+  --tex-card: url('/img/textures/tex8.png');
+}
+
+html[data-theme="stage"] {
+  --bg1: #070b10;
+  --bg2: #0b1118;
+  --bg3: #101824;
+  --card: #0f1722;
+  --card2: #152132;
+  --accent: #00ffaa;
+  --glow: rgba(0,255,170,0.24);
+  --text: #d7f4ea;
+  --text1: #d7f4ea;
+  --text2: #8bb4a7;
+  --text3: #5f7f76;
+  --line: rgba(128,255,220,0.12);
+  --line2: rgba(128,255,220,0.2);
+  --border1: rgba(128,255,220,0.2);
+  --tex-bg: none;
+  --tex-card: url('/img/textures/tex7.png');
+}
+
+html[data-theme="acoustic"] {
+  --bg1: #e8dac5;
+  --bg2: #ddccb3;
+  --bg3: #cfb995;
+  --card: #f4e9d8;
+  --card2: #e6d4bd;
+  --accent: #8b4513;
+  --glow: rgba(139,69,19,0.2);
+  --text: #2f2015;
+  --text1: #2f2015;
+  --text2: #674a35;
+  --text3: #86664d;
+  --line: rgba(47,32,21,0.14);
+  --line2: rgba(47,32,21,0.24);
+  --line3: rgba(47,32,21,0.32);
+  --border1: rgba(47,32,21,0.24);
+  --tex-bg: url('/img/textures/tex6.png');
+  --tex-card: url('/img/textures/tex3.png');
+  --tex-card2: url('/img/textures/tex5.png');
 }
 
 /* Reset & Base */
@@ -41,7 +133,14 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg1);
+  background-image:
+    var(--theme-top-glow),
+    linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.24) 30%, rgba(0,0,0,0.48) 100%),
+    var(--tex-bg);
+  background-size: auto, auto, var(--tex-scale);
+  background-position: center top, center top, center top;
+  background-repeat: no-repeat, no-repeat, repeat;
   color: var(--text);
   font-family: var(--f-body);
   font-size: 15px;
@@ -51,6 +150,49 @@ body {
   overflow-x: hidden;
   /* Noise texture */
   position: relative;
+}
+
+.card {
+  background-color: var(--card);
+  background-image:
+    linear-gradient(160deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18)),
+    var(--tex-card);
+  background-size: auto, var(--tex-scale);
+  background-repeat: no-repeat, repeat;
+  border: 1px solid var(--border1);
+}
+
+.ff-theme-opt {
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.ff-theme-opt:hover {
+  border-color: var(--line3) !important;
+  transform: translateY(-1px);
+}
+
+.ff-theme-opt.is-active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--glow);
+}
+
+html[data-theme="stage"] .df-btn--primary {
+  box-shadow: 0 0 18px var(--glow);
+}
+
+html[data-theme="acoustic"] .nav__log-btn,
+html[data-theme="acoustic"] .df-btn--primary {
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav__logo-dot,
+  .df-btn,
+  .nav__link,
+  .nav__log-btn {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 body::before {
@@ -2446,5 +2588,3 @@ select.df-input option {
   font-size: 24px;
   line-height: 1;
 }
-
-

@@ -212,6 +212,13 @@ Check stats:       Click "STATS"
 
 ---
 
+## Optional Theme Texture Assets
+
+- Place optional theme textures at: `/public/img/textures/tex1.png` through `/public/img/textures/tex9.png`.
+- Themes still render when textures are missing (gradient overlays and fallback colors are always applied).
+
+---
+
 ## Port / Network
 
 ```

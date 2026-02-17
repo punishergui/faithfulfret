@@ -208,6 +208,31 @@ window.Utils = {
       }, baseDelay + i * 60);
     });
   },
+
+  getTheme: () => {
+    const theme = localStorage.getItem('theme') || 'shed';
+    return ['shed', 'faithful', 'stage', 'acoustic'].includes(theme) ? theme : 'shed';
+  },
+
+  setTheme: (theme) => {
+    const value = ['shed', 'faithful', 'stage', 'acoustic'].includes(theme) ? theme : 'shed';
+    localStorage.setItem('theme', value);
+    document.documentElement.dataset.theme = value;
+  },
+
+  isLeftHanded: () => (localStorage.getItem('handedness') || 'right') === 'left',
+
+  getBpmStep: () => {
+    const raw = parseInt(localStorage.getItem('bpmStep') || '2', 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 2;
+  },
+
+  getDefaultSessionMinutes: () => {
+    const raw = parseInt(localStorage.getItem('defaultSessionMinutes') || '20', 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 20;
+  },
+
+  getDisplayName: () => (localStorage.getItem('displayName') || '').trim(),
 };
 
 // __FF_TOAST__

@@ -24,6 +24,7 @@
     { pattern: /^#\/tools\/tuning$/,              handler: () => Pages.Tuning.render() },
     { pattern: /^#\/tools\/amp-manual$/,          handler: () => window.location.assign('/manual.pdf') },
     { pattern: /^#\/tools$/,                      handler: () => Pages.ToolsHub.render() },
+    { pattern: /^#\/settings$/,                   handler: () => Pages.Settings.render() },
   ];
 
   function getHash() {
@@ -95,6 +96,9 @@
       }
       else if (hash.startsWith('#/tools') || hash.startsWith('#/log')) {
         if (hash.startsWith('#/tools') && href.includes('tools')) link.classList.add('active');
+      }
+      else if (hash.startsWith('#/settings')) {
+        if (href.includes('settings')) link.classList.add('active');
       }
     });
   }
