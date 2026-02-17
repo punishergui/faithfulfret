@@ -74,6 +74,7 @@ curl -s http://127.0.0.1:3000/api/sessions | jq
 curl -s http://127.0.0.1:3000/api/stats | jq
 curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
+curl -s http://127.0.0.1:3000/uploads/preset-audio/ | head -n 20
 curl -s http://127.0.0.1:3000/ | head -n 20
 ```
 

@@ -158,6 +158,17 @@
     async uploadPresetImage(payload) {
       return api('/api/preset-image', { method: 'POST', body: JSON.stringify(payload) });
     },
+    async uploadPresetAudio(presetId, file, fileName = 'recording.webm') {
+      const form = new FormData();
+      form.append('file', file, fileName);
+      const res = await fetch(`/api/presets/${presetId}/audio`, { method: 'POST', body: form });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `Request failed: ${res.status}`);
+      try { return JSON.parse(text); } catch { throw new Error('Invalid JSON response from preset audio upload'); }
+    },
+    async deletePresetAudio(presetId) {
+      return api(`/api/presets/${presetId}/audio`, { method: 'DELETE' });
+    },
 
     async uploadGearImage(payload) {
       return api('/api/gear-image', { method: 'POST', body: JSON.stringify(payload) });
