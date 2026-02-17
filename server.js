@@ -360,6 +360,7 @@ apiRouter.post('/presets/:id/audio', upload.single('file'), (req, res) => {
   fs.writeFileSync(path.join(presetAudioDir, fileName), file.buffer);
   const updated = Store.savePreset({
     ...preset,
+    audioData: null,
     audioPath: `uploads/preset-audio/${fileName}`,
     audioMime: file.mimetype || 'application/octet-stream',
   });
@@ -372,7 +373,7 @@ apiRouter.delete('/presets/:id/audio', (req, res) => {
     const absolutePath = path.join('/data', String(preset.audioPath).replace(/^\/+/, ''));
     if (absolutePath.startsWith('/data/') && fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
   }
-  const updated = Store.savePreset({ ...preset, audioPath: null, audioMime: null, audioDuration: null });
+  const updated = Store.savePreset({ ...preset, audioData: null, audioPath: null, audioMime: null, audioDuration: null });
   return res.json({ ok: true, preset: updated });
 });
 apiRouter.delete('/presets/:id', (req, res) => {
