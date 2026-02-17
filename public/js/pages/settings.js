@@ -24,14 +24,34 @@ Pages.Settings = {
         <section class="df-panel df-panel--wide ff-panel--page settings-panel">
           <div class="df-label">Theme Picker</div>
           <div class="ff-theme-grid">
-            ${themes.map((t) => `
-              <button type="button" class="ff-theme-card ${t.id === theme ? 'is-active' : ''}" data-theme-value="${t.id}">
-                <div class="ff-theme-swatches">
-                  ${t.swatches.map((swatch) => `<span class="ff-theme-swatch" style="background:${swatch};"></span>`).join('')}
-                </div>
-                <div class="ff-theme-nameplate"><span class="${t.fontClass}">${t.name}</span></div>
-              </button>
-            `).join('')}
+            ${themes.map((t) => {
+              const [sw1, sw2, sw3, sw4] = t.swatches;
+              const accent = t.vars?.['--accent'] || t.metaColor || sw3;
+              const border = t.vars?.['--line2'] || accent;
+              const glow = t.id === 'radioactive-gain' ? '#86ff1e' : accent;
+              const cardStyle = [
+                `--theme-bg1:${sw1}`,
+                `--theme-bg2:${sw2}`,
+                `--theme-accent:${accent}`,
+                `--theme-border:${border}`,
+                `--theme-glow:${glow}`,
+                `--theme-nameplate-glow:${sw4}`,
+              ].join(';');
+              return `
+                <button
+                  type="button"
+                  class="ff-theme-card ${t.id === theme ? 'is-active' : ''}"
+                  data-theme-value="${t.id}"
+                  style="${cardStyle}"
+                  aria-label="Switch to ${t.name} theme"
+                >
+                  <div class="ff-theme-swatches">
+                    ${t.swatches.map((swatch) => `<span class="ff-theme-swatch" style="background:${swatch};"></span>`).join('')}
+                  </div>
+                  <div class="ff-theme-nameplate"><span class="ff-theme-title">${t.name}</span></div>
+                </button>
+              `;
+            }).join('')}
           </div>
 
           <div style="height:1px;background:var(--line2);"></div>
