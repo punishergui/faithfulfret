@@ -104,59 +104,7 @@ Pages.Progress = {
 
 
   _computeGearStats(gear = []) {
-    const normalizeStatus = (status) => {
-      const normalized = typeof status === 'string' ? status.trim() : status;
-      const map = {
-        'Own it': 'Owned',
-        owned: 'Owned',
-        'Wish List': 'Wishlist',
-        wishlist: 'Wishlist',
-        Watching: 'Wishlist',
-        watching: 'Wishlist',
-        'On Loan': 'Wishlist',
-        sold: 'Sold',
-      };
-      return map[normalized] || normalized || 'Owned';
-    };
-    const money = (value) => {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : 0;
-    };
-
-    const normalizedGear = (gear || []).map((g) => ({ ...g, status: normalizeStatus(g.status) }));
-    const owned = normalizedGear.filter((g) => g.status === 'Owned');
-    const sold = normalizedGear.filter((g) => g.status === 'Sold');
-    const wishlist = normalizedGear.filter((g) => g.status === 'Wishlist');
-
-    const totalInvested = owned.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
-    const totalRecoveredNet = sold.reduce((sum, g) => sum + money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping), 0);
-    const soldCostBasis = sold.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
-    const soldNetPL = totalRecoveredNet - soldCostBasis;
-
-    const soldWithProfit = sold.map((g) => {
-      const recovered = money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping);
-      const basis = money(g.boughtPrice) + money(g.tax) + money(g.shipping);
-      return { item: g, profit: recovered - basis };
-    });
-
-    const bestFlip = soldWithProfit.length
-      ? soldWithProfit.reduce((best, row) => (row.profit > best.profit ? row : best), soldWithProfit[0])
-      : null;
-    const worstFlip = soldWithProfit.length
-      ? soldWithProfit.reduce((worst, row) => (row.profit < worst.profit ? row : worst), soldWithProfit[0])
-      : null;
-
-    return {
-      ownedCount: owned.length,
-      wishlistCount: wishlist.length,
-      soldCount: sold.length,
-      totalInvested,
-      totalRecoveredNet,
-      soldCostBasis,
-      soldNetPL,
-      bestFlip,
-      worstFlip,
-    };
+    return Utils.computeGearStats(gear || []);
   },
 
   _renderGearStats(stats) {
@@ -190,6 +138,20 @@ Pages.Progress = {
           <div style="display:grid;gap:6px;margin-top:10px;color:var(--text2);font-size:12px;">
             <span>${flipLabel(stats.bestFlip, 'Best flip')}</span>
             <span>${flipLabel(stats.worstFlip, 'Worst flip')}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Top Categories</div>
+              <div style="display:grid;gap:4px;">
+                ${(stats.topCategories || []).map((row) => `<div style="display:flex;justify-content:space-between;font-size:12px;"><span>${row.label}</span><strong>${row.count}</strong></div>`).join('') || '<div style="font-size:12px;color:var(--text3);">—</div>'}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Top Brands</div>
+              <div style="display:grid;gap:4px;">
+                ${(stats.topBrands || []).map((row) => `<div style="display:flex;justify-content:space-between;font-size:12px;"><span>${row.label}</span><strong>${row.count}</strong></div>`).join('') || '<div style="font-size:12px;color:var(--text3);">—</div>'}
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -187,6 +187,7 @@ apiRouter.put('/sessions/:id/gear', (req, res) => {
   res.json(Store.saveSessionGear(req.params.id, gearIds));
 });
 apiRouter.get('/sessions/:id/gear', (req, res) => res.json(Store.listSessionGear(req.params.id)));
+apiRouter.get('/gear-usage', (req, res) => res.json(Store.getGearUsage()));
 
 apiRouter.get('/presets', (req, res) => res.json(Store.listPresets()));
 apiRouter.post('/presets', (req, res) => {

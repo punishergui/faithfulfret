@@ -337,6 +337,22 @@ const listSessionGearBySessionIds = (sessionIds = []) => {
   `).all(...sessionIds);
 };
 
+const getGearUsage = () => db.prepare(`
+  SELECT
+    sg.gearId AS gearId,
+    COUNT(*) AS usedCount,
+    MAX(s.date) AS lastUsed
+  FROM session_gear sg
+  JOIN sessions s ON s.id = sg.sessionId
+  GROUP BY sg.gearId
+`).all().reduce((acc, row) => {
+  acc[row.gearId] = {
+    usedCount: Number(row.usedCount) || 0,
+    lastUsed: row.lastUsed || '',
+  };
+  return acc;
+}, {});
+
 const listPresets = () => all('SELECT * FROM presets ORDER BY createdAt DESC');
 const getPreset = (id) => one('SELECT * FROM presets WHERE id = ?', id);
 const savePreset = (data) => { const row = coercePreset(data); Q.upsertPreset.run(row); return getPreset(row.id); };
@@ -349,4 +365,4 @@ const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
 const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
-module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, saveSessionGear, listSessionGear, listSessionGearBySessionIds, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };

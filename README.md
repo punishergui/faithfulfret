@@ -105,10 +105,12 @@ docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA tab
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "SqliteError|isPrimary"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-form.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/progress.js"
 # Verify presets editor script syntax in running container
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
-# optional quick smoke check after deploy
+# optional quick smoke checks after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
+curl -s http://localhost:3000/api/gear-usage | head -c 200
 # optional UI smoke check: Gear page filter buttons (All/Owned/Wishlist/Sold) should not change route from #/gear
 # optional UI smoke check: Gear page keeps filters/list unchanged and shows compact Gear Stats in right sidebar
 # optional UI smoke check: Stats page (#/progress) title reads "Stats" and shows full Gear Stats section near top

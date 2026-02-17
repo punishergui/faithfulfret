@@ -110,6 +110,84 @@ window.Utils = {
     }
   },
 
+
+  normalizeGearStatus: (status) => {
+    const normalized = typeof status === 'string' ? status.trim() : status;
+    const map = {
+      'Own it': 'Owned',
+      owned: 'Owned',
+      'Wish List': 'Wishlist',
+      wishlist: 'Wishlist',
+      Watching: 'Wishlist',
+      watching: 'Wishlist',
+      'On Loan': 'Wishlist',
+      sold: 'Sold',
+    };
+    return map[normalized] || normalized || 'Owned';
+  },
+
+  computeGearStats: (gear = []) => {
+    const money = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const parseDay = (value) => {
+      if (!value) return null;
+      const d = new Date(`${value}T12:00:00`);
+      return Number.isFinite(d.getTime()) ? d : null;
+    };
+
+    const normalizedGear = (gear || []).map((g) => ({ ...g, status: window.Utils.normalizeGearStatus(g.status) }));
+    const owned = normalizedGear.filter((g) => g.status === 'Owned');
+    const sold = normalizedGear.filter((g) => g.status === 'Sold');
+    const wishlist = normalizedGear.filter((g) => g.status === 'Wishlist');
+
+    const ownedInvested = owned.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const soldRecoveredNet = sold.reduce((sum, g) => sum + money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping), 0);
+    const soldCostBasis = sold.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const soldNetPL = soldRecoveredNet - soldCostBasis;
+
+    const soldWithProfit = sold.map((g) => {
+      const recovered = money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping);
+      const basis = money(g.boughtPrice) + money(g.tax) + money(g.shipping);
+      return { item: g, profit: recovered - basis };
+    });
+
+    const soldHoldDays = sold
+      .map((g) => {
+        const start = parseDay(g.boughtDate);
+        const end = parseDay(g.soldDate);
+        if (!start || !end) return null;
+        return Math.max(0, Math.round((end - start) / 86400000));
+      })
+      .filter((v) => v != null);
+
+    const topN = (rows = [], key) => Object.entries(rows.reduce((acc, row) => {
+      const raw = String(row[key] || '').trim();
+      const label = raw || 'Other';
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {})).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)).slice(0, 5);
+
+    return {
+      ownedCount: owned.length,
+      wishlistCount: wishlist.length,
+      soldCount: sold.length,
+      ownedInvested,
+      totalInvested: ownedInvested,
+      soldRecoveredNet,
+      totalRecoveredNet: soldRecoveredNet,
+      soldCostBasis,
+      soldNetPL,
+      bestFlip: soldWithProfit.length ? soldWithProfit.reduce((best, row) => (row.profit > best.profit ? row : best), soldWithProfit[0]) : null,
+      worstFlip: soldWithProfit.length ? soldWithProfit.reduce((worst, row) => (row.profit < worst.profit ? row : worst), soldWithProfit[0]) : null,
+      avgHoldDays: soldHoldDays.length ? Math.round((soldHoldDays.reduce((a, b) => a + b, 0) / soldHoldDays.length) * 10) / 10 : null,
+      wishlistTargetTotal: wishlist.reduce((sum, g) => sum + money(g.targetPrice), 0),
+      topCategories: topN(normalizedGear, 'category'),
+      topBrands: topN(normalizedGear, 'brand'),
+    };
+  },
+
   formatPrice: (price) => {
     if (price == null || price === '' || isNaN(price)) return '';
     return '$' + Number(price).toLocaleString();
