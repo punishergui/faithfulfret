@@ -22,6 +22,16 @@ function money(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function parseDay(value) {
+  if (!value) return null;
+  const d = new Date(`${value}T12:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+function formatCurrency(v) {
+  return Utils.formatPrice(Number(v) || 0);
+}
+
 Pages.Gear = {
   async render() {
     const app = document.getElementById('app');
@@ -29,19 +39,21 @@ Pages.Gear = {
 
     const gear = (await DB.getAllGear()).map((g) => ({ ...g, status: normalizeGearStatus(g.status) }));
     const filterStorageKey = 'df:gearStatusFilter';
+    const sortStorageKey = 'df:gearSort';
+    const wishlistOnlyStorageKey = 'df:gearWishlistOnly';
     const filters = ['All', 'Owned', 'Wishlist', 'Sold'];
     const storedFilter = normalizeGearStatus(localStorage.getItem(filterStorageKey) || '');
     const selectedFilter = filters.includes(this._selectedFilter)
       ? this._selectedFilter
       : (filters.includes(storedFilter) ? storedFilter : 'All');
+    const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
+    const wishlistOnly = this._wishlistOnly ?? (localStorage.getItem(wishlistOnlyStorageKey) === '1');
     this._selectedFilter = selectedFilter;
+    this._selectedSort = selectedSort;
+    this._wishlistOnly = wishlistOnly;
 
-    const owned = gear.filter((g) => g.status === 'Owned').length;
-    const sold = gear.filter((g) => g.status === 'Sold').length;
-    const wishlist = gear.filter((g) => g.status === 'Wishlist').length;
-    const invested = gear.filter((g) => g.status === 'Owned').reduce((s, g) => s + money(g.boughtPrice || g.price), 0);
-
-    const visible = selectedFilter === 'All' ? gear : gear.filter((g) => g.status === selectedFilter);
+    const stats = this._computeStats(gear);
+    const visible = this._sortGear(this._filterGear(gear, selectedFilter, wishlistOnly), selectedSort);
     const byCategory = {};
     visible.forEach((g) => {
       const cat = g.category || 'Other';
@@ -61,18 +73,20 @@ Pages.Gear = {
         <div class="fret-line"></div>
       </div>
 
-      <div class="df-statbar">
-        <div class="df-statbar__item"><div class="df-statbar__key">Owned</div><div class="df-statbar__val">${owned}</div></div>
-        <div class="df-statbar__item"><div class="df-statbar__key">Sold</div><div class="df-statbar__val">${sold}</div></div>
-        <div class="df-statbar__item"><div class="df-statbar__key">Wishlist</div><div class="df-statbar__val">${wishlist}</div></div>
-        <div class="df-statbar__item"><div class="df-statbar__key">Invested</div><div class="df-statbar__val">${invested ? '$' + Number(invested).toLocaleString() : '$0'}</div></div>
-      </div>
+      ${this._renderStats(stats)}
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
           ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f}</button>`).join('')}
         </div>
-        ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter)}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+          <label class="df-label" style="margin:0;">Sort</label>
+          <select class="df-input" id="gear-sort" style="max-width:220px;">
+            ${['Newest', 'Price low->high', 'Priority', 'Brand', 'Type'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+          </select>
+          <button type="button" class="df-btn ${wishlistOnly ? 'df-btn--primary' : 'df-btn--outline'}" id="gear-wishlist-only">Wishlist only</button>
+        </div>
+        ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, wishlistOnly)}
       </div>
     `;
 
@@ -85,7 +99,157 @@ Pages.Gear = {
       });
     });
 
+    app.querySelector('#gear-sort')?.addEventListener('change', (e) => {
+      this._selectedSort = e.target.value;
+      localStorage.setItem(sortStorageKey, this._selectedSort);
+      this.render();
+    });
+
+    app.querySelector('#gear-wishlist-only')?.addEventListener('click', () => {
+      this._wishlistOnly = !this._wishlistOnly;
+      localStorage.setItem(wishlistOnlyStorageKey, this._wishlistOnly ? '1' : '0');
+      this.render();
+    });
+
+    app.querySelectorAll('[data-link-inline-save]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const gearId = btn.getAttribute('data-gear-id');
+        const linkId = btn.getAttribute('data-link-id');
+        const row = app.querySelector(`[data-link-inline-row="${linkId}"]`);
+        if (!row) return;
+        const price = row.querySelector('[name="linkInlinePrice"]')?.value || '';
+        const lastChecked = row.querySelector('[name="linkInlineLastChecked"]')?.value || '';
+        await DB.saveGearLink(gearId, { id: linkId, price, lastChecked });
+        Utils.toast?.('Link updated');
+        this.render();
+      });
+    });
+
     setTimeout(() => Utils.staggerReveal(app, '.gear-card', 0), 50);
+  },
+
+  _filterGear(gear, selectedFilter, wishlistOnly) {
+    let visible = selectedFilter === 'All' ? gear : gear.filter((g) => g.status === selectedFilter);
+    if (wishlistOnly) visible = visible.filter((g) => g.status === 'Wishlist');
+    return visible;
+  },
+
+  _sortGear(items, selectedSort) {
+    const priorityRank = { Dream: 0, High: 1, Medium: 2, Low: 3 };
+    const sorted = [...items];
+    sorted.sort((a, b) => {
+      if (selectedSort === 'Price low->high') {
+        return this._bestPrice(a) - this._bestPrice(b);
+      }
+      if (selectedSort === 'Priority') {
+        const ra = priorityRank[a.priority] ?? 99;
+        const rb = priorityRank[b.priority] ?? 99;
+        if (ra !== rb) return ra - rb;
+      }
+      if (selectedSort === 'Brand') {
+        return String(a.brand || '').localeCompare(String(b.brand || ''));
+      }
+      if (selectedSort === 'Type') {
+        return String(a.category || a.type || '').localeCompare(String(b.category || b.type || ''));
+      }
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+    });
+    return sorted;
+  },
+
+  _bestPrice(gearItem) {
+    const prices = (gearItem.linksList || []).map((l) => money(l.price)).filter((v) => Number.isFinite(v) && v > 0);
+    return prices.length ? Math.min(...prices) : Number.POSITIVE_INFINITY;
+  },
+
+  _computeStats(gear) {
+    const owned = gear.filter((g) => g.status === 'Owned');
+    const sold = gear.filter((g) => g.status === 'Sold');
+    const wishlist = gear.filter((g) => g.status === 'Wishlist');
+
+    const ownedInvested = owned.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const ownedAvgPurchase = (() => {
+      const withPrice = owned.filter((g) => Number.isFinite(Number(g.boughtPrice)));
+      if (!withPrice.length) return null;
+      const total = withPrice.reduce((sum, g) => sum + money(g.boughtPrice), 0);
+      return total / withPrice.length;
+    })();
+
+    const soldRecoveredNet = sold.reduce((sum, g) => sum + money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping), 0);
+    const soldCostBasis = sold.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const soldNetPL = soldRecoveredNet - soldCostBasis;
+
+    const soldWithProfit = sold.map((g) => {
+      const recovered = money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping);
+      const basis = money(g.boughtPrice) + money(g.tax) + money(g.shipping);
+      return { item: g, profit: recovered - basis };
+    });
+
+    const bestFlip = soldWithProfit.length
+      ? soldWithProfit.reduce((best, row) => (row.profit > best.profit ? row : best), soldWithProfit[0])
+      : null;
+    const worstFlip = soldWithProfit.length
+      ? soldWithProfit.reduce((worst, row) => (row.profit < worst.profit ? row : worst), soldWithProfit[0])
+      : null;
+
+    const soldHoldDays = sold
+      .map((g) => {
+        const start = parseDay(g.boughtDate);
+        const end = parseDay(g.soldDate);
+        if (!start || !end) return null;
+        return Math.max(0, Math.round((end - start) / 86400000));
+      })
+      .filter((v) => v != null);
+
+    const avgHoldDays = soldHoldDays.length
+      ? Math.round((soldHoldDays.reduce((a, b) => a + b, 0) / soldHoldDays.length) * 10) / 10
+      : null;
+
+    const wishlistTargetTotal = wishlist.reduce((sum, g) => sum + money(g.targetPrice), 0);
+
+    return {
+      ownedCount: owned.length,
+      ownedInvested,
+      ownedAvgPurchase,
+      soldCount: sold.length,
+      soldRecoveredNet,
+      soldCostBasis,
+      soldNetPL,
+      bestFlip,
+      worstFlip,
+      avgHoldDays,
+      wishlistCount: wishlist.length,
+      wishlistTargetTotal,
+    };
+  },
+
+  _renderStats(stats) {
+    const flipLabel = (flip, prefix) => {
+      if (!flip) return `${prefix}: —`;
+      return `${prefix}: ${flip.item.name || 'Unnamed'} (${formatCurrency(flip.profit)})`;
+    };
+    return `
+      <div class="page-wrap" style="padding:14px 24px 8px;">
+        <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Stats</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
+          <div class="df-statbar__item"><div class="df-statbar__key">Owned count</div><div class="df-statbar__val">${stats.ownedCount}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Total invested</div><div class="df-statbar__val">${formatCurrency(stats.ownedInvested)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Avg purchase</div><div class="df-statbar__val">${stats.ownedAvgPurchase == null ? '—' : formatCurrency(stats.ownedAvgPurchase)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Sold count</div><div class="df-statbar__val">${stats.soldCount}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Recovered net</div><div class="df-statbar__val">${formatCurrency(stats.soldRecoveredNet)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Cost basis</div><div class="df-statbar__val">${formatCurrency(stats.soldCostBasis)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Net P/L</div><div class="df-statbar__val">${formatCurrency(stats.soldNetPL)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Avg hold days</div><div class="df-statbar__val">${stats.avgHoldDays == null ? '—' : stats.avgHoldDays}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Wishlist count</div><div class="df-statbar__val">${stats.wishlistCount}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Wishlist target total</div><div class="df-statbar__val">${formatCurrency(stats.wishlistTargetTotal)}</div></div>
+        </div>
+        <div style="color:var(--text2);font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:12px;">
+          <span>${flipLabel(stats.bestFlip, 'Best flip')}</span>
+          <span>${flipLabel(stats.worstFlip, 'Worst flip')}</span>
+        </div>
+      </div>
+    `;
   },
 
   _renderByCategory(byCategory) {
@@ -105,7 +269,26 @@ Pages.Gear = {
       Sold: 'df-badge--red',
       Wishlist: 'df-badge--orange',
     }[g.status] || 'df-badge--muted';
-    const topLink = (g.linksList || []).find((l) => l.url);
+    const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.primary) - Number(a.primary));
+    const topLink = sortedLinks.find((l) => l.url);
+
+    let wishlistMeta = '';
+    if (g.status === 'Wishlist') {
+      const bestPrice = this._bestPrice(g);
+      const bestLink = sortedLinks.find((l) => money(l.price) === bestPrice);
+      const targetPrice = Number(g.targetPrice);
+      const hasTarget = Number.isFinite(targetPrice);
+      const delta = hasTarget && Number.isFinite(bestPrice) ? bestPrice - targetPrice : null;
+      const linkDates = sortedLinks.map((l) => l.lastChecked).filter(Boolean).sort().reverse();
+      const lastChecked = linkDates[0] || '';
+      wishlistMeta = `
+        <div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+          <div>Best price: ${Number.isFinite(bestPrice) ? formatCurrency(bestPrice) : '—'} ${bestLink?.label ? `· ${bestLink.label}` : ''}</div>
+          <div>Target: ${hasTarget ? formatCurrency(targetPrice) : '—'} ${delta == null ? '' : `· ${delta <= 0 ? 'Under target' : 'Over target'} (${formatCurrency(delta)})`}</div>
+          <div>Last checked: ${lastChecked ? Utils.formatDate(lastChecked, 'short') : '—'}</div>
+        </div>
+      `;
+    }
 
     return `
       <div class="gear-card card-reveal" onclick="go('#/gear/edit/${g.id}')">
@@ -116,6 +299,7 @@ Pages.Gear = {
           ${(g.brand || g.model) ? `<div class="gear-card__sub">${[g.brand, g.model].filter(Boolean).join(' · ')}</div>` : ''}
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
+          ${wishlistMeta}
           <div class="gear-card__footer">
             ${g.boughtPrice || g.price ? `<span class="gear-card__price">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
             ${g.status ? `<span class="df-badge ${statusBadge}">${g.status}</span>` : ''}
@@ -125,15 +309,23 @@ Pages.Gear = {
               <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Manual</a>
             </div>
           </div>
+          ${sortedLinks.slice(0, 3).map((link) => `
+            <div data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto;gap:6px;align-items:end;">
+              <div style="font-size:12px;color:var(--text2);">${link.primary ? '★ Primary' : ''} ${link.label || 'Link'}</div>
+              <input class="df-input" name="linkInlinePrice" type="number" step="0.01" value="${link.price ?? ''}" placeholder="Price">
+              <input class="df-input" name="linkInlineLastChecked" type="date" value="${link.lastChecked || ''}">
+              <button type="button" class="df-btn df-btn--outline" data-link-inline-save="1" data-gear-id="${g.id}" data-link-id="${link.id}">Save</button>
+            </div>
+          `).join('')}
         </div>
       </div>
     `;
   },
 
-  _renderEmpty(filterLabel) {
+  _renderEmpty(filterLabel, wishlistOnly) {
     return `
       <div class="empty-state" style="padding:80px 0;">
-        <div class="empty-state__title">No ${filterLabel === 'All' ? '' : filterLabel.toLowerCase() + ' '}gear found</div>
+        <div class="empty-state__title">No ${(wishlistOnly ? 'wishlist ' : '') + (filterLabel === 'All' ? '' : filterLabel.toLowerCase() + ' ')}gear found</div>
         <div class="empty-state__text">Start tracking your guitars, amps, and accessories.</div>
         <a href="#/gear/add" class="df-btn df-btn--primary">+ Add Your First Item</a>
       </div>
@@ -153,6 +345,8 @@ Pages.GearForm = {
 
     const categories = ['Guitar', 'Amp', 'Pedal', 'Strings', 'Interface', 'Picks', 'Tuner', 'Cable', 'Case', 'DAW', 'Strap', 'Other'];
     const statuses = ['Owned', 'Wishlist', 'Sold'];
+    const priorities = ['Low', 'Medium', 'High', 'Dream'];
+    const desiredConditions = ['Any', 'New', 'Used'];
     const linksList = Array.isArray(gear.linksList) ? gear.linksList : [];
 
     const totalCost = money(gear.boughtPrice || gear.pricePaid || gear.price) + money(gear.tax) + money(gear.shipping);
@@ -182,6 +376,10 @@ Pages.GearForm = {
             <div class="df-field"><label class="df-label" for="g-bought-from">Bought From</label><input type="text" id="g-bought-from" name="boughtFrom" class="df-input" value="${gear.boughtFrom || gear.vendor || ''}"></div>
             <div class="df-field"><label class="df-label" for="g-tax">Tax ($)</label><input type="number" id="g-tax" name="tax" class="df-input" min="0" step="0.01" value="${gear.tax ?? ''}"></div>
             <div class="df-field"><label class="df-label" for="g-shipping">Shipping ($)</label><input type="number" id="g-shipping" name="shipping" class="df-input" min="0" step="0.01" value="${gear.shipping ?? ''}"></div>
+
+            <div class="df-field"><label class="df-label" for="g-target-price">Target Price ($)</label><input type="number" id="g-target-price" name="targetPrice" class="df-input" min="0" step="0.01" value="${gear.targetPrice ?? ''}"></div>
+            <div class="df-field"><label class="df-label" for="g-priority">Priority</label><select id="g-priority" name="priority" class="df-input"><option value="">— Select —</option>${priorities.map((p) => `<option value="${p}" ${gear.priority === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+            <div class="df-field"><label class="df-label" for="g-desired-condition">Desired Condition</label><select id="g-desired-condition" name="desiredCondition" class="df-input"><option value="">— Select —</option>${desiredConditions.map((p) => `<option value="${p}" ${gear.desiredCondition === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
 
             <div class="df-field"><label class="df-label" for="g-sold-date">Sold Date</label><input type="date" id="g-sold-date" name="soldDate" class="df-input" value="${gear.soldDate || ''}"></div>
             <div class="df-field"><label class="df-label" for="g-sold-price">Sold Price ($)</label><input type="number" id="g-sold-price" name="soldPrice" class="df-input" min="0" step="0.01" value="${gear.soldPrice ?? ''}"></div>
@@ -298,7 +496,7 @@ Pages.GearForm = {
       const data = Object.fromEntries(fd.entries());
       delete data['g-image'];
 
-      ['boughtPrice', 'tax', 'shipping', 'soldPrice', 'soldFees', 'soldShipping'].forEach((k) => {
+      ['boughtPrice', 'tax', 'shipping', 'soldPrice', 'soldFees', 'soldShipping', 'targetPrice'].forEach((k) => {
         if (data[k]) data[k] = parseFloat(data[k]);
       });
 
@@ -308,7 +506,8 @@ Pages.GearForm = {
         url: row.querySelector('[name="linkUrl"]')?.value || '',
         price: row.querySelector('[name="linkPrice"]')?.value || '',
         lastChecked: row.querySelector('[name="linkLastChecked"]')?.value || '',
-      })).filter((l) => l.label || l.url || l.price || l.lastChecked);
+        primary: row.querySelector('[name="linkPrimary"]')?.checked ? 1 : 0,
+      })).filter((l) => l.label || l.url || l.price || l.lastChecked || l.primary);
 
       Object.keys(data).forEach((k) => {
         if (data[k] === '') delete data[k];
@@ -348,13 +547,14 @@ Pages.GearForm = {
     }
   },
 
-  _renderLinkRow(link, idx) {
+  _renderLinkRow(link) {
     return `
-      <div data-link-row="1" data-link-id="${link.id || ''}" style="display:grid;grid-template-columns:1fr 1fr 120px 160px auto;gap:8px;align-items:end;">
+      <div data-link-row="1" data-link-id="${link.id || ''}" style="display:grid;grid-template-columns:1fr 1fr 120px 160px 90px auto;gap:8px;align-items:end;">
         <div><label class="df-label">Label</label><input class="df-input" name="linkLabel" value="${link.label || ''}" placeholder="Store"></div>
         <div><label class="df-label">URL</label><input class="df-input" name="linkUrl" value="${link.url || ''}" placeholder="https://..."></div>
         <div><label class="df-label">Price</label><input class="df-input" name="linkPrice" value="${link.price ?? ''}" type="number" step="0.01"></div>
         <div><label class="df-label">Last Checked</label><input class="df-input" name="linkLastChecked" value="${link.lastChecked || ''}" type="date"></div>
+        <div><label class="df-label">Primary</label><input name="linkPrimary" type="checkbox" ${Number(link.primary) ? 'checked' : ''}></div>
         <button type="button" data-remove-link="1" class="df-btn df-btn--outline" style="height:40px;">Remove</button>
       </div>
     `;

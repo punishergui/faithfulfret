@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS gear_links (
   url TEXT,
   price REAL,
   lastChecked TEXT,
-  note TEXT
+  note TEXT,
+  "primary" INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS session_gear (
   sessionId TEXT NOT NULL,
@@ -99,6 +100,10 @@ ensureColumn('gear_items', 'soldPrice', 'REAL');
 ensureColumn('gear_items', 'soldFees', 'REAL');
 ensureColumn('gear_items', 'soldWhere', 'TEXT');
 ensureColumn('gear_items', 'soldShipping', 'REAL');
+ensureColumn('gear_items', 'targetPrice', 'REAL');
+ensureColumn('gear_items', 'priority', 'TEXT');
+ensureColumn('gear_items', 'desiredCondition', 'TEXT');
+ensureColumn('gear_links', 'primary', 'INTEGER DEFAULT 0');
 
 const uid = () => `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -129,8 +134,8 @@ function coerceGear(input = {}) {
     owned: 'Owned',
     'Wish List': 'Wishlist',
     wishlist: 'Wishlist',
-    watching: 'Watching',
-    'On Loan': 'Watching',
+    watching: 'Wishlist',
+    'On Loan': 'Wishlist',
     sold: 'Sold',
   };
   const nextStatus = statusMap[input.status] || input.status || 'Owned';
@@ -164,6 +169,9 @@ function coerceGear(input = {}) {
     soldFees: n(input.soldFees),
     soldWhere: input.soldWhere || '',
     soldShipping: n(input.soldShipping),
+    targetPrice: n(input.targetPrice),
+    priority: input.priority || '',
+    desiredCondition: input.desiredCondition || '',
   };
 }
 
@@ -176,6 +184,7 @@ function coerceGearLink(input = {}) {
     price: n(input.price),
     lastChecked: input.lastChecked || '',
     note: input.note || '',
+    primary: Number(input.primary) ? 1 : 0,
   };
 }
 function coercePreset(input = {}) {
@@ -209,17 +218,18 @@ const Q = {
       date=excluded.date,title=excluded.title,durationMinutes=excluded.durationMinutes,youtubeId=excluded.youtubeId,focusTag=excluded.focusTag,
       notes=excluded.notes,bpm=excluded.bpm,dayNumber=excluded.dayNumber,focus=excluded.focus,mood=excluded.mood,win=excluded.win,
       checklist=excluded.checklist,links=excluded.links,videoId=excluded.videoId`),
-  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping)
-    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping)
+  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping,targetPrice,priority,desiredCondition)
+    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping,:targetPrice,:priority,:desiredCondition)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name,type=excluded.type,status=excluded.status,pricePaid=excluded.pricePaid,priceSold=excluded.priceSold,vendor=excluded.vendor,
       links=excluded.links,notes=excluded.notes,category=excluded.category,brand=excluded.brand,model=excluded.model,price=excluded.price,
       dateAcquired=excluded.dateAcquired,buyUrl=excluded.buyUrl,mfrUrl=excluded.mfrUrl,manualUrl=excluded.manualUrl,imageData=excluded.imageData,
       boughtDate=excluded.boughtDate,boughtPrice=excluded.boughtPrice,boughtFrom=excluded.boughtFrom,tax=excluded.tax,shipping=excluded.shipping,
-      soldDate=excluded.soldDate,soldPrice=excluded.soldPrice,soldFees=excluded.soldFees,soldWhere=excluded.soldWhere,soldShipping=excluded.soldShipping`),
-  upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note)
-    VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note)
-    ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note`),
+      soldDate=excluded.soldDate,soldPrice=excluded.soldPrice,soldFees=excluded.soldFees,soldWhere=excluded.soldWhere,soldShipping=excluded.soldShipping,
+      targetPrice=excluded.targetPrice,priority=excluded.priority,desiredCondition=excluded.desiredCondition`),
+  upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note,"primary")
+    VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note,:primary)
+    ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note,"primary"=excluded."primary"`),
   upsertPreset: db.prepare(`INSERT INTO presets (id,name,ampModel,settings,tags,createdAt)
     VALUES (:id,:name,:ampModel,:settings,:tags,:createdAt)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name,ampModel=excluded.ampModel,settings=excluded.settings,tags=excluded.tags`),
@@ -271,7 +281,7 @@ const deleteGear = (id) => {
   return run('DELETE FROM gear_items WHERE id = ?', id);
 };
 
-const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY lastChecked DESC, id DESC').all(gearId);
+const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY "primary" DESC, lastChecked DESC, id DESC').all(gearId);
 const saveGearLink = (data) => {
   const row = coerceGearLink(data);
   if (!row.gearId) throw new Error('gearId is required');
