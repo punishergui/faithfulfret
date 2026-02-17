@@ -110,7 +110,8 @@ docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke check after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
 # optional UI smoke check: Gear page filter buttons (All/Owned/Wishlist/Sold) should not change route from #/gear
-# optional UI smoke check: Gear page shows Gear Stats cards, Wishlist sort + toggle controls, and Wishlist cards show best price/target delta
+# optional UI smoke check: Gear page keeps filters/list unchanged and shows compact Gear Stats in right sidebar
+# optional UI smoke check: Stats page (#/progress) title reads "Stats" and shows full Gear Stats section near top
 # optional UI smoke check: Session form supports Gear Used selection + "Use last gear" and session detail shows Used gear badges
 # optional UI smoke check: open Presets and confirm Vypyr X2 Inst/Stomp/Effects rows render inside the same dial card/box,
 # each row has a Type selector, and Amplifiers has an Amp LED Color selector that loads/saves correctly
@@ -181,7 +182,7 @@ cp ./data/faithfulfret.sqlite ./data/faithfulfret.sqlite.backup-$(date +%Y%m%d-%
 cp -R ./data/presets ./data/presets.backup-$(date +%Y%m%d-%H%M%S)
 ```
 
-- You can also export/import JSON from the `Progress` page for portability between environments.
+- You can also export/import JSON from the `Stats` page (`#/progress` route) for portability between environments.
 
 ---
 
@@ -191,7 +192,7 @@ cp -R ./data/presets ./data/presets.backup-$(date +%Y%m%d-%H%M%S)
 Log a session:     Click "+ LOG" in top nav
 View sessions:     Click "SESSIONS"
 Practice tools:    Click "TOOLS" → pick a tool
-Check progress:    Click "PROGRESS"
+Check stats:       Click "STATS"
 ```
 
 ---
@@ -212,8 +213,8 @@ The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:3000` when 
 ## Data Backup
 
 ```
-Progress page → "Export All Data" → saves daily-fret-backup-DATE.json
-To restore: Progress page → "Import Data" → select backup file
+Stats page (#/progress route) → "Export All Data" → saves daily-fret-backup-DATE.json
+To restore: Stats page (#/progress route) → "Import Data" → select backup file
 ```
 
 Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still useful for moving data between environments or creating portable backups.
@@ -380,7 +381,7 @@ PWA won't install: Must be served over HTTP (localhost) or HTTPS
 - **Session Form** — log new or edit existing sessions
 - **Gear** — track guitars, amps, pedals with category images and pricing
 - **Resources** — lessons, YouTube channels, apps with star ratings
-- **Progress** — BPM and minutes charts, full history table, export/import
+- **Stats** (`#/progress`) — BPM and minutes charts, full history table, export/import
 - **Metronome** — Web Audio API scheduler, tap tempo, keyboard shortcuts
 - **Chord Reference** — 15 essential chords with ASCII diagrams and tips
 - **Scale Patterns** — fretboard visualization with root note highlighting
