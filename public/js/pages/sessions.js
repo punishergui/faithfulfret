@@ -26,7 +26,7 @@ Pages.Sessions = {
   _renderHero(stats) {
     return `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=1200&q=80');">
-        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+        <div class="page-hero__inner">
           <div class="page-title">Sessions</div>
           <a href="#/log" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Log Session</a>
         </div>

@@ -27,7 +27,7 @@ Pages.Metronome = {
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1452457750107-be127b9f2f77?w=1200&q=80');">
-        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div class="page-hero__inner">
           <div class="page-title">Metronome</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>
         </div>

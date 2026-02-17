@@ -84,19 +84,12 @@ Pages.Dashboard = {
     return `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');overflow:hidden;">
         <div class="page-hero__inner">
-          <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">${Utils.today()}</div>
-          <div class="page-title" style="text-shadow:2px 2px 0 var(--heroGlow);margin-bottom:12px;">${greeting}</div>
-          <div style="font-family:var(--f-mono);font-size:13px;color:var(--text2);margin-bottom:${stats.streak > 0 ? '12px' : '0'};">
-            <span class="count-target" data-target="${stats.count}" data-type="int">${stats.count}</span> sessions &middot; <span class="count-target" data-target="${stats.totalHours}" data-type="float">${stats.totalHours}</span> hours in &middot; keep going.
+          <div class="page-title" style="text-shadow:2px 2px 0 var(--heroGlow);">${greeting}</div>
+          <p style="font-family:var(--f-mono);font-size:12px;color:var(--text2);">${awayText}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
+            <a href="#/sessions" class="df-btn df-btn--outline">View Sessions</a>
           </div>
-          <div style="font-family:var(--f-mono);font-size:11px;color:var(--text3);margin-bottom:12px;">${awayText}</div>
-          ${stats.count === 0 ? `<div style="font-family:var(--f-mono);font-size:10px;color:var(--yellow);letter-spacing:.06em;">If you recently updated and data looks empty, go to Stats and import your backup JSON.</div>` : ''}
-          ${stats.streak > 0 ? `
-          <div style="font-family:var(--f-mono);font-size:14px;color:var(--text2);">
-            <span class="streak-num count-target" data-target="${stats.streak}" data-type="int" style="font-family:var(--f-hero);font-size:48px;color:var(--accent);text-shadow:0 0 20px var(--glow);vertical-align:middle;">${stats.streak}</span>
-            <span style="vertical-align:middle;"> day streak 🔥</span>
-          </div>
-          ` : ''}
         </div>
         <div class="fret-line"></div>
       </div>
