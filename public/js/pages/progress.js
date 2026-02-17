@@ -1,4 +1,4 @@
-// Daily Fret — Progress Page
+// Daily Fret — Stats Page
 
 window.Pages = window.Pages || {};
 
@@ -7,11 +7,13 @@ Pages.Progress = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const [sessions, stats, heatmapDays] = await Promise.all([
+    const [sessions, stats, heatmapDays, gear] = await Promise.all([
       DB.getAllSess(),
       DB.getStats(),
       DB.getSessionHeatmap(),
+      DB.getAllGear(),
     ]);
+    const gearStats = this._computeGearStats(gear);
 
     // Reverse for chronological order (charts)
     const chrono = [...sessions].reverse();
@@ -19,12 +21,13 @@ Pages.Progress = {
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
         <div class="page-hero__inner">
-          <div class="page-title">Progress</div>
+          <div class="page-title">Stats</div>
         </div>
         <div class="fret-line"></div>
       </div>
 
       ${this._renderStatBar(stats)}
+      ${this._renderGearStats(gearStats)}
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
         ${this._renderInsightCards(sessions, stats)}
@@ -95,6 +98,100 @@ Pages.Progress = {
             <div class="df-statbar__val">${item.val}</div>
           </div>
         `).join('')}
+      </div>
+    `;
+  },
+
+
+  _computeGearStats(gear = []) {
+    const normalizeStatus = (status) => {
+      const normalized = typeof status === 'string' ? status.trim() : status;
+      const map = {
+        'Own it': 'Owned',
+        owned: 'Owned',
+        'Wish List': 'Wishlist',
+        wishlist: 'Wishlist',
+        Watching: 'Wishlist',
+        watching: 'Wishlist',
+        'On Loan': 'Wishlist',
+        sold: 'Sold',
+      };
+      return map[normalized] || normalized || 'Owned';
+    };
+    const money = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const normalizedGear = (gear || []).map((g) => ({ ...g, status: normalizeStatus(g.status) }));
+    const owned = normalizedGear.filter((g) => g.status === 'Owned');
+    const sold = normalizedGear.filter((g) => g.status === 'Sold');
+    const wishlist = normalizedGear.filter((g) => g.status === 'Wishlist');
+
+    const totalInvested = owned.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const totalRecoveredNet = sold.reduce((sum, g) => sum + money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping), 0);
+    const soldCostBasis = sold.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
+    const soldNetPL = totalRecoveredNet - soldCostBasis;
+
+    const soldWithProfit = sold.map((g) => {
+      const recovered = money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping);
+      const basis = money(g.boughtPrice) + money(g.tax) + money(g.shipping);
+      return { item: g, profit: recovered - basis };
+    });
+
+    const bestFlip = soldWithProfit.length
+      ? soldWithProfit.reduce((best, row) => (row.profit > best.profit ? row : best), soldWithProfit[0])
+      : null;
+    const worstFlip = soldWithProfit.length
+      ? soldWithProfit.reduce((worst, row) => (row.profit < worst.profit ? row : worst), soldWithProfit[0])
+      : null;
+
+    return {
+      ownedCount: owned.length,
+      wishlistCount: wishlist.length,
+      soldCount: sold.length,
+      totalInvested,
+      totalRecoveredNet,
+      soldCostBasis,
+      soldNetPL,
+      bestFlip,
+      worstFlip,
+    };
+  },
+
+  _renderGearStats(stats) {
+    const formatCurrency = (value) => Utils.formatPrice(Number(value) || 0);
+    const flipLabel = (flip, prefix) => {
+      if (!flip) return `${prefix}: —`;
+      return `${prefix}: ${flip.item.name || 'Unnamed'} (${formatCurrency(flip.profit)})`;
+    };
+    const items = [
+      { key: 'Owned count', val: stats.ownedCount },
+      { key: 'Wishlist count', val: stats.wishlistCount },
+      { key: 'Sold count', val: stats.soldCount },
+      { key: 'Total invested', val: formatCurrency(stats.totalInvested) },
+      { key: 'Total recovered net', val: formatCurrency(stats.totalRecoveredNet) },
+      { key: 'Cost basis', val: formatCurrency(stats.soldCostBasis) },
+      { key: 'Net P/L', val: formatCurrency(stats.soldNetPL) },
+    ];
+
+    return `
+      <div class="page-wrap" style="padding:18px 24px 0;">
+        <div class="df-panel" style="padding:16px;">
+          <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Gear Stats</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+            ${items.map((item) => `
+              <div class="df-statbar__item">
+                <div class="df-statbar__key">${item.key}</div>
+                <div class="df-statbar__val">${item.val}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="display:grid;gap:6px;margin-top:10px;color:var(--text2);font-size:12px;">
+            <span>${flipLabel(stats.bestFlip, 'Best flip')}</span>
+            <span>${flipLabel(stats.worstFlip, 'Worst flip')}</span>
+          </div>
+        </div>
       </div>
     `;
   },

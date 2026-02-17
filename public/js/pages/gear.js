@@ -73,20 +73,26 @@ Pages.Gear = {
         <div class="fret-line"></div>
       </div>
 
-      ${this._renderStats(stats)}
-
       <div class="page-wrap" style="padding:24px 24px 60px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-          ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f}</button>`).join('')}
+        <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1 1 760px;min-width:0;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f}</button>`).join('')}
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+              <label class="df-label" style="margin:0;">Sort</label>
+              <select class="df-input" id="gear-sort" style="max-width:220px;">
+                ${['Newest', 'Price low->high', 'Priority', 'Brand', 'Type'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+              </select>
+              <button type="button" class="df-btn ${wishlistOnly ? 'df-btn--primary' : 'df-btn--outline'}" id="gear-wishlist-only">Wishlist only</button>
+            </div>
+            ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, wishlistOnly)}
+          </div>
+
+          <aside style="flex:0 0 290px;max-width:330px;width:100%;position:sticky;top:84px;">
+            ${this._renderStatsCompact(stats)}
+          </aside>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
-          <label class="df-label" style="margin:0;">Sort</label>
-          <select class="df-input" id="gear-sort" style="max-width:220px;">
-            ${['Newest', 'Price low->high', 'Priority', 'Brand', 'Type'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
-          </select>
-          <button type="button" class="df-btn ${wishlistOnly ? 'df-btn--primary' : 'df-btn--outline'}" id="gear-wishlist-only">Wishlist only</button>
-        </div>
-        ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, wishlistOnly)}
       </div>
     `;
 
@@ -224,27 +230,22 @@ Pages.Gear = {
     };
   },
 
-  _renderStats(stats) {
+  _renderStatsCompact(stats) {
     const flipLabel = (flip, prefix) => {
       if (!flip) return `${prefix}: —`;
       return `${prefix}: ${flip.item.name || 'Unnamed'} (${formatCurrency(flip.profit)})`;
     };
     return `
-      <div class="page-wrap" style="padding:14px 24px 8px;">
+      <div class="df-panel" style="padding:14px;">
         <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Stats</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
           <div class="df-statbar__item"><div class="df-statbar__key">Owned count</div><div class="df-statbar__val">${stats.ownedCount}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Total invested</div><div class="df-statbar__val">${formatCurrency(stats.ownedInvested)}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Avg purchase</div><div class="df-statbar__val">${stats.ownedAvgPurchase == null ? '—' : formatCurrency(stats.ownedAvgPurchase)}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Sold count</div><div class="df-statbar__val">${stats.soldCount}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Recovered net</div><div class="df-statbar__val">${formatCurrency(stats.soldRecoveredNet)}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Cost basis</div><div class="df-statbar__val">${formatCurrency(stats.soldCostBasis)}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Net P/L</div><div class="df-statbar__val">${formatCurrency(stats.soldNetPL)}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Avg hold days</div><div class="df-statbar__val">${stats.avgHoldDays == null ? '—' : stats.avgHoldDays}</div></div>
           <div class="df-statbar__item"><div class="df-statbar__key">Wishlist count</div><div class="df-statbar__val">${stats.wishlistCount}</div></div>
-          <div class="df-statbar__item"><div class="df-statbar__key">Wishlist target total</div><div class="df-statbar__val">${formatCurrency(stats.wishlistTargetTotal)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Sold count</div><div class="df-statbar__val">${stats.soldCount}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Total invested</div><div class="df-statbar__val">${formatCurrency(stats.ownedInvested)}</div></div>
+          <div class="df-statbar__item"><div class="df-statbar__key">Net P/L</div><div class="df-statbar__val">${formatCurrency(stats.soldNetPL)}</div></div>
         </div>
-        <div style="color:var(--text2);font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:12px;">
+        <div style="color:var(--text2);font-size:12px;margin-top:10px;display:grid;gap:6px;">
           <span>${flipLabel(stats.bestFlip, 'Best flip')}</span>
           <span>${flipLabel(stats.worstFlip, 'Worst flip')}</span>
         </div>
