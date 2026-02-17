@@ -116,6 +116,10 @@ apiRouter.get('/health', (req, res) => {
   res.json({ ok: true, db: Store.dbPath });
 });
 
+apiRouter.get('/db-info', (req, res) => {
+  res.json(Store.getDbInfo());
+});
+
 apiRouter.get('/stats', (req, res) => {
   res.json(buildStats());
 });

@@ -65,6 +65,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 ```bash
 curl -s http://127.0.0.1:3000/api/health | jq
+curl -s http://127.0.0.1:3000/api/db-info | jq
 curl -s http://127.0.0.1:3000/api/gear | jq
 curl -s http://127.0.0.1:3000/api/gear-items | jq
 curl -s http://127.0.0.1:3000/api/sessions | jq
@@ -72,6 +73,41 @@ curl -s http://127.0.0.1:3000/api/stats | jq
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
 curl -s http://127.0.0.1:3000/ | head -n 20
 ```
+
+
+### Data recovery + persistence verification (safe runbook)
+
+```bash
+# 1) Inspect current mounts
+cd /opt/stacks/faithfulfret
+docker compose -f docker-compose.prod.yml ps
+docker inspect daily-fret --format '{{json .Mounts}}' | jq
+
+# 2) Find all candidate sqlite files (host + docker volumes)
+find /opt/stacks/faithfulfret -type f \\( -name '*.sqlite' -o -name '*.db' \\) -printf '%p %s %TY-%Tm-%Td %TH:%TM:%TS\n' | sort -k2 -nr
+for v in $(docker volume ls -q); do docker run --rm -v "$v:/v" alpine sh -lc "find /v -type f \( -name '*.sqlite' -o -name '*.db' \) -printf '$v %p %s %TY-%Tm-%Td %TH:%TM:%TS\n'"; done
+
+# 3) Backup before touching anything
+mkdir -p /opt/stacks/faithfulfret/_recovery
+cp /opt/stacks/faithfulfret/data/faithfulfret.sqlite /opt/stacks/faithfulfret/_recovery/faithfulfret.sqlite.$(date +%Y%m%d-%H%M%S).bak 2>/dev/null || true
+# (also back up candidate DB before restore)
+cp /PATH/TO/CANDIDATE.sqlite /opt/stacks/faithfulfret/_recovery/candidate.$(date +%Y%m%d-%H%M%S).bak
+
+# 4) Restore chosen DB into canonical persistent path
+mkdir -p /opt/stacks/faithfulfret/data
+cp /PATH/TO/CANDIDATE.sqlite /opt/stacks/faithfulfret/data/faithfulfret.sqlite
+chown -R 1000:1000 /opt/stacks/faithfulfret/data || true
+
+# 5) Restart stack
+cd /opt/stacks/faithfulfret
+docker compose -f docker-compose.prod.yml up -d
+
+# 6) Verify DB path + counts
+curl -s http://127.0.0.1:3000/api/db-info | jq
+docker exec daily-fret sh -lc 'ls -la /data && stat /data/faithfulfret.sqlite'
+```
+
+Expected: `api/db-info` returns the absolute DB path, file size, modified time, and record counts (`sessions`, `gear`, `presets`).
 
 ### Rollback / pin a known-good image tag
 
@@ -89,7 +125,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 Production uses prebuilt GHCR images and Watchtower auto-updates.
 
-`docker-compose.prod.yml` keeps host port `3000` mapped to container port `9999`, and mounts `./data:/data` so the SQLite DB survives restarts and image updates.
+`docker-compose.prod.yml` keeps host port `3000` mapped to container port `9999`, and mounts `/opt/stacks/faithfulfret/data:/data` so the SQLite DB survives restarts and image updates.
 
 ```bash
 # Start/refresh production stack (no local build, no bind mounts)

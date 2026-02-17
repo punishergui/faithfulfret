@@ -3,8 +3,28 @@ const path = require('path');
 const Database = require('better-sqlite3');
 
 const dataDir = '/data';
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const dbPath = path.join(dataDir, 'faithfulfret.sqlite');
+
+function isDataMountPresent() {
+  try {
+    const mountInfo = fs.readFileSync('/proc/self/mountinfo', 'utf8');
+    return mountInfo.split('\n').some((line) => {
+      const parts = line.trim().split(' ');
+      return parts[4] === dataDir;
+    });
+  } catch (error) {
+    return false;
+  }
+}
+
+const requireDataMount = String(process.env.REQUIRE_DATA_MOUNT || '').toLowerCase() === 'true';
+const hasDataMount = isDataMountPresent();
+if (!hasDataMount) {
+  const warning = `[DB SAFETY] /data is not a mounted volume. Persistence may be lost.`;
+  if (requireDataMount) throw new Error(`${warning} Refusing startup because REQUIRE_DATA_MOUNT=true.`);
+  console.warn(warning);
+}
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 console.log(`DB: ${dbPath}`);
 const db = new Database(dbPath);
 db.exec('PRAGMA journal_mode = WAL;');
@@ -389,4 +409,19 @@ const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
 const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM gear_images; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
-module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+const getDbInfo = () => {
+  const file = fs.existsSync(dbPath) ? fs.statSync(dbPath) : null;
+  return {
+    dbPath: path.resolve(dbPath),
+    sizeBytes: file?.size || 0,
+    modifiedAt: file?.mtime?.toISOString() || null,
+    sessions: Number(db.prepare('SELECT COUNT(*) AS count FROM sessions').get().count) || 0,
+    gear: Number(db.prepare('SELECT COUNT(*) AS count FROM gear_items').get().count) || 0,
+    presets: Number(db.prepare('SELECT COUNT(*) AS count FROM presets').get().count) || 0,
+  };
+};
+
+const dbInfo = getDbInfo();
+console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
+
+module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
