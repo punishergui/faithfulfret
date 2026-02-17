@@ -100,6 +100,8 @@ docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /d
 docker exec -it daily-fret sh -lc "node --check /app/server.js"
 docker exec -it daily-fret sh -lc "node --check /app/data-store.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
+# Hotfix validation: gear_links now uses isPrimary (not SQLite reserved word primary)
+docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "SqliteError|isPrimary"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-form.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
 # Verify presets editor script syntax in running container

@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS gear_links (
   price REAL,
   lastChecked TEXT,
   note TEXT,
-  "primary" INTEGER DEFAULT 0
+  isPrimary INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS session_gear (
   sessionId TEXT NOT NULL,
@@ -90,6 +90,11 @@ function ensureColumn(table, column, definition) {
   }
 }
 
+function hasColumn(table, column) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  return columns.some((row) => row.name === column);
+}
+
 ensureColumn('gear_items', 'boughtDate', 'TEXT');
 ensureColumn('gear_items', 'boughtPrice', 'REAL');
 ensureColumn('gear_items', 'boughtFrom', 'TEXT');
@@ -103,7 +108,10 @@ ensureColumn('gear_items', 'soldShipping', 'REAL');
 ensureColumn('gear_items', 'targetPrice', 'REAL');
 ensureColumn('gear_items', 'priority', 'TEXT');
 ensureColumn('gear_items', 'desiredCondition', 'TEXT');
-ensureColumn('gear_links', 'primary', 'INTEGER DEFAULT 0');
+ensureColumn('gear_links', 'isPrimary', 'INTEGER DEFAULT 0');
+if (hasColumn('gear_links', 'primary')) {
+  db.exec('UPDATE gear_links SET isPrimary = CASE WHEN COALESCE(isPrimary, 0) = 0 THEN COALESCE("primary", 0) ELSE isPrimary END');
+}
 
 const uid = () => `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -184,7 +192,7 @@ function coerceGearLink(input = {}) {
     price: n(input.price),
     lastChecked: input.lastChecked || '',
     note: input.note || '',
-    primary: Number(input.primary) ? 1 : 0,
+    isPrimary: Number(input.isPrimary ?? input.primary) ? 1 : 0,
   };
 }
 function coercePreset(input = {}) {
@@ -227,9 +235,9 @@ const Q = {
       boughtDate=excluded.boughtDate,boughtPrice=excluded.boughtPrice,boughtFrom=excluded.boughtFrom,tax=excluded.tax,shipping=excluded.shipping,
       soldDate=excluded.soldDate,soldPrice=excluded.soldPrice,soldFees=excluded.soldFees,soldWhere=excluded.soldWhere,soldShipping=excluded.soldShipping,
       targetPrice=excluded.targetPrice,priority=excluded.priority,desiredCondition=excluded.desiredCondition`),
-  upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note,"primary")
-    VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note,:primary)
-    ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note,"primary"=excluded."primary"`),
+  upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note,isPrimary)
+    VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note,:isPrimary)
+    ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note,isPrimary=excluded.isPrimary`),
   upsertPreset: db.prepare(`INSERT INTO presets (id,name,ampModel,settings,tags,createdAt)
     VALUES (:id,:name,:ampModel,:settings,:tags,:createdAt)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name,ampModel=excluded.ampModel,settings=excluded.settings,tags=excluded.tags`),
@@ -281,7 +289,7 @@ const deleteGear = (id) => {
   return run('DELETE FROM gear_items WHERE id = ?', id);
 };
 
-const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY "primary" DESC, lastChecked DESC, id DESC').all(gearId);
+const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY isPrimary DESC, lastChecked DESC, id DESC').all(gearId);
 const saveGearLink = (data) => {
   const row = coerceGearLink(data);
   if (!row.gearId) throw new Error('gearId is required');
