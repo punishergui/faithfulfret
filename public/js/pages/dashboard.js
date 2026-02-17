@@ -156,7 +156,7 @@ Pages.Dashboard = {
             </div>
             <div class="session-row__chips">
               ${s.minutes ? `<span class="df-badge df-badge--muted">${s.minutes}m</span>` : ''}
-              ${s.bpm ? `<span class="df-badge df-badge--orange">${s.bpm}bpm</span>` : ''}
+              ${s.bpm ? `<span class="df-badge df-badge--accent">${s.bpm}bpm</span>` : ''}
               ${s.videoId ? `<span class="df-badge df-badge--red">&#9654;</span>` : ''}
             </div>
           </div>
@@ -174,7 +174,7 @@ Pages.Dashboard = {
     const focuses = ['Chords','Scales','Strumming','Picking','Worship Set','Metronome','Song Practice','Technique','Ear Training'];
 
     return `
-      <div class="df-panel" style="padding:14px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
           <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
@@ -280,7 +280,7 @@ Pages.Dashboard = {
   _renderCompactHeatmap(rows = [], today, initialMetric = 'minutes') {
     const safeRows = Array.isArray(rows) ? rows : [];
     return `
-      <div class="df-panel" style="padding:14px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Practice Pulse · 90 Days</div>
           <div class="heatmap-toggle" data-heatmap-toggle>

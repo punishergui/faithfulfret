@@ -39,7 +39,7 @@ Pages.SessionSingle = {
           ${session.notes ? this._renderNotes(session.notes) : ''}
           ${session.links ? this._renderLinks(session.links) : ''}
         </div>
-        <div class="session-sidebar">
+        <div class="session-sidebar df-panel df-panel--tight">
           ${this._renderStats(session)}
           ${session.checklist ? this._renderChecklist(session) : ''}
           <div style="margin-top:20px;">
@@ -59,7 +59,7 @@ Pages.SessionSingle = {
       <div class="session-hero">
         <div style="max-width:1200px;margin:0 auto;padding:20px 24px 20px;position:relative;z-index:1;">
           <div class="session-hero__meta">
-            ${s.dayNumber ? `<span class="df-badge df-badge--orange">Day ${s.dayNumber}</span>` : ''}
+            ${s.dayNumber ? `<span class="df-badge df-badge--accent">Day ${s.dayNumber}</span>` : ''}
             ${s.mood ? `<span class="df-badge df-badge--muted">${s.mood}</span>` : ''}
             ${s.videoId ? `<span class="df-badge df-badge--red">&#9654; REC</span>` : ''}
           </div>
@@ -137,7 +137,7 @@ Pages.SessionSingle = {
 
   _renderGear(gear = []) {
     return `
-      <div class="df-panel" style="margin-bottom:16px;padding:12px;">
+      <div class="df-panel df-panel--wide" style="margin-bottom:16px;padding:12px;">
         <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Used</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${gear.map((item) => `<span class="df-badge df-badge--muted">${item.name}</span>`).join('')}
@@ -186,7 +186,7 @@ Pages.SessionSingle = {
     if (!rows.length) return '';
 
     return `
-      <div class="df-panel" style="padding:16px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide" style="padding:16px;margin-bottom:16px;">
         <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Stats</div>
         ${rows.map(r => `
           <div class="session-stat-row">

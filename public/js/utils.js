@@ -2,6 +2,7 @@
 // Exposes window.Utils
 
 window.Utils = {
+  themeIds: ['shed', 'faithful', 'stage', 'acoustic', 'neon_green', 'neon_purple', 'midnight_blue', 'carbon'],
   uuid: () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
 
   // Always use T12:00:00 to avoid timezone day-shift bugs
@@ -211,13 +212,21 @@ window.Utils = {
 
   getTheme: () => {
     const theme = localStorage.getItem('theme') || 'shed';
-    return ['shed', 'faithful', 'stage', 'acoustic'].includes(theme) ? theme : 'shed';
+    return window.Utils.themeIds.includes(theme) ? theme : 'shed';
+  },
+
+  applyThemeColorMeta: () => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    if (accent) meta.setAttribute('content', accent);
   },
 
   setTheme: (theme) => {
-    const value = ['shed', 'faithful', 'stage', 'acoustic'].includes(theme) ? theme : 'shed';
+    const value = window.Utils.themeIds.includes(theme) ? theme : 'shed';
     localStorage.setItem('theme', value);
     document.documentElement.dataset.theme = value;
+    window.Utils.applyThemeColorMeta();
   },
 
   isLeftHanded: () => (localStorage.getItem('handedness') || 'right') === 'left',
@@ -249,10 +258,10 @@ Utils.toast = Utils.toast || function(message, type = 'success', ms = 2400) {
   }
 
   const el = document.createElement('div');
-  const border = type === 'error' ? '#ff3b30' : '#ff6a00';
+  const border = type === 'error' ? 'var(--red)' : 'var(--accent)';
   el.style.cssText =
     'padding:12px 14px;border-radius:12px;border:1px solid ' + border +
-    ';background:rgba(0,0,0,.72);backdrop-filter:blur(10px);color:#fff;font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.35);';
+    ';background:var(--panelBg);backdrop-filter:blur(10px);color:var(--text);font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.35);';
   el.textContent = message;
 
   root.appendChild(el);

@@ -61,6 +61,8 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `exportedAt`, and `counts` so restores stay verifiable across upgrades.
+
 ### Verify endpoints
 
 ```bash
@@ -178,6 +180,7 @@ Rollback (pin a version tag):
 2. Pin `docker-compose.prod.yml` to that exact tag (`image: ghcr.io/punishergui/faithfulfret:vX.Y.Z`).
 3. Redeploy with compose pull/up.
 4. Keep the previous known-good tag noted so you can pin back instantly if needed (rollback path).
+5. If a bad deploy lands, pin `docker-compose.prod.yml` back to the previous immutable tag and redeploy with `pull && up -d`.
 
 
 ```bash

@@ -164,7 +164,7 @@
     } catch (e) {
       // If anything goes wrong, at least don't leave a blank screen with no clue
       const app = document.getElementById('app');
-      if (app) app.innerHTML = '<div style="padding:16px;border:1px solid #ff6a00;border-radius:12px">Router failed to start. Open DevTools → Console.</div>';
+      if (app) app.innerHTML = '<div style="padding:16px;border:1px solid var(--accent);border-radius:12px">Router failed to start. Open DevTools → Console.</div>';
       console.error(e);
     }
   }
