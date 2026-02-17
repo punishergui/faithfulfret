@@ -2,27 +2,33 @@
 
 window.Pages = window.Pages || {};
 
-function normalizeGearStatus(status) {
-  // Canonical display statuses used by UI + filtering.
+function gearStatusKey(status) {
   const normalizedStatus = String(status || '').trim().toLowerCase();
-  if (!normalizedStatus || normalizedStatus === 'owned' || normalizedStatus === 'own' || normalizedStatus === 'own it') return 'Owned';
-  if (normalizedStatus === 'wishlist' || normalizedStatus === 'wish list' || normalizedStatus === 'wanted' || normalizedStatus === 'watching' || normalizedStatus === 'on loan') return 'Wishlist';
-  if (normalizedStatus === 'sold') return 'Sold';
-  return 'Owned';
+  if (!normalizedStatus || normalizedStatus === 'owned' || normalizedStatus === 'own' || normalizedStatus === 'own it') return 'owned';
+  if (normalizedStatus === 'wishlist' || normalizedStatus === 'wish list' || normalizedStatus === 'wanted' || normalizedStatus === 'watching' || normalizedStatus === 'on loan') return 'wishlist';
+  if (normalizedStatus === 'sold') return 'sold';
+  return 'owned';
 }
 
 function gearStatusLabel(status) {
-  return normalizeGearStatus(status);
+  return {
+    owned: 'Owned',
+    wishlist: 'Wishlist',
+    sold: 'Sold',
+  }[gearStatusKey(status)] || 'Owned';
 }
 
 function normalizeStatusFilterValue(value) {
   const raw = String(value || '').trim().toLowerCase();
   if (raw === 'all' || raw === 'owned' || raw === 'wishlist' || raw === 'sold') return raw;
-  return {
-    Owned: 'owned',
-    Wishlist: 'wishlist',
-    Sold: 'sold',
-  }[normalizeGearStatus(value)] || 'all';
+  if (!raw) return 'all';
+  return gearStatusKey(value);
+}
+
+function toNum(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return Number.NaN;
+  return Number(text);
 }
 
 function money(v) {
@@ -87,7 +93,7 @@ Pages.Gear = {
         type,
         brand,
         displayType: type || '(Uncategorized)',
-        status: normalizeGearStatus(g.status),
+        status: gearStatusLabel(g.status),
         usage: usageByGear[g.id] || { usedCount: 0, lastUsed: '' },
         imagesList,
       };
@@ -343,13 +349,9 @@ Pages.Gear = {
   },
 
   _filterGear(gear, activeStatusFilter, searchTerm, advanced) {
-    const filterToStatus = {
-      owned: 'Owned',
-      wishlist: 'Wishlist',
-      sold: 'Sold',
-    };
-    const statusValue = filterToStatus[activeStatusFilter] || null;
-    let visible = statusValue ? gear.filter((g) => normalizeGearStatus(g.status) === statusValue) : gear;
+    const selectedFilter = normalizeStatusFilterValue(activeStatusFilter);
+    let visible = selectedFilter === 'all' ? gear : gear.filter((g) => gearStatusKey(g.status) === selectedFilter);
+    const isWishlistView = selectedFilter === 'wishlist';
     const needle = String(searchTerm || '').trim().toLowerCase();
     if (needle) {
       visible = visible.filter((g) => {
@@ -361,15 +363,14 @@ Pages.Gear = {
     if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.displayType) === advanced.category);
     if (advanced.brand && advanced.brand !== 'All') visible = visible.filter((g) => g.brand === advanced.brand);
     if (advanced.linksOnly) visible = visible.filter((g) => (g.linksList || []).some((l) => l.url));
-    if (advanced.hasTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'Wishlist' && Number.isFinite(Number(g.targetPrice)));
-    if (advanced.missingTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'Wishlist' && !Number.isFinite(Number(g.targetPrice)));
-    const min = Number(advanced.minPrice);
-    const max = Number(advanced.maxPrice);
-    if (Number.isFinite(min) || Number.isFinite(max)) {
+    if (isWishlistView && advanced.hasTargetPrice) visible = visible.filter((g) => Number.isFinite(toNum(g.targetPrice)));
+    if (isWishlistView && advanced.missingTargetPrice) visible = visible.filter((g) => !Number.isFinite(toNum(g.targetPrice)));
+    const min = toNum(advanced.minPrice);
+    const max = toNum(advanced.maxPrice);
+    if (isWishlistView && (Number.isFinite(min) || Number.isFinite(max))) {
       visible = visible.filter((g) => {
-        if (normalizeGearStatus(g.status) !== 'Wishlist') return false;
         const best = this._bestPrice(g);
-        const target = Number(g.targetPrice);
+        const target = toNum(g.targetPrice);
         const p = Number.isFinite(best) ? best : target;
         if (!Number.isFinite(p)) return false;
         if (Number.isFinite(min) && p < min) return false;
@@ -465,15 +466,15 @@ Pages.Gear = {
     const manualUrl = g.manualUrl || '/manual.pdf';
     const primaryUrl = g.primaryUrl || g.primaryLink || g.primary || g.buyUrl || '';
     const statusBadge = {
-      Owned: 'df-badge--green',
-      Sold: 'df-badge--red',
-      Wishlist: 'df-badge--orange',
-    }[normalizeGearStatus(g.status)] || 'df-badge--muted';
+      owned: 'df-badge--green',
+      sold: 'df-badge--red',
+      wishlist: 'df-badge--orange',
+    }[gearStatusKey(g.status)] || 'df-badge--muted';
     const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
     const topLink = sortedLinks.find((l) => l.url);
 
     let wishlistMeta = '';
-    if (normalizeGearStatus(g.status) === 'Wishlist') {
+    if (gearStatusKey(g.status) === 'wishlist') {
       const bestPrice = this._bestPrice(g);
       const bestLink = sortedLinks.find((l) => money(l.price) === bestPrice);
       const targetPrice = Number(g.targetPrice);
@@ -500,7 +501,7 @@ Pages.Gear = {
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
-          ${normalizeGearStatus(g.status) === 'Owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+          ${gearStatusKey(g.status) === 'owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
             <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
             <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           </div>` : ''}
@@ -575,7 +576,7 @@ Pages.GearForm = {
           <div class="form-grid">
             <div class="df-field full-width"><label class="df-label" for="g-name">Name *</label><input type="text" id="g-name" name="name" class="df-input" value="${gear.name || ''}" required></div>
             <div class="df-field"><label class="df-label" for="g-category">Category</label><select id="g-category" name="category" class="df-input"><option value="">— Select —</option>${categories.map((c) => `<option value="${c}" ${gear.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
-            <div class="df-field"><label class="df-label" for="g-status">Status</label><select id="g-status" name="status" class="df-input"><option value="">— Select —</option>${statuses.map((s) => `<option value="${s}" ${normalizeGearStatus(gear.status) === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+            <div class="df-field"><label class="df-label" for="g-status">Status</label><select id="g-status" name="status" class="df-input"><option value="">— Select —</option>${statuses.map((s) => `<option value="${s}" ${gearStatusLabel(gear.status) === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
             <div class="df-field"><label class="df-label" for="g-brand">Brand</label><input type="text" id="g-brand" name="brand" class="df-input" value="${gear.brand || ''}"></div>
             <div class="df-field"><label class="df-label" for="g-model">Model</label><input type="text" id="g-model" name="model" class="df-input" value="${gear.model || ''}"></div>
 
@@ -744,7 +745,7 @@ Pages.GearForm = {
         return;
       }
 
-      data.status = normalizeGearStatus(data.status);
+      data.status = gearStatusLabel(data.status);
       data.dateAcquired = data.boughtDate;
       data.price = data.boughtPrice;
       data.vendor = data.boughtFrom;
