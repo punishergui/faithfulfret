@@ -185,7 +185,7 @@ body::after {
 }
 .ff-theme-card[data-theme-value='radioactive-gain'].is-active {
   border-color: #86ff1e;
-  box-shadow: 0 0 0 2px #86ff1e, 0 0 30px rgba(134, 255, 30, 0.62), inset 0 1px 0 rgba(233, 246, 221, 0.34);
+  box-shadow: 0 0 0 1px #86ff1e, 0 0 30px rgba(134, 255, 30, 0.62), inset 0 1px 0 rgba(233, 246, 221, 0.34);
 }
 .ff-theme-swatches {
   display: grid;
@@ -207,13 +207,18 @@ body::after {
   min-height: 56px;
   display: grid;
   place-items: center;
+  padding: 8px 10px;
   color: color-mix(in srgb, var(--theme-nameplate-glow) 88%, #fff 12%);
 }
 .ff-theme-title {
+  display: block;
+  max-width: 100%;
+  text-align: center;
   white-space: nowrap;
   font-family: 'Segoe UI Light', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-size: 0.98rem;
-  letter-spacing: .24em;
+  font-size: clamp(12px, 1.2vw, 16px);
+  letter-spacing: clamp(.06em, .15vw, .18em);
+  line-height: 1.1;
   font-weight: 300;
   text-transform: uppercase;
   opacity: .95;
@@ -1450,6 +1455,12 @@ select.df-input option {
 }
 
 .page-hero {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  width: 100vw;
+  margin-left: -50vw;
+  margin-right: -50vw;
   background: var(--bg2);
   border-bottom: 1px solid var(--line2);
 }
