@@ -198,6 +198,62 @@
       return api(`/api/resources/${id}`, { method: 'DELETE' });
     },
 
+
+
+    // Training Videos
+    async fetchOEmbed(url) {
+      return api(`/api/oembed?url=${encodeURIComponent(url || '')}`);
+    },
+
+    async getAllTrainingVideos(filters = {}) {
+      const params = new URLSearchParams();
+      Object.entries(filters || {}).forEach(([key, value]) => {
+        if (value == null || value === '') return;
+        params.set(key, String(value));
+      });
+      const query = params.toString();
+      return api(`/api/training-videos${query ? `?${query}` : ''}`);
+    },
+
+    async getTrainingVideo(id) {
+      try { return await api(`/api/training-videos/${id}`); } catch { return null; }
+    },
+
+    async saveTrainingVideo(data) {
+      return data.id
+        ? api(`/api/training-videos/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/training-videos', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async deleteTrainingVideo(id) {
+      return api(`/api/training-videos/${id}`, { method: 'DELETE' });
+    },
+
+    async addVideoTimestamp(videoId, data) {
+      return api(`/api/training-videos/${videoId}/timestamps`, { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async deleteVideoTimestamp(id) {
+      return api(`/api/video-timestamps/${id}`, { method: 'DELETE' });
+    },
+
+    async getVideoPlaylists() {
+      return api('/api/video-playlists');
+    },
+
+    async saveVideoPlaylist(data) {
+      return data.id
+        ? api(`/api/video-playlists/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/video-playlists', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async deleteVideoPlaylist(id) {
+      return api(`/api/video-playlists/${id}`, { method: 'DELETE' });
+    },
+
+    async replaceVideoPlaylistItems(id, items) {
+      return api(`/api/video-playlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) });
+    },
     async getStats() {
       return api('/api/stats');
     },

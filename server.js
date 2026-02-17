@@ -168,6 +168,32 @@ function parseRepoOwnerRepo(remoteUrl) {
   return null;
 }
 
+
+function extractYouTubeId(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+  try {
+    const url = new URL(raw.includes('://') ? raw : `https://${raw}`);
+    const host = url.hostname.replace('www.', '');
+    if (host === 'youtu.be') {
+      const id = url.pathname.slice(1).split('/')[0];
+      return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : '';
+    }
+    if (host.includes('youtube.com')) {
+      const v = url.searchParams.get('v');
+      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+      const parts = url.pathname.split('/').filter(Boolean);
+      const maybe = parts[1] || parts[0] || '';
+      return /^[a-zA-Z0-9_-]{11}$/.test(maybe) ? maybe : '';
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
 function fetchJson(url, headers) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers }, (res) => {
@@ -519,6 +545,116 @@ apiRouter.delete('/gear-image/:id', (req, res) => {
     if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
   }
   return res.json({ ok: true });
+});
+
+
+apiRouter.get('/oembed', async (req, res) => {
+  const rawUrl = String(req.query.url || '').trim();
+  if (!rawUrl) return res.status(400).json({ error: 'url is required' });
+  const normalizedUrl = rawUrl.includes('://') ? rawUrl : `https://${rawUrl}`;
+  const videoId = extractYouTubeId(normalizedUrl);
+  if (!videoId) return res.status(400).json({ error: 'only valid youtube URLs are supported' });
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
+    const data = await fetchJson(oembedUrl, { 'User-Agent': 'faithfulfret' });
+    return res.json({ title: data.title || '', author_name: data.author_name || '', thumbnail_url: data.thumbnail_url || '' });
+  } catch (error) {
+    return res.status(502).json({ error: 'failed to fetch oembed metadata' });
+  }
+});
+
+apiRouter.get('/training-videos', (req, res) => {
+  const rows = Store.listTrainingVideos({
+    q: req.query.q,
+    tags: req.query.tags,
+    playlistId: req.query.playlistId,
+    difficulty: req.query.difficulty,
+  });
+  res.json(rows);
+});
+
+apiRouter.get('/training-videos/:id', (req, res) => {
+  const row = Store.getTrainingVideo(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  return res.json({
+    ...row,
+    timestamps: Store.listVideoTimestamps(req.params.id),
+    playlists: Store.listPlaylistsByVideo(req.params.id),
+  });
+});
+
+apiRouter.post('/training-videos', (req, res) => {
+  const payload = req.body || {};
+  const videoId = payload.videoId || extractYouTubeId(payload.url);
+  if (!payload.url) return res.status(400).json({ error: 'url is required' });
+  if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
+  const saved = Store.saveTrainingVideo({ ...payload, provider: payload.provider || 'youtube', videoId });
+  return res.status(201).json(saved);
+});
+
+apiRouter.put('/training-videos/:id', (req, res) => {
+  const existing = Store.getTrainingVideo(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const payload = req.body || {};
+  const videoId = payload.videoId || extractYouTubeId(payload.url || existing.url) || existing.videoId;
+  if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
+  const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), videoId, provider: payload.provider || existing.provider || 'youtube' });
+  return res.json(saved);
+});
+
+apiRouter.delete('/training-videos/:id', (req, res) => {
+  const existing = Store.getTrainingVideo(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  Store.deleteTrainingVideo(req.params.id);
+  return res.json({ ok: true });
+});
+
+apiRouter.post('/training-videos/:id/timestamps', (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  const payload = req.body || {};
+  if (!payload.label) return res.status(400).json({ error: 'label is required' });
+  if (payload.seconds == null || Number.isNaN(Number(payload.seconds))) return res.status(400).json({ error: 'seconds is required' });
+  const saved = Store.saveVideoTimestamp({ ...payload, videoId: Number(req.params.id) });
+  return res.status(201).json(saved);
+});
+
+apiRouter.delete('/video-timestamps/:id', (req, res) => {
+  Store.deleteVideoTimestamp(req.params.id);
+  return res.json({ ok: true });
+});
+
+apiRouter.get('/video-playlists', (req, res) => {
+  const playlists = Store.listVideoPlaylists().map((playlist) => ({ ...playlist, items: Store.listPlaylistItems(playlist.id) }));
+  return res.json(playlists);
+});
+
+apiRouter.post('/video-playlists', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  const saved = Store.saveVideoPlaylist(req.body);
+  return res.status(201).json(saved);
+});
+
+apiRouter.put('/video-playlists/:id', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const saved = Store.saveVideoPlaylist({ ...existing, ...req.body, id: Number(req.params.id) });
+  return res.json(saved);
+});
+
+apiRouter.delete('/video-playlists/:id', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  Store.deleteVideoPlaylist(req.params.id);
+  return res.json({ ok: true });
+});
+
+apiRouter.put('/video-playlists/:id/items', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  const updated = Store.replacePlaylistItems(req.params.id, items);
+  return res.json(updated);
 });
 
 // Keep existing resources features

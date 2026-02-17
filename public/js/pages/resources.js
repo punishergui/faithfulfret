@@ -21,7 +21,7 @@ Pages.Resources = {
       ${Utils.renderPageHero({
         title: 'Resources',
         image: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80',
-        actions: '<a href="#/resources/add" class="df-btn df-btn--primary">+ Add Resource</a>',
+        actions: '<a href="#/resources/videos" class="df-btn df-btn--outline" style="margin-right:8px;">Video Library</a><a href="#/resources/add" class="df-btn df-btn--primary">+ Add Resource</a>',
       })}
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
