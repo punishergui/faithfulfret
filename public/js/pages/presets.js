@@ -358,13 +358,11 @@ Pages.Presets = {
     const presets = await DB.getAllPresets();
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&q=80');">
-        <div class="page-hero__inner">
-          <div class="page-title">Presets</div>
-          <button id="new-preset-btn" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Preset</button>
-        </div>
-        <div class="fret-line"></div>
-      </div>
+      ${Utils.renderPageHero({
+        title: 'Presets',
+        image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&q=80',
+        actions: '<button id="new-preset-btn" class="df-btn df-btn--primary">+ Add Preset</button>',
+      })}
       <div class="page-wrap" style="padding:24px;">
         <div id="preset-form-wrap" class="df-panel df-panel--wide" style="display:none;margin-bottom:16px;padding:14px;"></div>
         ${presets.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">${presets.map((preset) => this.card(preset)).join('')}</div>` : '<div class="empty-state"><div class="empty-state__title">No presets yet</div><div class="empty-state__text">Save amp settings you want to reuse.</div></div>'}

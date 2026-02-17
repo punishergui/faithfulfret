@@ -18,13 +18,11 @@ Pages.Resources = {
     });
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80');">
-        <div class="page-hero__inner">
-          <div class="page-title">Resources</div>
-          <a href="#/resources/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Resource</a>
-        </div>
-        <div class="fret-line"></div>
-      </div>
+      ${Utils.renderPageHero({
+        title: 'Resources',
+        image: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80',
+        actions: '<a href="#/resources/add" class="df-btn df-btn--primary">+ Add Resource</a>',
+      })}
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
         ${resources.length ? `<div class="df-panel df-panel--wide">${this._renderByCategory(byCategory)}</div>` : this._renderEmpty()}
@@ -120,12 +118,10 @@ Pages.ResourceForm = {
     const levels = ['Beginner', 'Intermediate', 'Advanced', 'All Levels'];
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80');">
-        <div class="page-hero__inner">
-          <div class="page-title">${isEdit ? 'Edit Resource' : 'Add Resource'}</div>
-        </div>
-        <div class="fret-line"></div>
-      </div>
+      ${Utils.renderPageHero({
+        title: isEdit ? 'Edit Resource' : 'Add Resource',
+        image: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80',
+      })}
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
         <form id="resource-form" class="df-panel df-panel--wide" novalidate>

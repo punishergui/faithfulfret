@@ -81,19 +81,15 @@ Pages.Dashboard = {
         ? 'Practiced today.'
         : `${stats.daysSinceLastSession} day${stats.daysSinceLastSession === 1 ? '' : 's'} since last session.`;
 
-    return `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');overflow:hidden;">
-        <div class="page-hero__inner">
-          <div class="page-title" style="text-shadow:2px 2px 0 var(--heroGlow);">${greeting}</div>
-          <p style="font-family:var(--f-mono);font-size:12px;color:var(--text2);">${awayText}</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
-            <a href="#/sessions" class="df-btn df-btn--outline">View Sessions</a>
-          </div>
-        </div>
-        <div class="fret-line"></div>
-      </div>
-    `;
+    return Utils.renderPageHero({
+      title: greeting,
+      subtitle: awayText,
+      image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80',
+      actions: `
+        <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
+        <a href="#/sessions" class="df-btn df-btn--outline">View Sessions</a>
+      `,
+    });
   },
 
   _renderStatBar(stats) {
