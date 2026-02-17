@@ -251,7 +251,10 @@ function coerceResource(input = {}) {
   };
 }
 
-let Q = null;
+// TDZ_FIX: let Q = null;
+
+// TDZ_FIX: let Q = {};
+
 
 function initQueries() {
 Q = {
