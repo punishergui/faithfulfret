@@ -16,7 +16,7 @@
     { pattern: /^#\/resources\/edit\/(.+)$/,      handler: (m) => Pages.ResourceForm.render(m[1]) },
     { pattern: /^#\/resources$/,                  handler: () => Pages.Resources.render() },
     { pattern: /^#\/presets$/,                    handler: () => Pages.Presets.render() },
-    { pattern: /^#\/progress$/,                   handler: () => Pages.Progress.render() },
+    { pattern: /^#\/progress(?:\?.*)?$/,          handler: () => Pages.Progress.render() },
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
     { pattern: /^#\/tools\/scales$/,              handler: () => Pages.Scales.render() },
