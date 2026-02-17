@@ -23,12 +23,13 @@ Pages.ResourceVideoDetail = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
     const video = await DB.getTrainingVideo(id);
+    const attachments = await DB.getVideoAttachments(id);
     if (!video) {
       app.innerHTML = '<div class="page-wrap" style="padding:24px;color:var(--text2);">Video not found.</div>';
       return;
     }
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
-    const embedBase = `https://www.youtube-nocookie.com/embed/${video.videoId || ''}`;
+    const embedBase = `https://www.youtube-nocookie.com/embed/${video.videoId || video.video_id || ''}`;
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
     app.innerHTML = `
@@ -42,8 +43,8 @@ Pages.ResourceVideoDetail = {
           <div style="margin-top:12px;white-space:pre-wrap;color:var(--text2);">${video.notes || ''}</div>
           <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
             <button id="add-timestamp-toggle" class="df-btn df-btn--outline">Add Timestamp</button>
-            <a class="df-btn df-btn--outline" href="#/resources/videos/${video.id}/edit">Edit Video</a>
-            <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Session</a>
+            <a class="df-btn df-btn--outline" href="#/training/videos/${video.id}/edit">Edit Video</a>
+            <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || video.video_id || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Session</a>
           </div>
         </div>
 
@@ -58,6 +59,12 @@ Pages.ResourceVideoDetail = {
           <div id="timestamp-list">${(video.timestamps || []).map((stamp) => this.renderTimestamp(stamp, embedBase)).join('') || '<div style="color:var(--text3);">No timestamps yet.</div>'}</div>
         </div>
       </div>
+      
+        <div class="df-panel" style="padding:12px;">
+          <div style="font-weight:700;margin-bottom:10px;">Attachments</div>
+          ${(attachments || []).map((item) => `<div style="border-top:1px solid var(--line);padding:8px 0;"><a href="${item.url}" target="_blank" rel="noopener">${item.title || item.filename || item.url}</a></div>`).join('') || '<div style="color:var(--text3);">No attachments.</div>'}
+        </div>
+
     `;
 
     app.querySelector('#add-timestamp-toggle')?.addEventListener('click', () => {

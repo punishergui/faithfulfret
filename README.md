@@ -61,6 +61,7 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
 After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
@@ -76,6 +77,8 @@ curl -s http://127.0.0.1:3000/api/stats | jq
 curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ' | jq
 curl -s http://127.0.0.1:3000/api/training-videos | jq
 curl -s http://127.0.0.1:3000/api/video-playlists | jq
+curl -s http://127.0.0.1:3000/api/video-playlists/1 | jq
+curl -s http://127.0.0.1:3000/api/videos/1/attachments | jq
 curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
 curl -s http://127.0.0.1:3000/uploads/preset-audio/ | head -n 20

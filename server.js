@@ -213,6 +213,12 @@ function extractYouTubeId(value) {
   return '';
 }
 
+function playlistWithItems(id) {
+  const playlist = Store.getVideoPlaylist(id);
+  if (!playlist) return null;
+  return { ...playlist, items: Store.listPlaylistItems(id) };
+}
+
 function fetchJson(url, headers) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers }, (res) => {
@@ -923,11 +929,15 @@ apiRouter.delete('/attachments/:id', (req, res) => {
 });
 
 apiRouter.get('/training-videos', (req, res) => {
+  const track = String(req.query.difficulty_track || '').trim();
+  const level = Number(req.query.difficulty_level);
   const rows = Store.listTrainingVideos({
     q: req.query.q,
     tags: req.query.tags,
     playlistId: req.query.playlistId,
-    difficulty: req.query.difficulty,
+    category: req.query.category,
+    difficulty_track: track || undefined,
+    difficulty_level: Number.isFinite(level) ? level : undefined,
   });
   res.json(rows);
 });
@@ -942,21 +952,35 @@ apiRouter.get('/training-videos/:id', (req, res) => {
   });
 });
 
-apiRouter.post('/training-videos', (req, res) => {
+apiRouter.post('/training-videos', async (req, res) => {
   const payload = req.body || {};
-  const videoId = payload.videoId || extractYouTubeId(payload.url);
+  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.url);
   if (!payload.url) return res.status(400).json({ error: 'url is required' });
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
+  if (!payload.title || !payload.thumbUrl) {
+    try {
+      const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
+      payload.title = payload.title || meta.title || '';
+      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || meta.thumbnail_url || '';
+    } catch {}
+  }
   const saved = Store.saveTrainingVideo({ ...payload, provider: payload.provider || 'youtube', videoId });
   return res.status(201).json(saved);
 });
 
-apiRouter.put('/training-videos/:id', (req, res) => {
+apiRouter.put('/training-videos/:id', async (req, res) => {
   const existing = Store.getTrainingVideo(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const payload = req.body || {};
-  const videoId = payload.videoId || extractYouTubeId(payload.url || existing.url) || existing.videoId;
+  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.url || existing.url) || existing.videoId;
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
+  if ((!payload.title && !existing.title) || (!payload.thumbUrl && !payload.thumb_url && !existing.thumbUrl)) {
+    try {
+      const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
+      payload.title = payload.title || existing.title || meta.title || '';
+      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || existing.thumbUrl || meta.thumbnail_url || '';
+    } catch {}
+  }
   const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), videoId, provider: payload.provider || existing.provider || 'youtube' });
   return res.json(saved);
 });
@@ -984,21 +1008,27 @@ apiRouter.delete('/video-timestamps/:id', (req, res) => {
 });
 
 apiRouter.get('/video-playlists', (req, res) => {
-  const playlists = Store.listVideoPlaylists().map((playlist) => ({ ...playlist, items: Store.listPlaylistItems(playlist.id) }));
+  const playlists = Store.listVideoPlaylists();
   return res.json(playlists);
+});
+
+apiRouter.get('/video-playlists/:id', (req, res) => {
+  const playlist = playlistWithItems(req.params.id);
+  if (!playlist) return res.status(404).json({ error: 'not found' });
+  return res.json(playlist);
 });
 
 apiRouter.post('/video-playlists', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
   const saved = Store.saveVideoPlaylist(req.body);
-  return res.status(201).json(saved);
+  return res.status(201).json(playlistWithItems(saved.id));
 });
 
 apiRouter.put('/video-playlists/:id', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const saved = Store.saveVideoPlaylist({ ...existing, ...req.body, id: Number(req.params.id) });
-  return res.json(saved);
+  return res.json(playlistWithItems(saved.id));
 });
 
 apiRouter.delete('/video-playlists/:id', (req, res) => {
@@ -1012,8 +1042,66 @@ apiRouter.put('/video-playlists/:id/items', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
-  const updated = Store.replacePlaylistItems(req.params.id, items);
-  return res.json(updated);
+  Store.replacePlaylistItems(req.params.id, items);
+  return res.json(playlistWithItems(req.params.id));
+});
+
+
+apiRouter.get('/videos/:id/attachments', (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  return res.json(Store.listVideoAttachments(req.params.id));
+});
+
+apiRouter.post('/videos/:id/attachments', attachmentUpload.single('file'), (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+
+  if (req.file) {
+    const file = req.file;
+    const stamp = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const fileName = `${stamp}-${sanitizeUploadFileName(file.originalname || 'upload.bin')}`;
+    const storagePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(storagePath, file.buffer);
+    const kind = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
+    const row = Store.saveVideoAttachment({
+      video_id: Number(req.params.id),
+      kind,
+      title: req.body?.title || file.originalname || fileName,
+      url: `/uploads/${fileName}`,
+      filename: file.originalname || fileName,
+      mime: file.mimetype,
+      size_bytes: file.size,
+      storage_path: fileName,
+    });
+    return res.status(201).json(row);
+  }
+
+  const title = String(req.body?.title || '').trim();
+  const url = String(req.body?.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'file upload or url is required' });
+  const row = Store.saveVideoAttachment({
+    video_id: Number(req.params.id),
+    kind: 'link',
+    title,
+    url,
+    filename: '',
+    mime: '',
+    size_bytes: 0,
+    storage_path: '',
+  });
+  return res.status(201).json(row);
+});
+
+apiRouter.delete('/video-attachments/:id', (req, res) => {
+  const row = Store.getVideoAttachment(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  Store.deleteVideoAttachment(req.params.id);
+  if (row.storage_path) {
+    const fullPath = path.join(uploadsDir, path.basename(row.storage_path || ''));
+    if (fullPath.startsWith(uploadsDir) && fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+  return res.json({ ok: true });
 });
 
 // Keep existing resources features

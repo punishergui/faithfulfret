@@ -354,6 +354,10 @@
       return api('/api/video-playlists');
     },
 
+    async getVideoPlaylist(id) {
+      return api(`/api/video-playlists/${id}`);
+    },
+
     async saveVideoPlaylist(data) {
       return data.id
         ? api(`/api/video-playlists/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
@@ -366,6 +370,27 @@
 
     async replaceVideoPlaylistItems(id, items) {
       return api(`/api/video-playlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) });
+    },
+
+    async getVideoAttachments(videoId) {
+      return api(`/api/videos/${videoId}/attachments`);
+    },
+
+    async saveVideoAttachment(videoId, data = {}) {
+      if (data.file) {
+        const form = new FormData();
+        form.append('file', data.file);
+        if (data.title) form.append('title', data.title);
+        const res = await fetch(`/api/videos/${videoId}/attachments`, { method: 'POST', body: form });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text || `Request failed: ${res.status}`);
+        return JSON.parse(text);
+      }
+      return api(`/api/videos/${videoId}/attachments`, { method: 'POST', body: JSON.stringify({ title: data.title || '', url: data.url || '' }) });
+    },
+
+    async deleteVideoAttachment(id) {
+      return api(`/api/video-attachments/${id}`, { method: 'DELETE' });
     },
     async getStats() {
       return api('/api/stats');
