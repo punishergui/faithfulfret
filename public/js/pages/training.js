@@ -13,18 +13,18 @@ async function renderWithError(renderFn) {
 
 Pages.TrainingHome = { async render() { await renderWithError(async () => {
   const app = document.getElementById('app');
-  const [levels, groups] = await Promise.all([DB.getTrainingLevels(), DB.getTrainingSkillGroups()]);
-  const tracks = ['Beginner', 'Intermediate', 'Advanced'];
-  const byTrack = tracks.map((t) => ({ track: t, rows: levels.filter((l) => l.track === t).sort((a,b)=>a.level_num-b.level_num) }));
-  app.innerHTML = `${Utils.renderPageHero({ title: 'Training', subtitle: 'Browse lessons by level, skills, songs, or search.', actions: '<a href="#/training/admin" class="df-btn df-btn--outline">Admin</a>' })}
+  const [videos, playlists] = await Promise.all([DB.getAllTrainingVideos(), DB.getVideoPlaylists()]);
+  app.innerHTML = `${Utils.renderPageHero({ title: 'Training', subtitle: 'Video library with playlists, difficulty, and attachments.', actions: '<a href="#/training/videos/new" class="df-btn df-btn--primary">+ New Video</a>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:16px;">
-      <div class="card" style="padding:16px;"><form id="training-search" style="display:flex;gap:8px;"><input class="df-input" name="q" placeholder="Search all lessons"><button class="df-btn df-btn--primary">Search</button></form></div>
-      <div class="card" style="padding:16px;"><h3>BY LEVEL</h3>${byTrack.map((g)=>`<div><strong>${g.track}</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;">${g.rows.map((l)=>`<a class="df-btn df-btn--outline" href="#/training/level/${l.id}">${esc(l.name)}</a>`).join('')}</div></div>`).join('')}</div>
-      <div class="card" style="padding:16px;"><h3>FOR SKILLS</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">${groups.map((g)=>`<div><strong>${esc(g.name)}</strong>${(g.skills||[]).map((s)=>`<div><a href="#/training/skills/${esc(s.slug)}">${esc(s.name)}</a></div>`).join('')}</div>`).join('')}</div></div>
-      <div class="card" style="padding:16px;"><h3>SONGS</h3><a href="#/training/songs" class="df-btn df-btn--outline">Browse Songs</a></div>
-      <div class="card" style="padding:16px;"><h3>NOT SURE WHERE TO START?</h3><div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="df-btn df-btn--outline" href="#/training/levels">Beginner Course</a><a class="df-btn df-btn--outline" href="#/training/levels">Lesson Map</a><a class="df-btn df-btn--outline" href="#/training/all">All Lessons</a></div></div>
+      <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div><h3 style="margin:0 0 6px;">Video Library</h3><div style="color:var(--text2);">${videos.length} videos saved</div></div>
+        <a class="df-btn df-btn--outline" href="#/training/videos">Open Videos</a>
+      </div>
+      <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div><h3 style="margin:0 0 6px;">Playlists</h3><div style="color:var(--text2);">${playlists.length} playlists</div></div>
+        <a class="df-btn df-btn--outline" href="#/training/playlists">Manage Playlists</a>
+      </div>
     </div>`;
-  app.querySelector('#training-search').addEventListener('submit', (e) => { e.preventDefault(); go(`#/training/all?q=${encodeURIComponent(new FormData(e.target).get('q') || '')}`); });
 }); }};
 
 Pages.TrainingLevels = { async render() { await renderWithError(async () => {
@@ -111,4 +111,46 @@ Pages.TrainingAdmin = { async render() { await renderWithError(async () => {
   app.querySelector('#oembed-btn').addEventListener('click', async ()=>{ try { const form=app.querySelector('#lesson-form'); const meta=await DB.fetchOEmbed(form.video_url.value); if (!form.title.value) form.title.value = meta.title || ''; if (!form.thumb_url.value) form.thumb_url.value = meta.thumb_url || ''; } catch (err) { showError(err.message); } });
   app.querySelector('#lesson-form').addEventListener('submit', async (e)=>{ e.preventDefault(); try { await DB.saveTrainingLesson(Object.fromEntries(new FormData(e.target).entries())); go('#/training/admin'); } catch (err) { showError(err.message); } });
   app.querySelector('#song-form').addEventListener('submit', async (e)=>{ e.preventDefault(); try { await DB.saveTrainingSong(Object.fromEntries(new FormData(e.target).entries())); go('#/training/admin'); } catch (err) { showError(err.message); } });
+}); }};
+
+
+Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
+  const app = document.getElementById('app');
+  const playlists = await DB.getVideoPlaylists();
+  app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
+    <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
+      <form id="playlist-create" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr 2fr auto;gap:8px;">
+        <input class="df-input" name="name" placeholder="Playlist name" required>
+        <input class="df-input" name="description" placeholder="Description">
+        <button class="df-btn df-btn--primary">Create</button>
+      </form>
+      <div class="df-panel" style="padding:12px;">${playlists.map((p)=>`<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:10px 0;"><div><strong>${esc(p.name || `Playlist ${p.id}`)}</strong><div style="color:var(--text2);">${esc(p.description || '')}</div></div><a class="df-btn df-btn--outline" href="#/training/playlists/${p.id}">Open</a></div>`).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}</div>
+    </div>`;
+  app.querySelector('#playlist-create')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); await DB.saveVideoPlaylist(data); go('#/training/playlists'); });
+}); }};
+
+Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async () => {
+  const app = document.getElementById('app');
+  const [playlist, videos] = await Promise.all([DB.getVideoPlaylist(id), DB.getAllTrainingVideos()]);
+  if (!playlist) { app.innerHTML = '<div class="page-wrap" style="padding:24px;">Playlist not found.</div>'; return; }
+  const items = Array.isArray(playlist.items) ? playlist.items.slice().sort((a,b)=>(a.position||0)-(b.position||0)) : [];
+  const map = new Map(videos.map((v)=>[Number(v.id), v]));
+  const available = videos.filter((v)=>!items.find((i)=>Number(i.videoId || i.video_id)===Number(v.id)));
+  app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a>' })}
+    <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
+      <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><span>${esc(video?.title || `Video ${item.videoId}`)}</span><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
+      <form id="playlist-add" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;">
+        <select class="df-input" name="videoId">${available.map((v)=>`<option value="${v.id}">${esc(v.title || `Video ${v.id}`)}</option>`).join('')}</select>
+        <button class="df-btn df-btn--primary">Add Video</button>
+      </form>
+    </div>`;
+
+  async function save(nextItems) {
+    await DB.replaceVideoPlaylistItems(id, nextItems.map((it, index) => ({ videoId: Number(it.videoId || it.video_id), position: index + 1 })));
+    go(`#/training/playlists/${id}`);
+  }
+  app.querySelector('#playlist-add')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const videoId=Number(new FormData(e.target).get('videoId')); if (!videoId) return; await save([...items, { videoId }]); });
+  app.querySelectorAll('[data-remove]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.remove); const next=items.filter((_,i)=>i!==idx); await save(next); }));
+  app.querySelectorAll('[data-up]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.up); if (idx<1) return; const next=items.slice(); [next[idx-1], next[idx]]=[next[idx], next[idx-1]]; await save(next); }));
+  app.querySelectorAll('[data-down]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.down); if (idx>=items.length-1) return; const next=items.slice(); [next[idx+1], next[idx]]=[next[idx], next[idx+1]]; await save(next); }));
 }); }};

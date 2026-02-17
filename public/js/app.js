@@ -171,7 +171,7 @@
     try {
       if (action === 'open-session-builder') {
         event.preventDefault();
-        window.go?.('#/training/session-builder');
+        window.go?.('#/training/videos');
         return;
       }
       if (!window.TrainingUI) return;
