@@ -131,6 +131,12 @@ docker compose -f docker-compose.prod.yml up -d
 
 ## Deployment / Updates
 
+### Training Phase 1 deploy check
+1. Pull and redeploy the pinned image tag (`docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`).
+2. Open `#/training` and confirm the seeded JustinGuitar provider + 9 levels appear.
+3. Keep rollback path by publishing immutable `vX.Y.Z` tags and pinning `docker-compose.prod.yml` to the previous known-good tag if needed.
+
+
 Production uses prebuilt GHCR images and Watchtower auto-updates.
 
 `docker-compose.prod.yml` keeps host port `3000` mapped to container port `9999`, and mounts `/opt/stacks/faithfulfret/data:/data` so the SQLite DB survives restarts and image updates.

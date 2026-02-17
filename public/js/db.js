@@ -201,6 +201,54 @@
 
 
 
+
+    async getTrainingProviders() { return api('/api/training/providers'); },
+    async saveTrainingProvider(data) {
+      if (data.id) return api(`/api/training/providers/${data.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return api('/api/training/providers', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async deleteTrainingProvider(id) { return api(`/api/training/providers/${id}`, { method: 'DELETE' }); },
+    async getTrainingLevels(providerId) {
+      const q = providerId ? `?provider_id=${encodeURIComponent(providerId)}` : '';
+      return api(`/api/training/levels${q}`);
+    },
+    async createTrainingDefaultLevels(provider_id) { return api('/api/training/levels/bootstrap', { method: 'POST', body: JSON.stringify({ provider_id }) }); },
+    async getTrainingModules(levelId) {
+      const q = levelId ? `?level_id=${encodeURIComponent(levelId)}` : '';
+      return api(`/api/training/modules${q}`);
+    },
+    async saveTrainingModule(data) {
+      if (data.id) return api(`/api/training/modules/${data.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return api('/api/training/modules', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async getTrainingLessons(filters = {}) {
+      const params = new URLSearchParams();
+      Object.entries(filters || {}).forEach(([k, v]) => { if (v != null && v !== '') params.set(k, String(v)); });
+      const q = params.toString();
+      return api(`/api/training/lessons${q ? `?${q}` : ''}`);
+    },
+    async getTrainingLesson(id) { return api(`/api/training/lessons/${id}`); },
+    async saveTrainingLesson(data) {
+      if (data.id) return api(`/api/training/lessons/${data.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return api('/api/training/lessons', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async deleteTrainingLesson(id) { return api(`/api/training/lessons/${id}`, { method: 'DELETE' }); },
+    async getTrainingSkillGroups() { return api('/api/training/skill-groups'); },
+    async getTrainingSkillLessons(slug) { return api(`/api/training/skills/${encodeURIComponent(slug)}/lessons`); },
+    async getTrainingSongs(filters = {}) {
+      const params = new URLSearchParams();
+      Object.entries(filters || {}).forEach(([k, v]) => { if (v != null && v !== '') params.set(k, String(v)); });
+      const q = params.toString();
+      return api(`/api/training/songs${q ? `?${q}` : ''}`);
+    },
+    async getTrainingSong(id) { return api(`/api/training/songs/${id}`); },
+    async saveTrainingSong(data) {
+      if (data.id) return api(`/api/training/songs/${data.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return api('/api/training/songs', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async deleteTrainingSong(id) { return api(`/api/training/songs/${id}`, { method: 'DELETE' }); },
+    async assignTrainingSongLessons(id, lesson_ids = []) { return api(`/api/training/songs/${id}/lessons`, { method: 'POST', body: JSON.stringify({ lesson_ids }) }); },
+
     async getProviders() { return api('/api/providers'); },
     async saveProvider(data) {
       return data.id ? api(`/api/providers/${data.id}`, { method: 'PUT', body: JSON.stringify(data) }) : api('/api/providers', { method: 'POST', body: JSON.stringify(data) });
