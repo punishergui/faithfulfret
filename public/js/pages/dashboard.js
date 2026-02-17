@@ -85,7 +85,7 @@ Pages.Dashboard = {
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');overflow:hidden;">
         <div class="page-hero__inner">
           <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">${Utils.today()}</div>
-          <div class="page-title" style="text-shadow:2px 2px 0 rgba(255,106,0,.15);margin-bottom:12px;">${greeting}</div>
+          <div class="page-title" style="text-shadow:2px 2px 0 var(--heroGlow);margin-bottom:12px;">${greeting}</div>
           <div style="font-family:var(--f-mono);font-size:13px;color:var(--text2);margin-bottom:${stats.streak > 0 ? '12px' : '0'};">
             <span class="count-target" data-target="${stats.count}" data-type="int">${stats.count}</span> sessions &middot; <span class="count-target" data-target="${stats.totalHours}" data-type="float">${stats.totalHours}</span> hours in &middot; keep going.
           </div>
@@ -174,7 +174,7 @@ Pages.Dashboard = {
     const focuses = ['Chords','Scales','Strumming','Picking','Worship Set','Metronome','Song Practice','Technique','Ear Training'];
 
     return `
-      <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
+      <div class="df-panel" style="padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
           <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
@@ -280,7 +280,7 @@ Pages.Dashboard = {
   _renderCompactHeatmap(rows = [], today, initialMetric = 'minutes') {
     const safeRows = Array.isArray(rows) ? rows : [];
     return `
-      <div class="card" style="border:1px solid var(--line);background:rgba(0,0,0,.25);padding:14px;margin-bottom:16px;">
+      <div class="df-panel" style="padding:14px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Practice Pulse · 90 Days</div>
           <div class="heatmap-toggle" data-heatmap-toggle>

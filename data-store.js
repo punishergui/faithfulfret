@@ -26,8 +26,16 @@ if (!hasDataMount) {
 }
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 console.log(`DB: ${dbPath}`);
-const db = new Database(dbPath);
-db.exec('PRAGMA journal_mode = WAL;');
+let db = null;
+
+function openDb() {
+  db = new Database(dbPath);
+  db.exec('PRAGMA journal_mode = WAL;');
+  if (typeof initQueries === 'function') initQueries();
+  return db;
+}
+
+openDb();
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS sessions (
@@ -243,7 +251,10 @@ function coerceResource(input = {}) {
   };
 }
 
-const Q = {
+let Q = null;
+
+function initQueries() {
+Q = {
   upsertSession: db.prepare(`INSERT INTO sessions (id,date,title,durationMinutes,youtubeId,focusTag,notes,createdAt,bpm,dayNumber,focus,mood,win,checklist,links,videoId)
     VALUES (:id,:date,:title,:durationMinutes,:youtubeId,:focusTag,:notes,:createdAt,:bpm,:dayNumber,:focus,:mood,:win,:checklist,:links,:videoId)
     ON CONFLICT(id) DO UPDATE SET
@@ -271,6 +282,9 @@ const Q = {
   insertGearImage: db.prepare(`INSERT INTO gear_images (id,gearId,filePath,createdAt,sortOrder)
     VALUES (:id,:gearId,:filePath,:createdAt,:sortOrder)`),
 };
+}
+
+initQueries();
 
 const all = (sql) => db.prepare(sql).all();
 const one = (sql, v) => db.prepare(sql).get(v);
@@ -409,6 +423,23 @@ const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
 const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM gear_images; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
+
+const checkpointWal = () => db.exec('PRAGMA wal_checkpoint(FULL);');
+const close = () => {
+  if (!db) return;
+  db.close();
+  db = null;
+};
+const reopen = () => {
+  if (db) return db;
+  openDb();
+  return db;
+};
+const backupToFile = (filePath) => {
+  if (!db) reopen();
+  return db.backup(filePath);
+};
+
 const getDbInfo = () => {
   const file = fs.existsSync(dbPath) ? fs.statSync(dbPath) : null;
   return {
@@ -424,4 +455,4 @@ const getDbInfo = () => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll, checkpointWal, backupToFile, close, reopen };

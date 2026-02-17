@@ -178,6 +178,25 @@
       return api('/api/export');
     },
 
+    async exportAllZip() {
+      const res = await fetch('/api/export/zip');
+      if (!res.ok) throw new Error(await res.text() || `Request failed: ${res.status}`);
+      return res.blob();
+    },
+
+    async importZip(file) {
+      const form = new FormData();
+      form.append('backupZip', file);
+      const res = await fetch('/api/import/zip', { method: 'POST', body: form });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `Request failed: ${res.status}`);
+      try { return JSON.parse(text); } catch { throw new Error('Invalid JSON response from /api/import/zip'); }
+    },
+
+    async getDbInfo() {
+      return api('/api/db-info');
+    },
+
     async importAll(data) {
       return api('/api/import', { method: 'POST', body: JSON.stringify(data) });
     },

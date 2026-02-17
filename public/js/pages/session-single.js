@@ -137,7 +137,7 @@ Pages.SessionSingle = {
 
   _renderGear(gear = []) {
     return `
-      <div style="margin-bottom:16px;padding:12px;border:1px solid var(--line2);background:var(--bg1);">
+      <div class="df-panel" style="margin-bottom:16px;padding:12px;">
         <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Used</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${gear.map((item) => `<span class="df-badge df-badge--muted">${item.name}</span>`).join('')}
@@ -186,7 +186,7 @@ Pages.SessionSingle = {
     if (!rows.length) return '';
 
     return `
-      <div style="border:1px solid var(--line2);background:var(--bg1);padding:16px;margin-bottom:16px;">
+      <div class="df-panel" style="padding:16px;margin-bottom:16px;">
         <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;">Stats</div>
         ${rows.map(r => `
           <div class="session-stat-row">

@@ -203,7 +203,7 @@ Pages.Presets = {
   },
 
   renderDialField(name, label, value, options, helperText = '', extraContent = '') {
-    return `<div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+    return `<div class="df-panel" style="padding:10px;">
       <label class="df-label">${label}</label>
       <select name="${name}" class="df-input" style="margin-top:6px;">
         ${options.map((option) => `<option value="${option}" ${option === value ? 'selected' : ''}>${option}</option>`).join('')}
@@ -223,7 +223,7 @@ Pages.Presets = {
   },
 
   renderVypyrRow(scope, row, rowLabel, labelOptions) {
-    return `<div data-v2-row="${scope}" data-uid="${this.escapeHtml(row.uid)}" style="border:1px solid var(--line2);padding:10px;background:var(--bg0);display:grid;gap:8px;margin-bottom:8px;">
+    return `<div data-v2-row="${scope}" data-uid="${this.escapeHtml(row.uid)}" class="df-panel" style="padding:10px;display:grid;gap:8px;margin-bottom:8px;">
       <div class="df-field"><label class="df-label">${rowLabel}</label>
         <select name="${scope}_label" class="df-input">${labelOptions.map((option) => `<option value="${option}" ${row.label === option ? 'selected' : ''}>${option}</option>`).join('')}</select>
       </div>
@@ -298,7 +298,7 @@ Pages.Presets = {
 
   card(p) {
     const settings = this.parseSettings(p.settings, p.ampModel);
-    return `<div style="border:1px solid var(--line2);padding:14px;background:var(--bg1);">
+    return `<div class="df-panel" style="padding:14px;">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
         <strong>${this.escapeHtml(p.name)}</strong>
         <div style="display:flex;gap:6px;">
@@ -366,7 +366,7 @@ Pages.Presets = {
         <div class="fret-line"></div>
       </div>
       <div class="page-wrap" style="padding:24px;">
-        <div id="preset-form-wrap" style="display:none;margin-bottom:16px;border:1px solid var(--line2);padding:14px;background:var(--bg1);"></div>
+        <div id="preset-form-wrap" class="df-panel" style="display:none;margin-bottom:16px;padding:14px;"></div>
         ${presets.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">${presets.map((preset) => this.card(preset)).join('')}</div>` : '<div class="empty-state"><div class="empty-state__title">No presets yet</div><div class="empty-state__text">Save amp settings you want to reuse.</div></div>'}
       </div>
     `;
@@ -434,7 +434,7 @@ Pages.Presets = {
                   <div id="v2-inst-rows" style="margin-top:8px;"></div>
                 </div>
               `)}
-              <div style="border:1px solid var(--line2);padding:10px;background:var(--bg0);">
+              <div class="df-panel" style="padding:10px;">
                 <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
                   <div class="df-field"><label class="df-label">Amplifiers Dial</label>
                     <select name="v2_ampLabel" class="df-input">${this.ampDialOptions.map((option) => `<option value="${option}" ${option === settings.vypyrX2.ampLabel ? 'selected' : ''}>${option}</option>`).join('')}</select>

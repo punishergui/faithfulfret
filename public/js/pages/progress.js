@@ -311,15 +311,19 @@ Pages.Progress = {
 
   _renderExportImport() {
     return `
-      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:20px;background:var(--bg1);border:1px solid var(--line2);margin-bottom:24px;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:20px;margin-bottom:24px;">
         <div style="flex:1;">
           <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Data Management</div>
           <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Before any server update, export a backup file. Changing browser profile, domain, or port can hide local IndexedDB data.</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button id="export-btn" class="df-btn df-btn--outline">Export All Data</button>
             <div style="position:relative;">
+              <input type="file" id="import-zip-file" accept=".zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
+              <button class="df-btn df-btn--outline">Import Backup ZIP</button>
+            </div>
+            <div style="position:relative;">
               <input type="file" id="import-file" accept=".json" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
-              <button class="df-btn df-btn--outline">Import Data</button>
+              <button class="df-btn df-btn--outline">Import JSON</button>
             </div>
           </div>
           <div id="import-status" style="margin-top:10px;font-family:var(--f-mono);font-size:10px;color:var(--green);display:none;"></div>
@@ -347,7 +351,7 @@ Pages.Progress = {
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:24px;">
         ${cards.map(c => `
-          <div style="border:1px solid var(--line2);background:var(--bg1);padding:14px;">
+          <div class="df-panel" style="padding:14px;">
             <div style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">${c.k}</div>
             <div style="font-family:var(--f-hero);font-size:30px;line-height:1;color:var(--accent);">${c.v}</div>
             ${c.hint ? `<div style="font-size:12px;color:var(--text2);margin-top:6px;">${c.hint}</div>` : ''}
@@ -362,20 +366,41 @@ Pages.Progress = {
     const exportBtn = container.querySelector('#export-btn');
     if (exportBtn) {
       exportBtn.addEventListener('click', async () => {
-        const data = await DB.exportAll();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const blob = await DB.exportAllZip();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `daily-fret-backup-${Utils.today()}.json`;
+        a.download = `faithfulfret-backup-${Utils.today()}.zip`;
         a.click();
         URL.revokeObjectURL(url);
       });
     }
 
-    // Import
-    const importFile = container.querySelector('#import-file');
+    const importZipFile = container.querySelector('#import-zip-file');
     const importStatus = container.querySelector('#import-status');
+    if (importZipFile) {
+      importZipFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          if (!confirm('Import backup ZIP? This will REPLACE all existing data.')) {
+            importZipFile.value = '';
+            return;
+          }
+          const result = await DB.importZip(file);
+          const dbInfo = result?.dbInfo || await DB.getDbInfo();
+          importStatus.style.display = 'block';
+          importStatus.textContent = `✓ ZIP restore complete. Sessions: ${dbInfo.sessions || 0}, Gear: ${dbInfo.gear || 0}, Presets: ${dbInfo.presets || 0}.`;
+          setTimeout(() => { importZipFile.value = ''; this.render(); }, 1200);
+        } catch (err) {
+          alert('Failed to import ZIP backup.\n' + err.message);
+          importZipFile.value = '';
+        }
+      });
+    }
+
+    // Import JSON
+    const importFile = container.querySelector('#import-file');
     if (importFile) {
       importFile.addEventListener('change', async (e) => {
         const file = e.target.files[0];
