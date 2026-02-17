@@ -57,7 +57,7 @@ Pages.SessionSingle = {
     const longDate = Utils.formatDate(s.date, 'long').toUpperCase();
     return `
       <div class="session-hero">
-        <div style="max-width:1200px;margin:0 auto;padding:20px 24px 20px;position:relative;z-index:1;">
+        <div class="session-hero__inner">
           <div class="session-hero__meta">
             ${s.dayNumber ? `<span class="df-badge df-badge--accent">Day ${s.dayNumber}</span>` : ''}
             ${s.mood ? `<span class="df-badge df-badge--muted">${s.mood}</span>` : ''}
