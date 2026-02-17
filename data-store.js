@@ -29,22 +29,7 @@ console.log(`DB: ${dbPath}`);
 let db = null;
 let Q;
 
-function openDb() {
-  db = new Database(dbPath);
-  db.exec('PRAGMA journal_mode = WAL;');
-  if (typeof initQueries === 'function') initQueries();
-  return db;
-}
-
-function assertQueriesInitialized() {
-  if (!Q || typeof Q !== 'object') {
-    throw new Error('Query preparation failed: Q is undefined. Ensure Q is declared before initQueries() runs.');
-  }
-}
-
-openDb();
-
-db.exec(`
+const BASE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   date TEXT NOT NULL,
@@ -124,7 +109,27 @@ CREATE TABLE IF NOT EXISTS resources (
   notes TEXT,
   createdAt INTEGER NOT NULL
 );
-`);
+`;
+
+function ensureSchema() {
+  db.exec(BASE_SCHEMA_SQL);
+}
+
+function openDb() {
+  db = new Database(dbPath);
+  db.exec('PRAGMA journal_mode = WAL;');
+  ensureSchema();
+  if (typeof initQueries === 'function') initQueries();
+  return db;
+}
+
+function assertQueriesInitialized() {
+  if (!Q || typeof Q !== 'object') {
+    throw new Error('Query preparation failed: Q is undefined. Ensure Q is declared before initQueries() runs.');
+  }
+}
+
+openDb();
 
 function ensureColumn(table, column, definition) {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -289,8 +294,6 @@ Q = {
 };
 assertQueriesInitialized();
 }
-
-initQueries();
 
 const all = (sql) => db.prepare(sql).all();
 const one = (sql, v) => db.prepare(sql).get(v);
