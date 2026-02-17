@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS gear_links (
   note TEXT,
   isPrimary INTEGER DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS gear_images (
+  id TEXT PRIMARY KEY,
+  gearId TEXT NOT NULL,
+  filePath TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  sortOrder INTEGER DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS session_gear (
   sessionId TEXT NOT NULL,
   gearId TEXT NOT NULL,
@@ -241,6 +248,8 @@ const Q = {
   upsertResource: db.prepare(`INSERT INTO resources (id,title,url,category,rating,notes,createdAt)
     VALUES (:id,:title,:url,:category,:rating,:notes,:createdAt)
     ON CONFLICT(id) DO UPDATE SET title=excluded.title,url=excluded.url,category=excluded.category,rating=excluded.rating,notes=excluded.notes`),
+  insertGearImage: db.prepare(`INSERT INTO gear_images (id,gearId,filePath,createdAt,sortOrder)
+    VALUES (:id,:gearId,:filePath,:createdAt,:sortOrder)`),
 };
 
 const all = (sql) => db.prepare(sql).all();
@@ -275,16 +284,37 @@ const deleteSession = (id) => {
 
 const listGear = (includeLinks = true) => {
   const rows = all('SELECT * FROM gear_items ORDER BY createdAt DESC');
-  if (!includeLinks) return rows;
-  return rows.map((row) => ({ ...row, linksList: getGearLinks(row.id) }));
+  const imagesByGearId = listGearImagesByGearIds(rows.map((row) => row.id));
+  if (!includeLinks) return rows.map((row) => ({ ...row, imagesList: imagesByGearId[row.id] || [] }));
+  return rows.map((row) => ({ ...row, linksList: getGearLinks(row.id), imagesList: imagesByGearId[row.id] || [] }));
 };
 const getGear = (id) => one('SELECT * FROM gear_items WHERE id = ?', id);
 const saveGear = (data) => { const row = coerceGear(data); Q.upsertGear.run(row); return getGear(row.id); };
 const deleteGear = (id) => {
   run('DELETE FROM gear_links WHERE gearId = ?', id);
+  run('DELETE FROM gear_images WHERE gearId = ?', id);
   run('DELETE FROM session_gear WHERE gearId = ?', id);
   return run('DELETE FROM gear_items WHERE id = ?', id);
 };
+
+const listGearImages = (gearId) => db.prepare('SELECT * FROM gear_images WHERE gearId = ? ORDER BY sortOrder ASC, createdAt ASC').all(gearId);
+const listGearImagesByGearIds = (gearIds = []) => {
+  if (!gearIds.length) return {};
+  const placeholders = gearIds.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM gear_images WHERE gearId IN (${placeholders}) ORDER BY sortOrder ASC, createdAt ASC`).all(...gearIds);
+  return rows.reduce((acc, row) => {
+    if (!acc[row.gearId]) acc[row.gearId] = [];
+    acc[row.gearId].push(row);
+    return acc;
+  }, {});
+};
+const addGearImage = ({ gearId, filePath, sortOrder = 0 }) => {
+  const row = { id: uid(), gearId, filePath, createdAt: Date.now(), sortOrder: Number(sortOrder) || 0 };
+  Q.insertGearImage.run(row);
+  return row;
+};
+const getGearImage = (id) => one('SELECT * FROM gear_images WHERE id = ?', id);
+const deleteGearImage = (id) => run('DELETE FROM gear_images WHERE id = ?', id);
 
 const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY isPrimary DESC, lastChecked DESC, id DESC').all(gearId).map((row) => ({ ...row, isPrimary: readPrimaryFlag(row) }));
 const saveGearLink = (data) => {
@@ -357,6 +387,6 @@ const getResource = (id) => one('SELECT * FROM resources WHERE id = ?', id);
 const saveResource = (data) => { const row = coerceResource(data); Q.upsertResource.run(row); return getResource(row.id); };
 const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
 
-const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
+const clearAll = () => db.exec('DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM gear_images; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
-module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };
+module.exports = { dbPath, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll };

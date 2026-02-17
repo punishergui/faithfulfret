@@ -108,12 +108,14 @@ docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "Sq
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-form.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/progress.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/stats.js" # only if stats.js exists
 # Verify presets editor script syntax in running container
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke checks after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
 curl -s http://localhost:3000/api/gear-usage | head -c 200
 curl -s http://localhost:3000/api/gear-items | head
+curl -s http://localhost:3000/api/gear/EXAMPLE_ID/images | head
 # optional UI smoke check: Gear list should show items by default (All filters)
 # optional UI smoke check: Gear page filter buttons (All/Owned/Wishlist/Sold) should not change route from #/gear
 # optional UI smoke check: Gear page keeps filters/list unchanged and shows compact Gear Stats in right sidebar
@@ -180,12 +182,14 @@ docker compose -f docker-compose.prod.yml up -d
 
 - App data is stored in SQLite: `/data/faithfulfret.sqlite`.
 - Preset images are stored in `/data/presets` and served from `/media/presets/*`.
+- Gear images are stored in `/data/gear` and served from `/media/gear/*`.
 - In both dev and prod compose files, `./data:/data` is mounted, so DB + preset images persist across restarts/updates.
 - Backup the DB file and preset media directly:
 
 ```bash
 cp ./data/faithfulfret.sqlite ./data/faithfulfret.sqlite.backup-$(date +%Y%m%d-%H%M%S)
 cp -R ./data/presets ./data/presets.backup-$(date +%Y%m%d-%H%M%S)
+cp -R ./data/gear ./data/gear.backup-$(date +%Y%m%d-%H%M%S)
 ```
 
 - You can also export/import JSON from the `Stats` page (`#/progress` route) for portability between environments.

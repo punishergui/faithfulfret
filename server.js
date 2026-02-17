@@ -9,7 +9,9 @@ const app = express();
 const apiRouter = express.Router();
 const PORT = process.env.PORT || 9999;
 const presetMediaDir = '/data/presets';
+const gearMediaDir = '/data/gear';
 if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
+if (!fs.existsSync(gearMediaDir)) fs.mkdirSync(gearMediaDir, { recursive: true });
 
 app.use(express.json({ limit: '20mb' }));
 
@@ -161,7 +163,7 @@ apiRouter.post('/gear-items', (req, res) => {
 apiRouter.get('/gear-items/:id', (req, res) => {
   const row = Store.getGear(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
-  res.json({ ...row, linksList: Store.getGearLinks(req.params.id) });
+  res.json({ ...row, linksList: Store.getGearLinks(req.params.id), imagesList: Store.listGearImages(req.params.id) });
 });
 apiRouter.put('/gear-items/:id', (req, res) => res.json(Store.saveGear({ ...req.body, id: req.params.id })));
 apiRouter.delete('/gear-items/:id', (req, res) => {
@@ -236,6 +238,15 @@ function savePresetImageFromBuffer({ fileName, mimeType, buffer }) {
   return { filePath: `/media/presets/${finalName}` };
 }
 
+function saveGearImageFromBuffer({ fileName, mimeType, buffer }) {
+  const ext = extensionFromMime(mimeType);
+  const safeBase = sanitizeFileName(fileName).replace(/\.[^/.]+$/, '');
+  const finalName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}.${ext}`;
+  const fullPath = path.join(gearMediaDir, finalName);
+  fs.writeFileSync(fullPath, buffer);
+  return { filePath: `/media/gear/${finalName}` };
+}
+
 function parseMultipartImage(req) {
   return new Promise((resolve, reject) => {
     const contentType = req.headers['content-type'] || '';
@@ -300,6 +311,46 @@ apiRouter.post('/preset-image', async (req, res) => {
   }
 });
 
+apiRouter.post('/gear-image', (req, res) => {
+  try {
+    const gearId = req.body?.gearId;
+    const mimeType = req.body?.mime || req.body?.mimeType || 'image/jpeg';
+    const fileName = req.body?.fileName || 'gear-image';
+    let dataBase64 = req.body?.dataBase64 || '';
+    if (!gearId) return res.status(400).json({ error: 'gearId is required' });
+
+    if (typeof dataBase64 === 'string' && dataBase64.startsWith('data:')) {
+      const parts = dataBase64.split(',');
+      if (parts.length === 2) dataBase64 = parts[1];
+    }
+    if (!dataBase64) return res.status(400).json({ error: 'image data is required' });
+
+    const buffer = Buffer.from(dataBase64, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'invalid image payload' });
+
+    const savedFile = saveGearImageFromBuffer({ fileName, mimeType, buffer });
+    const row = Store.addGearImage({ gearId, filePath: savedFile.filePath, sortOrder: Number(req.body?.sortOrder) || 0 });
+    return res.json({ id: row.id, filePath: row.filePath, createdAt: row.createdAt, sortOrder: row.sortOrder });
+  } catch (e) {
+    return res.status(400).json({ error: e.message || 'failed to save gear image' });
+  }
+});
+
+apiRouter.get('/gear/:id/images', (req, res) => {
+  res.json(Store.listGearImages(req.params.id));
+});
+
+apiRouter.delete('/gear-image/:id', (req, res) => {
+  const row = Store.getGearImage(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  Store.deleteGearImage(req.params.id);
+  if (row.filePath && row.filePath.startsWith('/media/gear/')) {
+    const fullPath = path.join(gearMediaDir, path.basename(row.filePath));
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  }
+  return res.json({ ok: true });
+});
+
 // Keep existing resources features
 apiRouter.get('/resources', (req, res) => res.json(Store.listResources()));
 apiRouter.post('/resources', (req, res) => res.json(Store.saveResource(req.body || {})));
@@ -319,6 +370,7 @@ apiRouter.get('/export', (req, res) => {
     sessions: Store.listSessions(),
     gear: Store.listGear(false),
     gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary) ? 1 : 0 }))),
+    gear_images: Store.listGear(false).flatMap((item) => (item.imagesList || [])),
     session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
     resources: Store.listResources(),
     presets: Store.listPresets(),
@@ -337,6 +389,9 @@ apiRouter.post('/import', (req, res) => {
     }
   }
   for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
+  for (const row of (payload.gear_images || [])) {
+    if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
+  }
   const sessionGear = payload.session_gear || payload.sessionGear || [];
   const grouped = {};
   sessionGear.forEach((row) => {
@@ -478,6 +533,7 @@ app.use('/api', (req, res) => {
 });
 
 app.use('/media/presets', express.static(presetMediaDir));
+app.use('/media/gear', express.static(gearMediaDir));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route

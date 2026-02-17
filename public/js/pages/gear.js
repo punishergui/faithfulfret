@@ -44,6 +44,10 @@ Pages.Gear = {
     const gear = gearRows.map((g) => {
       const type = (g.type || '').trim();
       const brand = (g.brand || g.vendor || '').trim();
+      const rawImages = Array.isArray(g.imagesList) ? g.imagesList : [];
+      const imagesList = rawImages.length
+        ? rawImages.filter((row) => row?.filePath).map((row) => ({ ...row, filePath: row.filePath }))
+        : (g.imageData ? [{ id: `legacy-${g.id}`, filePath: g.imageData }] : []);
       return {
         ...g,
         type,
@@ -51,6 +55,7 @@ Pages.Gear = {
         displayType: type || '(Uncategorized)',
         status: normalizeGearStatus(g.status),
         usage: usageByGear[g.id] || { usedCount: 0, lastUsed: '' },
+        imagesList,
       };
     });
 
@@ -257,7 +262,60 @@ Pages.Gear = {
       });
     });
 
+    this._initCarousels(app);
     setTimeout(() => Utils.staggerReveal(app, '.gear-card', 0), 50);
+  },
+
+
+  _renderCardMedia(g, fallbackImage) {
+    const images = (g.imagesList || []).map((row) => row.filePath).filter(Boolean);
+    if (!images.length) {
+      return `<div class="gear-card__bg" style="background-image:url('${fallbackImage}');"></div>`;
+    }
+    if (images.length === 1) {
+      return `<img class="gear-card__photo" src="${images[0]}" alt="${g.name || 'Gear photo'}" loading="lazy">`;
+    }
+    return `
+      <div class="gear-carousel" data-gear-carousel="${g.id}" data-count="${images.length}">
+        ${images.map((src, index) => `<img class="gear-card__photo ${index === 0 ? 'is-active' : ''}" src="${src}" alt="${g.name || 'Gear photo'} ${index + 1}" loading="lazy" data-gear-slide="${index}">`).join('')}
+        <button type="button" class="gear-carousel__arrow gear-carousel__arrow--left" data-gear-prev aria-label="Previous image">‹</button>
+        <button type="button" class="gear-carousel__arrow gear-carousel__arrow--right" data-gear-next aria-label="Next image">›</button>
+      </div>
+    `;
+  },
+
+  _initCarousels(container) {
+    container.querySelectorAll('[data-gear-carousel]').forEach((el) => {
+      const slides = [...el.querySelectorAll('[data-gear-slide]')];
+      if (slides.length < 2) return;
+      let index = 0;
+      let interval = null;
+      const setIndex = (next) => {
+        index = (next + slides.length) % slides.length;
+        slides.forEach((slide, slideIndex) => slide.classList.toggle('is-active', slideIndex === index));
+      };
+      const start = () => {
+        if (interval) clearInterval(interval);
+        interval = setInterval(() => setIndex(index + 1), 4000);
+      };
+      const stop = () => {
+        if (interval) clearInterval(interval);
+        interval = null;
+      };
+      el.querySelector('[data-gear-prev]')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        stop();
+        setIndex(index - 1);
+      });
+      el.querySelector('[data-gear-next]')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        stop();
+        setIndex(index + 1);
+      });
+      el.addEventListener('mouseenter', stop);
+      el.addEventListener('mouseleave', start);
+      start();
+    });
   },
 
   _filterGear(gear, selectedFilter, searchTerm, advanced) {
@@ -354,7 +412,7 @@ Pages.Gear = {
   },
 
   _renderCard(g) {
-    const imgUrl = g.imageData || Utils.gearImage(g.category);
+    const fallbackImage = Utils.gearImage(g.category);
     const manualUrl = g.manualUrl || '/manual.pdf';
     const primaryUrl = g.primaryUrl || g.primaryLink || g.primary || g.buyUrl || '';
     const statusBadge = {
@@ -385,7 +443,7 @@ Pages.Gear = {
 
     return `
       <div class="gear-card card-reveal" onclick="go('#/gear/edit/${g.id}')">
-        <div class="gear-card__bg" style="background-image:url('${imgUrl}');"></div>
+        ${this._renderCardMedia(g, fallbackImage)}
         <div class="gear-card__body">
           <div class="gear-card__category">${g.category || ''}</div>
           <div class="gear-card__name">${g.name || 'Unnamed'}</div>
@@ -505,14 +563,14 @@ Pages.GearForm = {
             </div>
 
             <div class="df-field full-width">
-              <label class="df-label" for="g-image">Photo</label>
-              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:1px solid var(--line2);cursor:pointer;font-family:var(--f-mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text2);" id="g-image-label">
-                  <input type="file" id="g-image" accept="image/*" style="display:none;"><span id="g-image-text">${gear.imageData ? 'Change Photo' : '+ Upload Photo'}</span>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <label class="df-label" for="g-image" style="margin-bottom:0;">Images</label>
+                <label class="df-btn df-btn--outline" style="cursor:pointer;">
+                  <input type="file" id="g-image" accept="image/*" multiple style="display:none;">+ Upload Images
                 </label>
-                ${gear.imageData ? `<img id="g-image-preview" src="${gear.imageData}" style="height:60px;width:80px;object-fit:cover;border:1px solid var(--line2);" alt="Current photo">` : `<span id="g-image-preview" style="display:none;"></span>`}
-                ${gear.imageData ? '<button type="button" id="g-image-clear" class="df-btn df-btn--outline">Remove</button>' : ''}
               </div>
+              <div id="g-images-wrap" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+              <div style="font-size:12px;color:var(--text3);margin-top:6px;">Optional. Images are stored at /data/gear and served from /media/gear.</div>
             </div>
           </div>
 
@@ -522,7 +580,9 @@ Pages.GearForm = {
       </div>
     `;
 
-    let pendingImageData = gear.imageData || null;
+    const currentImages = [...(Array.isArray(gear.imagesList) ? gear.imagesList : [])];
+    const pendingUploads = [];
+    const pendingDeletes = new Set();
     const linksWrap = app.querySelector('#g-links-wrap');
     const addLinkBtn = app.querySelector('#g-add-link');
 
@@ -544,11 +604,9 @@ Pages.GearForm = {
     });
 
     const imageInput = app.querySelector('#g-image');
-    const imagePreview = app.querySelector('#g-image-preview');
-    const imageText = app.querySelector('#g-image-text');
-    const imageClear = app.querySelector('#g-image-clear');
+    const imagesWrap = app.querySelector('#g-images-wrap');
 
-    function resizeToBase64(file, maxPx = 800) {
+    function resizeToBase64(file, maxPx = 1200) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
@@ -559,7 +617,7 @@ Pages.GearForm = {
             canvas.width = Math.round(img.width * ratio);
             canvas.height = Math.round(img.height * ratio);
             canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.82));
+            resolve(canvas.toDataURL('image/jpeg', 0.84));
           };
           img.src = ev.target.result;
         };
@@ -567,26 +625,45 @@ Pages.GearForm = {
       });
     }
 
-    if (imageInput) {
-      imageInput.addEventListener('change', async () => {
-        const file = imageInput.files[0];
-        if (!file) return;
-        imageText.textContent = 'Processing...';
-        pendingImageData = await resizeToBase64(file);
-        if (imagePreview) {
-          imagePreview.src = pendingImageData;
-          imagePreview.style.display = 'inline-block';
-        }
-        imageText.textContent = 'Change Photo';
+    function renderImages() {
+      const existing = currentImages.filter((row) => !pendingDeletes.has(row.id));
+      const uploads = pendingUploads.map((row, index) => ({ ...row, id: `pending-${index}`, pending: true }));
+      const rows = [...existing, ...uploads];
+      if (!rows.length) {
+        imagesWrap.innerHTML = '<div style="color:var(--text3);font-size:12px;">No images yet.</div>';
+        return;
+      }
+      imagesWrap.innerHTML = rows.map((row) => `
+        <div data-image-id="${row.id}" style="position:relative;">
+          <img src="${row.filePath}" alt="Gear image" style="width:100px;height:72px;object-fit:cover;border:1px solid var(--line2);background:var(--bg1);" loading="lazy">
+          <button type="button" data-remove-image="${row.id}" class="df-btn df-btn--outline" style="margin-top:6px;width:100%;">Remove</button>
+        </div>
+      `).join('');
+      imagesWrap.querySelectorAll('[data-remove-image]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const imageId = btn.getAttribute('data-remove-image');
+          if (imageId.startsWith('pending-')) {
+            const idx = Number(imageId.replace('pending-', ''));
+            pendingUploads.splice(idx, 1);
+          } else {
+            pendingDeletes.add(imageId);
+          }
+          renderImages();
+        });
       });
     }
 
-    if (imageClear) {
-      imageClear.addEventListener('click', () => {
-        pendingImageData = null;
-        if (imagePreview) imagePreview.style.display = 'none';
-        if (imageText) imageText.textContent = '+ Upload Photo';
-        imageClear.style.display = 'none';
+    renderImages();
+
+    if (imageInput) {
+      imageInput.addEventListener('change', async () => {
+        const files = [...(imageInput.files || [])];
+        for (const file of files) {
+          const filePath = await resizeToBase64(file);
+          pendingUploads.push({ filePath, fileName: file.name, mime: file.type || 'image/jpeg' });
+        }
+        imageInput.value = '';
+        renderImages();
       });
     }
 
@@ -629,10 +706,10 @@ Pages.GearForm = {
         data.createdAt = gear.createdAt;
       }
       data.linksList = links;
-      if (pendingImageData) data.imageData = pendingImageData;
-      else if (pendingImageData === null) data.imageData = null;
-
       const saved = await DB.saveGear(data);
+
+      await Promise.all([...pendingDeletes].map((imageId) => DB.deleteGearImage(imageId)));
+      await Promise.all(pendingUploads.map((image, index) => DB.uploadGearImage({ gearId: saved.id, mime: image.mime, dataBase64: image.filePath, fileName: image.fileName, sortOrder: currentImages.length + index })));
       await Promise.all(links.map((link) => DB.saveGearLink(saved.id, link)));
       const existingIds = new Set(links.filter((l) => l.id).map((l) => l.id));
       await Promise.all((gear.linksList || []).filter((existing) => !existingIds.has(existing.id)).map((existing) => DB.deleteGearLink(saved.id, existing.id)));
