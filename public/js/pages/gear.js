@@ -356,6 +356,7 @@ Pages.Gear = {
   _renderCard(g) {
     const imgUrl = g.imageData || Utils.gearImage(g.category);
     const manualUrl = g.manualUrl || '/manual.pdf';
+    const primaryUrl = g.primaryUrl || g.primaryLink || g.primary || g.buyUrl || '';
     const statusBadge = {
       Owned: 'df-badge--green',
       Sold: 'df-badge--red',
@@ -401,7 +402,7 @@ Pages.Gear = {
             ${g.status ? `<span class="df-badge ${statusBadge}">${g.status}</span>` : ''}
             <div class="gear-card__links">
               ${topLink ? `<a href="${topLink.url}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">${topLink.label || 'Link'}</a>` : ''}
-              ${g.buyUrl ? `<a href="${g.buyUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
+              ${primaryUrl ? `<a href="${primaryUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
               <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Manual</a>
             </div>
           </div>
@@ -621,6 +622,8 @@ Pages.GearForm = {
       data.dateAcquired = data.boughtDate;
       data.price = data.boughtPrice;
       data.vendor = data.boughtFrom;
+      data.primaryUrl = data.primaryUrl || data.primaryLink || data.primary || data.buyUrl || '';
+      data.buyUrl = data.primaryUrl;
       if (isEdit) {
         data.id = gear.id;
         data.createdAt = gear.createdAt;
