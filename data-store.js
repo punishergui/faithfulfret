@@ -302,12 +302,95 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_session_items_lesson_id ON session_items
 db.exec('CREATE INDEX IF NOT EXISTS idx_session_items_session_id ON session_items(session_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_training_playlist_items_playlist_id ON training_playlist_items(playlist_id)');
+
+db.exec(`CREATE TABLE IF NOT EXISTS levels (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_id INTEGER NOT NULL,
+  track TEXT NOT NULL CHECK(track IN ('Beginner','Intermediate','Advanced')),
+  level_num INTEGER NOT NULL CHECK(level_num IN (1,2,3)),
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS skill_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS skills (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS songs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  artist TEXT,
+  level_hint TEXT,
+  thumb_url TEXT,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS song_lessons (
+  song_id INTEGER NOT NULL,
+  lesson_id INTEGER NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+)`);
+ensureColumn('modules', 'level_id', 'INTEGER');
+ensureColumn('modules', 'module_num', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('modules', 'thumb_url', 'TEXT');
+ensureColumn('lessons', 'description', 'TEXT');
+ensureColumn('lessons', 'lesson_kind', "TEXT NOT NULL DEFAULT 'lesson'");
+ensureColumn('lessons', 'skill_tags', 'TEXT');
+ensureColumn('lesson_skills', 'skill_id', 'INTEGER');
+db.exec('CREATE INDEX IF NOT EXISTS idx_levels_provider_sort ON levels(provider_id, sort_order)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_modules_level_sort ON modules(level_id, sort_order)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_module_sort ON lessons(module_id, sort_order)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_lesson_skills_lesson ON lesson_skills(lesson_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_lesson_skills_skill ON lesson_skills(skill_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_skills_group_slug ON skills(group_id, slug)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_song_lessons_song_sort ON song_lessons(song_id, sort_order)');
+
+}
+
+
+function seedTrainingDefaults() {
+  const now = Date.now();
+  db.prepare(`INSERT INTO providers (name, slug, url, created_at)
+    SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM providers WHERE slug = ?)`)
+    .run('JustinGuitar', 'justinguitar', 'https://www.justinguitar.com', now, 'justinguitar');
+  const provider = db.prepare('SELECT * FROM providers WHERE slug = ?').get('justinguitar');
+  if (!provider) return;
+  const defs = [
+    ['Beginner',1,10],['Beginner',2,20],['Beginner',3,30],
+    ['Intermediate',1,40],['Intermediate',2,50],['Intermediate',3,60],
+    ['Advanced',1,70],['Advanced',2,80],['Advanced',3,90],
+  ];
+  defs.forEach(([track, level_num, sort_order]) => {
+    const name = `${track} ${level_num}`;
+    db.prepare(`INSERT INTO levels (provider_id,track,level_num,name,sort_order,created_at)
+      SELECT @provider_id,@track,@level_num,@name,@sort_order,@created_at
+      WHERE NOT EXISTS (SELECT 1 FROM levels WHERE provider_id=@provider_id AND track=@track AND level_num=@level_num)`)
+      .run({ provider_id: provider.id, track, level_num, name, sort_order, created_at: now });
+    const level = db.prepare('SELECT id FROM levels WHERE provider_id = ? AND track = ? AND level_num = ?').get(provider.id, track, level_num);
+    if (level) {
+      db.prepare(`INSERT INTO modules (level_id,title,description,module_num,sort_order,thumb_url,created_at,course_id,slug)
+        SELECT @level_id,'Module 0','Getting Started',0,0,NULL,@created_at,0,'module-0'
+        WHERE NOT EXISTS (SELECT 1 FROM modules WHERE level_id=@level_id AND module_num=0)`)
+        .run({ level_id: level.id, created_at: now });
+    }
+  });
 }
 
 function openDb() {
   db = new Database(dbPath);
   db.exec('PRAGMA journal_mode = WAL;');
   ensureSchema();
+  seedTrainingDefaults(db);
   if (typeof initQueries === 'function') initQueries();
   return db;
 }
@@ -1096,7 +1179,126 @@ const getDbInfo = () => {
   };
 };
 
+
+
+const listTrainingProviders = () => all('SELECT * FROM providers ORDER BY name COLLATE NOCASE ASC');
+const getTrainingProvider = (id) => one('SELECT * FROM providers WHERE id = ?', Number(id));
+const saveTrainingProvider = (data = {}) => {
+  const now = Date.now();
+  if (data.id) {
+    run('UPDATE providers SET name=@name, slug=@slug, url=@url WHERE id=@id', { id: Number(data.id), name: data.name || '', slug: data.slug || slugify(data.name), url: data.url || '' });
+    return getTrainingProvider(data.id);
+  }
+  const result = db.prepare('INSERT INTO providers (name,slug,url,created_at) VALUES (@name,@slug,@url,@created_at)').run({ name: data.name || '', slug: data.slug || slugify(data.name), url: data.url || '', created_at: now });
+  return getTrainingProvider(result.lastInsertRowid);
+};
+const deleteTrainingProvider = (id) => run('DELETE FROM providers WHERE id = ?', Number(id));
+
+const listLevels = (providerId) => db.prepare(`SELECT * FROM levels ${providerId ? 'WHERE provider_id = ?' : ''} ORDER BY sort_order ASC, id ASC`).all(...(providerId ? [Number(providerId)] : []));
+const bootstrapProviderLevels = (providerId) => {
+  const provider = getTrainingProvider(providerId);
+  if (!provider) throw new Error('provider not found');
+  const map = [['Beginner',1,10],['Beginner',2,20],['Beginner',3,30],['Intermediate',1,40],['Intermediate',2,50],['Intermediate',3,60],['Advanced',1,70],['Advanced',2,80],['Advanced',3,90]];
+  map.forEach(([track,num,sort]) => db.prepare(`INSERT INTO levels (provider_id,track,level_num,name,sort_order,created_at)
+  SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM levels WHERE provider_id=? AND track=? AND level_num=?)`).run(provider.id, track, num, `${track} ${num}`, sort, Date.now(), provider.id, track, num));
+  return listLevels(provider.id);
+};
+const listTrainingModules = (levelId) => db.prepare(`SELECT * FROM modules ${levelId ? 'WHERE level_id = ?' : ''} ORDER BY sort_order ASC, id ASC`).all(...(levelId ? [Number(levelId)] : []));
+const getTrainingModule = (id) => one('SELECT * FROM modules WHERE id = ?', Number(id));
+const saveTrainingModule = (data = {}) => {
+  const now = Date.now();
+  if (data.id) {
+    run('UPDATE modules SET level_id=@level_id,title=@title,description=@description,module_num=@module_num,sort_order=@sort_order,thumb_url=@thumb_url WHERE id=@id', {
+      id: Number(data.id), level_id: Number(data.level_id) || null, title: data.title || '', description: data.description || '', module_num: Number(data.module_num) || 0, sort_order: Number(data.sort_order) || 0, thumb_url: data.thumb_url || null,
+    });
+    return getTrainingModule(data.id);
+  }
+  const result = db.prepare('INSERT INTO modules (level_id,title,description,module_num,sort_order,thumb_url,created_at,course_id,slug) VALUES (@level_id,@title,@description,@module_num,@sort_order,@thumb_url,@created_at,@course_id,@slug)').run({
+    level_id: Number(data.level_id) || null, title: data.title || '', description: data.description || '', module_num: Number(data.module_num) || 0, sort_order: Number(data.sort_order) || 0, thumb_url: data.thumb_url || null, created_at: now, course_id: Number(data.course_id) || 0, slug: data.slug || slugify(data.title || `module-${now}`),
+  });
+  return getTrainingModule(result.lastInsertRowid);
+};
+
+const listTrainingLessons = (filters = {}) => {
+  const where = []; const vals = [];
+  if (filters.module_id) { where.push('l.module_id = ?'); vals.push(Number(filters.module_id)); }
+  if (filters.q) { where.push('(l.title LIKE ? OR l.description LIKE ?)'); vals.push(`%${filters.q}%`, `%${filters.q}%`); }
+  if (filters.kind) { where.push('l.lesson_kind = ?'); vals.push(String(filters.kind)); }
+  if (filters.track) { where.push('lv.track = ?'); vals.push(String(filters.track)); }
+  if (filters.level_num) { where.push('lv.level_num = ?'); vals.push(Number(filters.level_num)); }
+  if (filters.skill_slug) { where.push('sk.slug = ?'); vals.push(String(filters.skill_slug)); }
+  const sql = `SELECT DISTINCT l.* FROM lessons l
+    LEFT JOIN modules m ON m.id = l.module_id
+    LEFT JOIN levels lv ON lv.id = m.level_id
+    LEFT JOIN lesson_skills ls ON ls.lesson_id = l.id
+    LEFT JOIN skills sk ON sk.id = ls.skill_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY l.sort_order ASC, l.id ASC`;
+  return db.prepare(sql).all(...vals);
+};
+const getTrainingLesson = (id) => {
+  const row = one('SELECT * FROM lessons WHERE id = ?', Number(id));
+  if (!row) return null;
+  const skills = db.prepare('SELECT s.* FROM lesson_skills ls JOIN skills s ON s.id = ls.skill_id WHERE ls.lesson_id = ? ORDER BY s.name').all(Number(id));
+  const songs = db.prepare('SELECT so.* FROM song_lessons sl JOIN songs so ON so.id = sl.song_id WHERE sl.lesson_id = ? ORDER BY sl.sort_order ASC').all(Number(id));
+  return { ...row, skills, songs };
+};
+const saveTrainingLesson = (data = {}) => {
+  const now = Date.now();
+  const payload = {
+    module_id: data.module_id == null || data.module_id === '' ? null : Number(data.module_id), title: data.title || '', description: data.description || '', video_url: data.video_url || '', video_provider: data.video_provider || '', video_id: data.video_id || '', thumb_url: data.thumb_url || '', duration_sec: Number(data.duration_sec) || 0, skill_tags: data.skill_tags || '', lesson_kind: data.lesson_kind || 'lesson', sort_order: Number(data.sort_order) || 0,
+  };
+  if (data.id) {
+    run('UPDATE lessons SET module_id=@module_id,title=@title,description=@description,video_url=@video_url,video_provider=@video_provider,video_id=@video_id,thumb_url=@thumb_url,duration_sec=@duration_sec,skill_tags=@skill_tags,lesson_kind=@lesson_kind,sort_order=@sort_order,updated_at=@updated_at WHERE id=@id', { ...payload, id: Number(data.id), updated_at: now });
+    return getTrainingLesson(data.id);
+  }
+  const result = db.prepare('INSERT INTO lessons (module_id,title,description,video_url,video_provider,video_id,thumb_url,duration_sec,skill_tags,lesson_kind,sort_order,created_at,updated_at,slug,lesson_type,author,summary,practice_plan,notes) VALUES (@module_id,@title,@description,@video_url,@video_provider,@video_id,@thumb_url,@duration_sec,@skill_tags,@lesson_kind,@sort_order,@created_at,@updated_at,@slug,@lesson_type,@author,@summary,@practice_plan,@notes)').run({ ...payload, created_at: now, updated_at: now, slug: slugify(payload.title), lesson_type: 'core', author: '', summary: '', practice_plan: '', notes: '' });
+  return getTrainingLesson(result.lastInsertRowid);
+};
+const deleteTrainingLesson = (id) => { run('DELETE FROM lesson_skills WHERE lesson_id = ?', Number(id)); run('DELETE FROM song_lessons WHERE lesson_id = ?', Number(id)); return run('DELETE FROM lessons WHERE id = ?', Number(id)); };
+const saveLessonSkillLinks = (lessonId, skillIds = []) => { run('DELETE FROM lesson_skills WHERE lesson_id = ?', Number(lessonId)); const st = db.prepare('INSERT INTO lesson_skills (lesson_id,skill_id) VALUES (?,?)'); skillIds.forEach((sid) => { if (Number(sid)) st.run(Number(lessonId), Number(sid)); }); };
+const listSkillGroups = () => {
+  const groups = all('SELECT * FROM skill_groups ORDER BY sort_order ASC, name ASC');
+  return groups.map((g) => ({ ...g, skills: db.prepare('SELECT * FROM skills WHERE group_id = ? ORDER BY name ASC').all(g.id) }));
+};
+const getSkillLessons = (slug) => listTrainingLessons({ skill_slug: slug });
+const saveSkillGroup = (data = {}) => {
+  const now = Date.now();
+  if (data.id) { run('UPDATE skill_groups SET name=@name, slug=@slug, sort_order=@sort_order WHERE id=@id', { id: Number(data.id), name: data.name || '', slug: data.slug || slugify(data.name), sort_order: Number(data.sort_order) || 0 }); return one('SELECT * FROM skill_groups WHERE id = ?', Number(data.id)); }
+  const r = db.prepare('INSERT INTO skill_groups (name,slug,sort_order,created_at) VALUES (?,?,?,?)').run(data.name || '', data.slug || slugify(data.name), Number(data.sort_order) || 0, now); return one('SELECT * FROM skill_groups WHERE id = ?', r.lastInsertRowid);
+};
+const saveSkill = (data = {}) => {
+  const now = Date.now();
+  if (data.id) { run('UPDATE skills SET group_id=@group_id,name=@name,slug=@slug WHERE id=@id', { id: Number(data.id), group_id: Number(data.group_id), name: data.name || '', slug: data.slug || slugify(data.name) }); return one('SELECT * FROM skills WHERE id = ?', Number(data.id)); }
+  const r = db.prepare('INSERT INTO skills (group_id,name,slug,created_at) VALUES (?,?,?,?)').run(Number(data.group_id), data.name || '', data.slug || slugify(data.name), now); return one('SELECT * FROM skills WHERE id = ?', r.lastInsertRowid);
+};
+const listSongs = (filters = {}) => {
+  const where = []; const vals = [];
+  if (filters.q) { where.push('(title LIKE ? OR artist LIKE ?)'); vals.push(`%${filters.q}%`, `%${filters.q}%`); }
+  if (filters.provider_id) { where.push('provider_id = ?'); vals.push(Number(filters.provider_id)); }
+  if (filters.level_hint) { where.push('level_hint = ?'); vals.push(String(filters.level_hint)); }
+  return db.prepare(`SELECT * FROM songs ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY title COLLATE NOCASE ASC`).all(...vals);
+};
+const getSong = (id) => {
+  const song = one('SELECT * FROM songs WHERE id = ?', Number(id));
+  if (!song) return null;
+  const lessons = db.prepare('SELECT l.* FROM song_lessons sl JOIN lessons l ON l.id = sl.lesson_id WHERE sl.song_id = ? ORDER BY sl.sort_order ASC, l.id ASC').all(Number(id));
+  return { ...song, lessons };
+};
+const saveSong = (data = {}) => {
+  const now = Date.now();
+  if (data.id) { run('UPDATE songs SET provider_id=@provider_id,title=@title,artist=@artist,level_hint=@level_hint,thumb_url=@thumb_url WHERE id=@id', { id: Number(data.id), provider_id: Number(data.provider_id), title: data.title || '', artist: data.artist || '', level_hint: data.level_hint || '', thumb_url: data.thumb_url || '' }); return getSong(data.id); }
+  const r = db.prepare('INSERT INTO songs (provider_id,title,artist,level_hint,thumb_url,created_at) VALUES (?,?,?,?,?,?)').run(Number(data.provider_id), data.title || '', data.artist || '', data.level_hint || '', data.thumb_url || '', now); return getSong(r.lastInsertRowid);
+};
+const deleteSong = (id) => { run('DELETE FROM song_lessons WHERE song_id = ?', Number(id)); run('DELETE FROM songs WHERE id = ?', Number(id)); };
+const assignSongLessons = (songId, lessonIds = []) => {
+  run('DELETE FROM song_lessons WHERE song_id = ?', Number(songId));
+  const st = db.prepare('INSERT INTO song_lessons (song_id,lesson_id,sort_order) VALUES (?,?,?)');
+  lessonIds.forEach((lid, idx) => { if (Number(lid)) st.run(Number(songId), Number(lid), idx); });
+  return getSong(songId);
+};
+
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

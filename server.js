@@ -592,6 +592,25 @@ apiRouter.delete('/gear-image/:id', (req, res) => {
 });
 
 
+
+async function hydrateLessonVideo(payload = {}) {
+  if (!payload.video_url) return payload;
+  const videoId = extractYouTubeId(payload.video_url);
+  if (!videoId) return payload;
+  payload.video_provider = payload.video_provider || 'youtube';
+  payload.video_id = payload.video_id || videoId;
+  if (payload.title && payload.thumb_url) return payload;
+  try {
+    const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(canonicalUrl)}`, { 'User-Agent': 'faithfulfret' });
+    payload.title = payload.title || meta.title || '';
+    payload.thumb_url = payload.thumb_url || meta.thumbnail_url || '';
+  } catch (error) {
+    // ignore oembed failure
+  }
+  return payload;
+}
+
 apiRouter.get('/oembed', async (req, res) => {
   const rawUrl = String(req.query.url || '').trim();
   if (!rawUrl) return res.status(400).json({ error: 'url is required' });
@@ -616,6 +635,88 @@ apiRouter.get('/oembed', async (req, res) => {
     return res.status(502).json({ error: 'failed to fetch oembed metadata' });
   }
 });
+
+
+apiRouter.get('/training/providers', (req, res) => res.json(Store.listTrainingProviders()));
+apiRouter.post('/training/providers', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  try { return res.status(201).json(Store.saveTrainingProvider(req.body || {})); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.put('/training/providers/:id', (req, res) => {
+  const existing = Store.getTrainingProvider(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  try { return res.json(Store.saveTrainingProvider({ ...existing, ...req.body, id: Number(req.params.id) })); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.delete('/training/providers/:id', (req, res) => { Store.deleteTrainingProvider(req.params.id); return res.json({ ok: true }); });
+
+apiRouter.get('/training/levels', (req, res) => res.json(Store.listLevels(req.query.provider_id)));
+apiRouter.post('/training/levels/bootstrap', (req, res) => {
+  if (!req.body?.provider_id) return res.status(400).json({ error: 'provider_id is required' });
+  try { return res.status(201).json(Store.bootstrapProviderLevels(req.body.provider_id)); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+
+apiRouter.get('/training/modules', (req, res) => res.json(Store.listTrainingModules(req.query.level_id)));
+apiRouter.post('/training/modules', (req, res) => {
+  if (!req.body?.level_id) return res.status(400).json({ error: 'level_id is required' });
+  if (!req.body?.title) return res.status(400).json({ error: 'title is required' });
+  try { return res.status(201).json(Store.saveTrainingModule(req.body || {})); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.put('/training/modules/:id', (req, res) => {
+  const existing = Store.getTrainingModule(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  try { return res.json(Store.saveTrainingModule({ ...existing, ...req.body, id: Number(req.params.id) })); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+
+apiRouter.get('/training/lessons', (req, res) => res.json(Store.listTrainingLessons(req.query || {})));
+apiRouter.get('/training/lessons/:id', (req, res) => {
+  const lesson = Store.getTrainingLesson(req.params.id);
+  if (!lesson) return res.status(404).json({ error: 'not found' });
+  return res.json(lesson);
+});
+apiRouter.post('/training/lessons', async (req, res) => {
+  try {
+    const payload = await hydrateLessonVideo(req.body || {});
+    if (!payload.title && !payload.video_url) return res.status(400).json({ error: 'title or video_url is required' });
+    return res.status(201).json(Store.saveTrainingLesson(payload));
+  } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.put('/training/lessons/:id', async (req, res) => {
+  const existing = Store.getTrainingLesson(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  try {
+    const payload = await hydrateLessonVideo({ ...existing, ...req.body, id: Number(req.params.id) });
+    return res.json(Store.saveTrainingLesson(payload));
+  } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.delete('/training/lessons/:id', (req, res) => { Store.deleteTrainingLesson(req.params.id); return res.json({ ok: true }); });
+
+apiRouter.get('/training/skill-groups', (req, res) => res.json(Store.listSkillGroups()));
+apiRouter.get('/training/skills/:slug/lessons', (req, res) => res.json(Store.getSkillLessons(req.params.slug)));
+
+apiRouter.get('/training/songs', (req, res) => res.json(Store.listSongs(req.query || {})));
+apiRouter.get('/training/songs/:id', (req, res) => {
+  const song = Store.getSong(req.params.id);
+  if (!song) return res.status(404).json({ error: 'not found' });
+  return res.json(song);
+});
+apiRouter.post('/training/songs', (req, res) => {
+  if (!req.body?.provider_id) return res.status(400).json({ error: 'provider_id is required' });
+  if (!req.body?.title) return res.status(400).json({ error: 'title is required' });
+  try { return res.status(201).json(Store.saveSong(req.body || {})); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.put('/training/songs/:id', (req, res) => {
+  const existing = Store.getSong(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  try { return res.json(Store.saveSong({ ...existing, ...req.body, id: Number(req.params.id) })); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+apiRouter.delete('/training/songs/:id', (req, res) => { Store.deleteSong(req.params.id); return res.json({ ok: true }); });
+apiRouter.post('/training/songs/:id/lessons', (req, res) => {
+  const existing = Store.getSong(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const lessonIds = Array.isArray(req.body?.lesson_ids) ? req.body.lesson_ids : [];
+  try { return res.json(Store.assignSongLessons(req.params.id, lessonIds)); } catch (e) { return res.status(400).json({ error: e.message || 'failed' }); }
+});
+
 
 apiRouter.get('/providers', (req, res) => {
   res.json(Store.listProviders());
