@@ -269,7 +269,7 @@ Pages.Gear = {
       Sold: 'df-badge--red',
       Wishlist: 'df-badge--orange',
     }[g.status] || 'df-badge--muted';
-    const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.primary) - Number(a.primary));
+    const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary ?? b.primary) - Number(a.isPrimary ?? a.primary));
     const topLink = sortedLinks.find((l) => l.url);
 
     let wishlistMeta = '';
@@ -311,7 +311,7 @@ Pages.Gear = {
           </div>
           ${sortedLinks.slice(0, 3).map((link) => `
             <div data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto;gap:6px;align-items:end;">
-              <div style="font-size:12px;color:var(--text2);">${link.primary ? '★ Primary' : ''} ${link.label || 'Link'}</div>
+              <div style="font-size:12px;color:var(--text2);">${(link.isPrimary ?? link.primary) ? '★ Primary' : ''} ${link.label || 'Link'}</div>
               <input class="df-input" name="linkInlinePrice" type="number" step="0.01" value="${link.price ?? ''}" placeholder="Price">
               <input class="df-input" name="linkInlineLastChecked" type="date" value="${link.lastChecked || ''}">
               <button type="button" class="df-btn df-btn--outline" data-link-inline-save="1" data-gear-id="${g.id}" data-link-id="${link.id}">Save</button>
@@ -506,8 +506,8 @@ Pages.GearForm = {
         url: row.querySelector('[name="linkUrl"]')?.value || '',
         price: row.querySelector('[name="linkPrice"]')?.value || '',
         lastChecked: row.querySelector('[name="linkLastChecked"]')?.value || '',
-        primary: row.querySelector('[name="linkPrimary"]')?.checked ? 1 : 0,
-      })).filter((l) => l.label || l.url || l.price || l.lastChecked || l.primary);
+        isPrimary: row.querySelector('[name="linkPrimary"]')?.checked ? 1 : 0,
+      })).filter((l) => l.label || l.url || l.price || l.lastChecked || l.isPrimary);
 
       Object.keys(data).forEach((k) => {
         if (data[k] === '') delete data[k];
@@ -554,7 +554,7 @@ Pages.GearForm = {
         <div><label class="df-label">URL</label><input class="df-input" name="linkUrl" value="${link.url || ''}" placeholder="https://..."></div>
         <div><label class="df-label">Price</label><input class="df-input" name="linkPrice" value="${link.price ?? ''}" type="number" step="0.01"></div>
         <div><label class="df-label">Last Checked</label><input class="df-input" name="linkLastChecked" value="${link.lastChecked || ''}" type="date"></div>
-        <div><label class="df-label">Primary</label><input name="linkPrimary" type="checkbox" ${Number(link.primary) ? 'checked' : ''}></div>
+        <div><label class="df-label">Primary</label><input name="linkPrimary" type="checkbox" ${Number(link.isPrimary ?? link.primary) ? 'checked' : ''}></div>
         <button type="button" data-remove-link="1" class="df-btn df-btn--outline" style="height:40px;">Remove</button>
       </div>
     `;
