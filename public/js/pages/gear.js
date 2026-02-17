@@ -30,6 +30,32 @@ function parseDay(value) {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
+function normalizeSortValue(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+  return value;
+}
+
+function compareValues(aValue, bValue, direction = 'asc') {
+  const a = normalizeSortValue(aValue);
+  const b = normalizeSortValue(bValue);
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === 'string' || typeof b === 'string') {
+    const result = String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
+    return direction === 'desc' ? -result : result;
+  }
+  if (a === b) return 0;
+  const result = a < b ? -1 : 1;
+  return direction === 'desc' ? -result : result;
+}
+
 function formatCurrency(v) {
   return Utils.formatPrice(Number(v) || 0);
 }
@@ -129,9 +155,13 @@ Pages.Gear = {
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
         <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
-          <div class="page-title">Gear</div>
+          <div>
+            <div class="page-title">Gear</div>
+            <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
+            </div>
+          </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <a href="/manual.pdf" target="_blank" rel="noopener" class="df-btn df-btn--outline" style="margin-bottom:4px;">Open Manual PDF</a>
             <a href="#/gear/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Gear</a>
           </div>
         </div>
@@ -141,9 +171,6 @@ Pages.Gear = {
       <div class="page-wrap" style="padding:24px 24px 60px;">
         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
           <div style="flex:1 1 760px;min-width:0;">
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
-            </div>
             <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px;align-items:center;">
               <input class="df-input" id="gear-search" placeholder="Quick search: name, brand, type, notes, tags" value="${searchTerm.replace(/"/g, '&quot;')}">
               <button type="button" class="df-btn df-btn--outline" id="gear-advanced-toggle">${this._advancedFilters.expanded ? 'Hide' : 'Show'} filters</button>
@@ -355,27 +382,46 @@ Pages.Gear = {
 
   _sortGear(items, selectedSort) {
     const priorityRank = { Dream: 0, High: 1, Medium: 2, Low: 3 };
-    const sorted = [...items];
-    sorted.sort((a, b) => {
-      if (selectedSort === 'Oldest') return Number(a.createdAt || 0) - Number(b.createdAt || 0);
-      if (selectedSort === 'Name A-Z') return String(a.name || '').localeCompare(String(b.name || ''));
-      if (selectedSort === 'Price low->high') return this._bestPrice(a) - this._bestPrice(b);
+    const sorted = items.map((item, idx) => ({ item, idx }));
+    sorted.sort((aEntry, bEntry) => {
+      const a = aEntry.item;
+      const b = bEntry.item;
+      if (selectedSort === 'Oldest') {
+        const cmp = compareValues(a.createdAt, b.createdAt, 'asc');
+        return cmp || (aEntry.idx - bEntry.idx);
+      }
+      if (selectedSort === 'Name A-Z') {
+        const cmp = compareValues(a.name, b.name, 'asc');
+        return cmp || (aEntry.idx - bEntry.idx);
+      }
+      if (selectedSort === 'Price low->high') {
+        const cmp = compareValues(this._bestPrice(a), this._bestPrice(b), 'asc');
+        return cmp || (aEntry.idx - bEntry.idx);
+      }
       if (selectedSort === 'Priority') {
         const ra = priorityRank[a.priority] ?? 99;
         const rb = priorityRank[b.priority] ?? 99;
-        if (ra !== rb) return ra - rb;
+        const cmp = compareValues(ra === 99 ? null : ra, rb === 99 ? null : rb, 'asc');
+        if (cmp) return cmp;
       }
-      if (selectedSort === 'Most used') return Number(b.usage?.usedCount || 0) - Number(a.usage?.usedCount || 0);
-      if (selectedSort === 'Recently used') return String(b.usage?.lastUsed || '').localeCompare(String(a.usage?.lastUsed || ''));
-      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+      if (selectedSort === 'Most used') {
+        const cmp = compareValues(a.usage?.usedCount, b.usage?.usedCount, 'desc');
+        return cmp || (aEntry.idx - bEntry.idx);
+      }
+      if (selectedSort === 'Recently used') {
+        const cmp = compareValues(parseDay(a.usage?.lastUsed)?.getTime(), parseDay(b.usage?.lastUsed)?.getTime(), 'desc');
+        return cmp || (aEntry.idx - bEntry.idx);
+      }
+      const cmp = compareValues(a.createdAt, b.createdAt, 'desc');
+      return cmp || (aEntry.idx - bEntry.idx);
     });
-    return sorted;
+    return sorted.map((entry) => entry.item);
   },
 
   _bestPrice(gearItem) {
     const prices = (gearItem.linksList || []).map((l) => money(l.price)).filter((v) => Number.isFinite(v) && v > 0);
     if (Number.isFinite(Number(gearItem.targetPrice))) prices.push(Number(gearItem.targetPrice));
-    return prices.length ? Math.min(...prices) : Number.POSITIVE_INFINITY;
+    return prices.length ? Math.min(...prices) : null;
   },
 
   _computeStats(gear) {
