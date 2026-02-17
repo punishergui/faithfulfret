@@ -36,6 +36,23 @@
     };
   }
 
+
+  function readLocalSettings() {
+    const settings = {};
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      settings[key] = localStorage.getItem(key);
+    }
+    return settings;
+  }
+
+  function writeLocalSettings(settings = {}) {
+    Object.entries(settings || {}).forEach(([key, value]) => {
+      if (value == null) localStorage.removeItem(key);
+      else localStorage.setItem(key, String(value));
+    });
+  }
   window.DB = {
     // Sessions
     async saveSess(data) {
@@ -175,7 +192,9 @@
     },
 
     async exportAll() {
-      return api('/api/export');
+      const payload = await api('/api/backup/export');
+      payload.localSettings = readLocalSettings();
+      return payload;
     },
 
     async exportAllZip() {
@@ -198,7 +217,10 @@
     },
 
     async importAll(data) {
-      return api('/api/import', { method: 'POST', body: JSON.stringify(data) });
+      const result = await api('/api/backup/import', { method: 'POST', body: JSON.stringify(data) });
+      if (data && data.localSettings && typeof data.localSettings === 'object') writeLocalSettings(data.localSettings);
+      if (window.Utils?.setTheme) window.Utils.setTheme(localStorage.getItem('theme') || (window.FF_THEME_DEFAULT || 'shed'));
+      return result;
     },
   };
 

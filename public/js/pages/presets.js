@@ -8,7 +8,7 @@ Pages.Presets = {
   instStompOptions: ['Bypass', 'Acs 1/2', '12Str/7Str', 'Res/Sit', 'Evio*/Syn*', 'Bari/Bss*', 'Rmd/Slap', 'Achr/Uvb', 'Wah/Slice', 'Aphs/Aflg', 'Comp/Bst', 'Tsc/Fuzz'],
   ampDialOptions: ['Budda', '6506', '6534', 'XXX', 'Classic', 'Butcher', 'British', 'Peavy(Base)', 'Trace(Bass)', 'Ecous(Acous)', 'Trace(Acous)', 'Twn'],
   effectsDialOptions: ['Bypass', 'Chorus', 'Env', 'Filtr', 'Comp Bst', 'Flanger', 'M.O.G.*', 'Pitch Shifter', 'Reverse', 'Rot. Spkr', 'Phaser', 'Octaver*', 'Tremelo'],
-  ampLedColorOptions: ['green', 'orange', 'red'],
+  ampLedColorOptions: ['green', 'amber', 'red'],
 
   clamp(value, min, max) {
     return Math.min(max, Math.max(min, Number(value) || 0));
