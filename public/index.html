@@ -10,18 +10,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Daily Fret">
 
+  <script src="/js/themes.js"></script>
   <script>
     (function() {
-      var theme = localStorage.getItem('theme') || 'shed';
+      var themes = Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [];
+      var fallback = window.FF_THEME_DEFAULT || 'shed';
+      var map = {};
+      themes.forEach(function (t) { map[t.id] = t; });
+      var rawTheme = localStorage.getItem('theme') || fallback;
+      var theme = map[rawTheme] ? rawTheme : fallback;
       var hand = localStorage.getItem('handedness') || 'right';
-      var accents = {
-        shed: '#ff6a00', faithful: '#c9a96e', stage: '#00ffaa', acoustic: '#b88858',
-        neon_green: '#39ff88', neon_purple: '#b85cff', midnight_blue: '#4db6ff', carbon: '#7de2d1'
-      };
       document.documentElement.dataset.theme = theme;
       document.documentElement.dataset.handedness = hand;
       var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', accents[theme] || accents.shed);
+      var accent = (map[theme] && map[theme].vars && map[theme].vars['--accent']) || '#101010';
+      if (meta) meta.setAttribute('content', accent);
     })();
   </script>
 

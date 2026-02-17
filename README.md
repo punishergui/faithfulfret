@@ -61,7 +61,7 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `exportedAt`, and `counts` so restores stay verifiable across upgrades.
+After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 
 ### Verify endpoints
 
@@ -72,6 +72,7 @@ curl -s http://127.0.0.1:3000/api/gear | jq
 curl -s http://127.0.0.1:3000/api/gear-items | jq
 curl -s http://127.0.0.1:3000/api/sessions | jq
 curl -s http://127.0.0.1:3000/api/stats | jq
+curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
 curl -s http://127.0.0.1:3000/ | head -n 20
 ```
@@ -135,6 +136,8 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 # Smoke-check API on host port 3000 (must map to container 9999)
 curl -fsS http://127.0.0.1:3000/api/health | jq -e ' .ok == true '
+# Backup API smoke (full DB + local settings restore path)
+curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
 
 # If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
 

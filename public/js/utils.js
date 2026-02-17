@@ -2,7 +2,8 @@
 // Exposes window.Utils
 
 window.Utils = {
-  themeIds: ['shed', 'faithful', 'stage', 'acoustic', 'neon_green', 'neon_purple', 'midnight_blue', 'carbon'],
+  getThemes: () => Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [],
+  getThemeMap: () => Object.fromEntries((window.Utils.getThemes()).map((theme) => [theme.id, theme])),
   uuid: () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
 
   // Always use T12:00:00 to avoid timezone day-shift bugs
@@ -211,8 +212,9 @@ window.Utils = {
   },
 
   getTheme: () => {
-    const theme = localStorage.getItem('theme') || 'shed';
-    return window.Utils.themeIds.includes(theme) ? theme : 'shed';
+    const fallback = window.FF_THEME_DEFAULT || 'shed';
+    const theme = localStorage.getItem('theme') || fallback;
+    return window.Utils.getThemeMap()[theme] ? theme : fallback;
   },
 
   applyThemeColorMeta: () => {
@@ -223,7 +225,8 @@ window.Utils = {
   },
 
   setTheme: (theme) => {
-    const value = window.Utils.themeIds.includes(theme) ? theme : 'shed';
+    const fallback = window.FF_THEME_DEFAULT || 'shed';
+    const value = window.Utils.getThemeMap()[theme] ? theme : fallback;
     localStorage.setItem('theme', value);
     document.documentElement.dataset.theme = value;
     window.Utils.applyThemeColorMeta();

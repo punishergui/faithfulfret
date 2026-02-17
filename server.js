@@ -28,70 +28,88 @@ app.use('/api', (req, res, next) => {
   return res.status(503).json({ error: 'maintenance mode: restore in progress' });
 });
 
-function buildJsonExport() {
+function buildJsonExport(localSettings = {}) {
+  const tables = typeof Store.exportAllTables === 'function' ? Store.exportAllTables() : {};
   return {
-    sessions: Store.listSessions(),
-    gear: Store.listGear(false),
-    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary) ? 1 : 0 }))),
-    gear_images: Store.listGear(false).flatMap((item) => (item.imagesList || [])),
-    session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
-    resources: Store.listResources(),
-    presets: Store.listPresets(),
-    exportedAt: new Date().toISOString(),
+    schemaVersion: 3,
+    createdAt: new Date().toISOString(),
+    tables,
+    localSettings: localSettings && typeof localSettings === 'object' ? localSettings : {},
+    // legacy keys for compatibility
+    sessions: tables.sessions || Store.listSessions(),
+    gear: tables.gear_items || Store.listGear(false),
+    gear_links: tables.gear_links || [],
+    gear_images: tables.gear_images || [],
+    session_gear: tables.session_gear || [],
+    resources: tables.resources || Store.listResources(),
+    presets: tables.presets || Store.listPresets(),
   };
 }
 
-
-
 function countExportEntities(payload) {
+  const tables = payload?.tables || {};
+  const count = (name, fallback) => Array.isArray(tables[name]) ? tables[name].length : (Array.isArray(fallback) ? fallback.length : 0);
   return {
-    sessions: Array.isArray(payload.sessions) ? payload.sessions.length : 0,
-    gear: Array.isArray(payload.gear) ? payload.gear.length : 0,
-    gear_links: Array.isArray(payload.gear_links) ? payload.gear_links.length : 0,
-    gear_images: Array.isArray(payload.gear_images) ? payload.gear_images.length : 0,
-    session_gear: Array.isArray(payload.session_gear) ? payload.session_gear.length : 0,
-    resources: Array.isArray(payload.resources) ? payload.resources.length : 0,
-    presets: Array.isArray(payload.presets) ? payload.presets.length : 0,
+    sessions: count('sessions', payload.sessions),
+    gear_items: count('gear_items', payload.gear),
+    gear_links: count('gear_links', payload.gear_links),
+    gear_images: count('gear_images', payload.gear_images),
+    session_gear: count('session_gear', payload.session_gear),
+    resources: count('resources', payload.resources),
+    presets: count('presets', payload.presets),
+    tables: Object.keys(tables).length,
   };
 }
 
 function withExportMeta(payload) {
-  const schemaVersion = 2;
-  const exportedAt = payload.exportedAt || new Date().toISOString();
-  return { ...payload, schemaVersion, exportedAt, counts: countExportEntities(payload) };
+  const schemaVersion = Number(payload?.schemaVersion) || 3;
+  const createdAt = payload?.createdAt || payload?.exportedAt || new Date().toISOString();
+  return { ...payload, schemaVersion, createdAt, exportedAt: createdAt, counts: countExportEntities(payload) };
 }
 
 function validateImportPayload(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid import payload');
-  const requiredArrays = ['sessions', 'gear', 'resources', 'presets'];
-  requiredArrays.forEach((key) => {
-    if (payload[key] != null && !Array.isArray(payload[key])) throw new Error(`invalid ${key}: expected array`);
-  });
+  if (payload.tables != null && (typeof payload.tables !== 'object' || Array.isArray(payload.tables))) throw new Error('invalid tables payload');
+}
+
+function normalizeLegacyTables(payload) {
+  if (payload.tables && typeof payload.tables === 'object') return payload.tables;
+  return {
+    sessions: Array.isArray(payload.sessions) ? payload.sessions : [],
+    gear_items: Array.isArray(payload.gear) ? payload.gear : [],
+    gear_links: Array.isArray(payload.gear_links) ? payload.gear_links : [],
+    gear_images: Array.isArray(payload.gear_images) ? payload.gear_images : [],
+    session_gear: Array.isArray(payload.session_gear || payload.sessionGear) ? (payload.session_gear || payload.sessionGear) : [],
+    resources: Array.isArray(payload.resources) ? payload.resources : [],
+    presets: Array.isArray(payload.presets) ? payload.presets : [],
+  };
 }
 
 function restoreFromPayload(payload) {
   validateImportPayload(payload);
-  Store.clearAll();
-  for (const row of (payload.sessions || [])) Store.saveSession(row);
-  for (const row of (payload.gear || [])) {
-    const saved = Store.saveGear(row);
-    if (Array.isArray(row.linksList) && row.linksList.length) Store.replaceGearLinks(saved.id, row.linksList);
+  if (typeof Store.ensureSchema === 'function') Store.ensureSchema();
+  const tables = normalizeLegacyTables(payload);
+  if (typeof Store.importAllTables === 'function') {
+    Store.importAllTables(tables);
+  } else {
+    Store.clearAll();
+    for (const row of (tables.sessions || [])) Store.saveSession(row);
+    for (const row of (tables.gear_items || [])) Store.saveGear(row);
+    for (const row of (tables.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
+    for (const row of (tables.gear_images || [])) {
+      if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
+    }
+    const grouped = {};
+    (tables.session_gear || []).forEach((row) => {
+      if (!row?.sessionId || !row?.gearId) return;
+      if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
+      grouped[row.sessionId].push(row.gearId);
+    });
+    Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
+    for (const row of (tables.resources || [])) Store.saveResource(row);
+    for (const row of (tables.presets || [])) Store.savePreset(row);
   }
-  for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
-  for (const row of (payload.gear_images || [])) {
-    if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
-  }
-  const sessionGear = payload.session_gear || payload.sessionGear || [];
-  const grouped = {};
-  sessionGear.forEach((row) => {
-    if (!row?.sessionId || !row?.gearId) return;
-    if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
-    grouped[row.sessionId].push(row.gearId);
-  });
-  Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
-  for (const row of (payload.resources || [])) Store.saveResource(row);
-  for (const row of (payload.presets || [])) Store.savePreset(row);
-  return countExportEntities(payload);
+  return countExportEntities({ ...payload, tables });
 }
 
 function copyTreeIntoZip(zip, basePath, zipPath) {
@@ -482,6 +500,10 @@ apiRouter.get('/export', (req, res) => {
   res.json(withExportMeta(buildJsonExport()));
 });
 
+apiRouter.get('/backup/export', (req, res) => {
+  res.json(withExportMeta(buildJsonExport()));
+});
+
 
 
 function createSafeSqliteBackup() {
@@ -537,6 +559,16 @@ apiRouter.post('/import', (req, res) => {
     const payload = req.body || {};
     const counts = restoreFromPayload(payload);
     res.json({ ok: true, counts, schemaVersion: payload.schemaVersion || 1 });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'invalid import payload' });
+  }
+});
+
+apiRouter.post('/backup/import', (req, res) => {
+  try {
+    const payload = req.body || {};
+    const counts = restoreFromPayload(payload);
+    res.json({ ok: true, counts, schemaVersion: payload.schemaVersion || 1, localSettings: payload.localSettings || {} });
   } catch (e) {
     res.status(400).json({ error: e.message || 'invalid import payload' });
   }

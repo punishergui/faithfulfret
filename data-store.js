@@ -451,6 +451,43 @@ const backupToFile = (filePath) => {
   return db.backup(filePath);
 };
 
+
+const listUserTables = () => db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC").all().map((row) => row.name);
+const listTableRows = (table) => db.prepare(`SELECT * FROM "${table.replace(/"/g, '""')}"`).all();
+const exportAllTables = () => {
+  const tables = {};
+  listUserTables().forEach((table) => {
+    tables[table] = listTableRows(table);
+  });
+  return tables;
+};
+const importAllTables = (tables = {}) => {
+  if (!tables || typeof tables !== 'object' || Array.isArray(tables)) throw new Error('invalid backup tables payload');
+  ensureSchema();
+  const tableNames = listUserTables();
+  const tx = db.transaction(() => {
+    db.exec('PRAGMA foreign_keys = OFF;');
+    tableNames.forEach((table) => {
+      db.prepare(`DELETE FROM "${table.replace(/"/g, '""')}"`).run();
+    });
+    tableNames.forEach((table) => {
+      const rows = Array.isArray(tables[table]) ? tables[table] : [];
+      if (!rows.length) return;
+      const cols = db.prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`).all().map((col) => col.name);
+      rows.forEach((row) => {
+        const keys = cols.filter((key) => Object.prototype.hasOwnProperty.call(row || {}, key));
+        if (!keys.length) return;
+        const sql = `INSERT INTO "${table.replace(/"/g, '""')}" (${keys.map((k) => `"${k.replace(/"/g, '""')}"`).join(',')}) VALUES (${keys.map((k) => `@${k}`).join(',')})`;
+        db.prepare(sql).run(row);
+      });
+    });
+    db.exec('PRAGMA foreign_keys = ON;');
+  });
+  tx();
+  checkpointWal();
+  return tableNames;
+};
+
 const getDbInfo = () => {
   const file = fs.existsSync(dbPath) ? fs.statSync(dbPath) : null;
   return {
@@ -466,4 +503,4 @@ const getDbInfo = () => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll, checkpointWal, backupToFile, close, reopen };
+module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

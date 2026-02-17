@@ -316,7 +316,7 @@ Pages.Progress = {
           <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Data Management</div>
           <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Before any server update, export a backup file. Changing browser profile, domain, or port can hide local IndexedDB data.</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button id="export-btn" class="df-btn df-btn--outline">Export All Data</button>
+            <button id="export-btn" class="df-btn df-btn--outline">Export Full Backup (JSON)</button>
             <div style="position:relative;">
               <input type="file" id="import-zip-file" accept=".zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;">
               <button class="df-btn df-btn--outline">Import Backup ZIP</button>
@@ -366,11 +366,12 @@ Pages.Progress = {
     const exportBtn = container.querySelector('#export-btn');
     if (exportBtn) {
       exportBtn.addEventListener('click', async () => {
-        const blob = await DB.exportAllZip();
+        const payload = await DB.exportAll();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `faithfulfret-backup-${Utils.today()}.zip`;
+        a.download = `faithfulfret-backup-${Utils.today()}.json`;
         a.click();
         URL.revokeObjectURL(url);
       });
@@ -422,9 +423,10 @@ Pages.Progress = {
 
             const result = await DB.importAll(data);
             const counts = result?.counts || {};
+            const settingsCount = Object.keys(data.localSettings || {}).length;
 
             importStatus.style.display = 'block';
-            importStatus.textContent = `✓ Imported ${counts.sessions ?? sessionCount} sessions, ${counts.gear ?? gearCount} gear, ${counts.resources ?? resourceCount} resources, ${counts.presets ?? (data.presets || []).length} presets.`;
+            importStatus.textContent = `✓ Imported ${(counts.sessions ?? sessionCount)} sessions, ${(counts.gear_items ?? gearCount)} gear, ${(counts.resources ?? resourceCount)} resources, ${(counts.presets ?? (data.presets || []).length)} presets, ${settingsCount} local settings.`;
 
             setTimeout(() => {
               importFile.value = '';

@@ -11,18 +11,8 @@ Pages.Settings = {
     const defaultSessionMinutes = Utils.getDefaultSessionMinutes();
     const displayName = Utils.getDisplayName();
 
-    const themes = [
-      { id: 'shed', name: 'Shed', swatches: ['#0f0f0d', '#1d1d18', '#ff6a00', '#d8d8cf'] },
-      { id: 'faithful', name: 'Faithful', swatches: ['#14100d', '#2a2219', '#c9a96e', '#e9ddca'] },
-      { id: 'stage', name: 'Stage', swatches: ['#070b10', '#152132', '#00ffaa', '#d7f4ea'] },
-      { id: 'acoustic', name: 'Acoustic', swatches: ['#26211b', '#4a3d30', '#b88858', '#f1e1cc'] },
-      { id: 'neon_green', name: 'Neon Green', swatches: ['#040906', '#13211a', '#42f08f', '#e7f3ec'] },
-      { id: 'neon_purple', name: 'Neon Purple', swatches: ['#08060f', '#21183a', '#b567f3', '#ece8f7'] },
-      { id: 'carbon_blue', name: 'Carbon Blue', swatches: ['#080c12', '#1f2d3d', '#4caee9', '#e5edf4'] },
-      { id: 'blood_moon', name: 'Blood Moon', swatches: ['#0b0709', '#2d1c23', '#bd4a5b', '#f0e7e9'] },
-      { id: 'midnight_blue', name: 'Midnight Blue', swatches: ['#070d16', '#1d3250', '#4db6ff', '#e3f3ff'] },
-      { id: 'carbon', name: 'Carbon', swatches: ['#111214', '#29303a', '#7de2d1', '#e5edf5'] },
-    ];
+    const themes = Utils.getThemes();
+
 
     app.innerHTML = `
       <div class="page-hero">
@@ -40,9 +30,12 @@ Pages.Settings = {
               <button type="button" class="ff-theme-opt ${t.id === theme ? 'is-active' : ''}" data-theme-value="${t.id}">
                 <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text1);margin-bottom:8px;">${t.name}</div>
                 <div style="display:flex;gap:6px;margin-bottom:8px;">
-                  ${t.swatches.map((c) => `<span style="width:18px;height:18px;border:1px solid rgba(0,0,0,.22);background:${c};display:inline-block;"></span>`).join('')}
+                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--bg']};display:inline-block;"></span>
+                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--panel']};display:inline-block;"></span>
+                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--accent']};display:inline-block;"></span>
+                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--text']};display:inline-block;"></span>
                 </div>
-                <div class="ff-theme-opt__preview"></div>
+                <div class="ff-theme-opt__preview" style="--theme-preview-accent:${t.vars['--accent']};--theme-preview-glow:${t.vars['--glow']};"></div>
               </button>
             `).join('')}
           </div>

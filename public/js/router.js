@@ -42,6 +42,7 @@
       if (m) {
         // Page transition
         const app = document.getElementById('app');
+        app.classList.add('ff-panel--page');
         app.classList.add('page-out');
 
         setTimeout(() => {
