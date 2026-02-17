@@ -55,12 +55,12 @@
 .manual-hotspots__image { width: 100%; border-radius: 8px; border: 1px solid var(--line2); }
 .manual-hotspot-dot {
   position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 999px;
-  background: #ff7a1a; color: #000; font-weight: 700; font-size: 11px;
+  background: var(--accent); color: var(--bg); font-weight: 700; font-size: 11px;
 }
 .manual-hotspots__list { margin: 12px 0 0 20px; }
 .manual-hotspots__list li { margin-bottom: 8px; }
 .manual-hotspots__list li span { display: block; color: var(--text2); }
-.manual-hotspots__item--active { background: rgba(255,122,26,.15); }
+.manual-hotspots__item--active { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 
 .manual-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .manual-card, .manual-result, .manual-panel {
