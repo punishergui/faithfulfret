@@ -142,6 +142,7 @@ curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt,
 docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/public/js/themes.js\");console.log(window.FF_THEMES.length)'"
 
 # If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
+# UI polish deploy check: verify Dashboard, Sessions, Stats, and Settings headers render full-width with compact, uniform hero height.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 
 # Verify DB path after deploy
