@@ -73,6 +73,9 @@ curl -s http://127.0.0.1:3000/api/gear | jq
 curl -s http://127.0.0.1:3000/api/gear-items | jq
 curl -s http://127.0.0.1:3000/api/sessions | jq
 curl -s http://127.0.0.1:3000/api/stats | jq
+curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ' | jq
+curl -s http://127.0.0.1:3000/api/training-videos | jq
+curl -s http://127.0.0.1:3000/api/video-playlists | jq
 curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
 curl -s http://127.0.0.1:3000/uploads/preset-audio/ | head -n 20
