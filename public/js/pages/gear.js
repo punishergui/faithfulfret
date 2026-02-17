@@ -3,20 +3,26 @@
 window.Pages = window.Pages || {};
 
 function normalizeGearStatus(status) {
-  // Canonical status keys used by filters: owned | wishlist | sold.
+  // Canonical display statuses used by UI + filtering.
   const normalizedStatus = String(status || '').trim().toLowerCase();
-  if (!normalizedStatus || normalizedStatus === 'owned' || normalizedStatus === 'own' || normalizedStatus === 'own it') return 'owned';
-  if (normalizedStatus === 'wishlist' || normalizedStatus === 'wish list' || normalizedStatus === 'wanted' || normalizedStatus === 'watching' || normalizedStatus === 'on loan') return 'wishlist';
-  if (normalizedStatus === 'sold') return 'sold';
-  return 'owned';
+  if (!normalizedStatus || normalizedStatus === 'owned' || normalizedStatus === 'own' || normalizedStatus === 'own it') return 'Owned';
+  if (normalizedStatus === 'wishlist' || normalizedStatus === 'wish list' || normalizedStatus === 'wanted' || normalizedStatus === 'watching' || normalizedStatus === 'on loan') return 'Wishlist';
+  if (normalizedStatus === 'sold') return 'Sold';
+  return 'Owned';
 }
 
 function gearStatusLabel(status) {
+  return normalizeGearStatus(status);
+}
+
+function normalizeStatusFilterValue(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'all' || raw === 'owned' || raw === 'wishlist' || raw === 'sold') return raw;
   return {
-    owned: 'Owned',
-    wishlist: 'Wishlist',
-    sold: 'Sold',
-  }[normalizeGearStatus(status)] || 'Owned';
+    Owned: 'owned',
+    Wishlist: 'wishlist',
+    Sold: 'sold',
+  }[normalizeGearStatus(value)] || 'all';
 }
 
 function money(v) {
@@ -110,13 +116,13 @@ Pages.Gear = {
       localStorage.setItem(advancedStorageKey, JSON.stringify(this._advancedFilters));
       this._filtersInitialized = true;
     }
-    const storedFilterRaw = String(localStorage.getItem(filterStorageKey) || '').trim().toLowerCase();
-    const storedFilter = storedFilterRaw === 'all' ? 'all' : normalizeGearStatus(storedFilterRaw);
-    const selectedFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'all');
+    const storedFilterRaw = String(localStorage.getItem(filterStorageKey) || '').trim();
+    const storedFilter = normalizeStatusFilterValue(storedFilterRaw);
+    const activeStatusFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'all');
     const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
     const searchTerm = this._searchTerm ?? (localStorage.getItem(searchStorageKey) || '');
     const advanced = this._advancedFilters || JSON.parse(localStorage.getItem(advancedStorageKey) || '{}');
-    this._selectedFilter = selectedFilter;
+    this._selectedFilter = activeStatusFilter;
     this._selectedSort = selectedSort;
     this._searchTerm = searchTerm;
     this._advancedFilters = {
@@ -131,8 +137,8 @@ Pages.Gear = {
     };
 
     const stats = Utils.computeGearStats(gear);
-    const filtered = this._filterGear(gear, selectedFilter, searchTerm, this._advancedFilters);
-    const isDefaultFilterState = selectedFilter === 'all'
+    const filtered = this._filterGear(gear, activeStatusFilter, searchTerm, this._advancedFilters);
+    const isDefaultFilterState = activeStatusFilter === 'all'
       && !String(searchTerm || '').trim()
       && (this._advancedFilters.category || 'All') === 'All'
       && (this._advancedFilters.brand || 'All') === 'All'
@@ -158,7 +164,7 @@ Pages.Gear = {
           <div>
             <div class="page-title">Gear</div>
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
+              ${filters.map((f) => `<button type="button" class="df-btn ${activeStatusFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
             </div>
           </div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -204,7 +210,7 @@ Pages.Gear = {
     app.querySelectorAll('[data-status-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const status = btn.getAttribute('data-status-filter');
-        this._selectedFilter = status === 'all' ? 'all' : normalizeGearStatus(status);
+        this._selectedFilter = normalizeStatusFilterValue(status);
         localStorage.setItem(filterStorageKey, this._selectedFilter);
         this.render();
       });
@@ -308,8 +314,6 @@ Pages.Gear = {
     return `
       <div class="gear-carousel" data-gear-carousel="${g.id}" data-count="${images.length}">
         ${images.map((src, index) => `<img class="gear-card__photo ${index === 0 ? 'is-active' : ''}" src="${src}" alt="${g.name || 'Gear photo'} ${index + 1}" loading="lazy" data-gear-slide="${index}">`).join('')}
-        <button type="button" class="gear-carousel__arrow gear-carousel__arrow--left" data-gear-prev aria-label="Previous image">‹</button>
-        <button type="button" class="gear-carousel__arrow gear-carousel__arrow--right" data-gear-next aria-label="Next image">›</button>
       </div>
     `;
   },
@@ -332,24 +336,20 @@ Pages.Gear = {
         if (interval) clearInterval(interval);
         interval = null;
       };
-      el.querySelector('[data-gear-prev]')?.addEventListener('click', (event) => {
-        event.stopPropagation();
-        stop();
-        setIndex(index - 1);
-      });
-      el.querySelector('[data-gear-next]')?.addEventListener('click', (event) => {
-        event.stopPropagation();
-        stop();
-        setIndex(index + 1);
-      });
       el.addEventListener('mouseenter', stop);
       el.addEventListener('mouseleave', start);
       start();
     });
   },
 
-  _filterGear(gear, selectedFilter, searchTerm, advanced) {
-    let visible = selectedFilter === 'all' ? gear : gear.filter((g) => normalizeGearStatus(g.status) === selectedFilter);
+  _filterGear(gear, activeStatusFilter, searchTerm, advanced) {
+    const filterToStatus = {
+      owned: 'Owned',
+      wishlist: 'Wishlist',
+      sold: 'Sold',
+    };
+    const statusValue = filterToStatus[activeStatusFilter] || null;
+    let visible = statusValue ? gear.filter((g) => normalizeGearStatus(g.status) === statusValue) : gear;
     const needle = String(searchTerm || '').trim().toLowerCase();
     if (needle) {
       visible = visible.filter((g) => {
@@ -361,13 +361,13 @@ Pages.Gear = {
     if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.displayType) === advanced.category);
     if (advanced.brand && advanced.brand !== 'All') visible = visible.filter((g) => g.brand === advanced.brand);
     if (advanced.linksOnly) visible = visible.filter((g) => (g.linksList || []).some((l) => l.url));
-    if (advanced.hasTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'wishlist' && Number.isFinite(Number(g.targetPrice)));
-    if (advanced.missingTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'wishlist' && !Number.isFinite(Number(g.targetPrice)));
+    if (advanced.hasTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'Wishlist' && Number.isFinite(Number(g.targetPrice)));
+    if (advanced.missingTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'Wishlist' && !Number.isFinite(Number(g.targetPrice)));
     const min = Number(advanced.minPrice);
     const max = Number(advanced.maxPrice);
     if (Number.isFinite(min) || Number.isFinite(max)) {
       visible = visible.filter((g) => {
-        if (normalizeGearStatus(g.status) !== 'wishlist') return false;
+        if (normalizeGearStatus(g.status) !== 'Wishlist') return false;
         const best = this._bestPrice(g);
         const target = Number(g.targetPrice);
         const p = Number.isFinite(best) ? best : target;
@@ -465,15 +465,15 @@ Pages.Gear = {
     const manualUrl = g.manualUrl || '/manual.pdf';
     const primaryUrl = g.primaryUrl || g.primaryLink || g.primary || g.buyUrl || '';
     const statusBadge = {
-      owned: 'df-badge--green',
-      sold: 'df-badge--red',
-      wishlist: 'df-badge--orange',
+      Owned: 'df-badge--green',
+      Sold: 'df-badge--red',
+      Wishlist: 'df-badge--orange',
     }[normalizeGearStatus(g.status)] || 'df-badge--muted';
     const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
     const topLink = sortedLinks.find((l) => l.url);
 
     let wishlistMeta = '';
-    if (normalizeGearStatus(g.status) === 'wishlist') {
+    if (normalizeGearStatus(g.status) === 'Wishlist') {
       const bestPrice = this._bestPrice(g);
       const bestLink = sortedLinks.find((l) => money(l.price) === bestPrice);
       const targetPrice = Number(g.targetPrice);
@@ -500,7 +500,7 @@ Pages.Gear = {
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
-          ${normalizeGearStatus(g.status) === 'owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+          ${normalizeGearStatus(g.status) === 'Owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
             <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
             <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           </div>` : ''}
