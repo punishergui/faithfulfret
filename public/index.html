@@ -10,6 +10,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Daily Fret">
 
+  <script>
+    (function() {
+      var theme = localStorage.getItem('theme') || 'shed';
+      var hand = localStorage.getItem('handedness') || 'right';
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.handedness = hand;
+    })();
+  </script>
+
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -63,6 +72,7 @@
         <a href="#/presets" class="nav__link" data-route="presets">Presets</a>
         <a href="#/progress" class="nav__link" data-route="progress">Stats</a>
         <a href="#/tools" class="nav__link" data-route="tools">Tools</a>
+        <a href="#/settings" class="nav__link" data-route="settings">Settings</a>
       </div>
       <div class="nav__actions">
         <a href="#/log" class="nav__log-btn">+ LOG</a>
@@ -79,6 +89,7 @@
       <a href="#/presets" class="nav__mobile-link">Presets</a>
       <a href="#/progress" class="nav__mobile-link">Stats</a>
       <a href="#/tools" class="nav__mobile-link">Tools</a>
+      <a href="#/settings" class="nav__mobile-link">Settings</a>
       <a href="#/log" class="nav__mobile-link nav__mobile-link--cta">+ Log Session</a>
     </div>
   </nav>
@@ -103,6 +114,7 @@
   <script type="module" src="/js/pages/tools/scales.js"></script>
   <script type="module" src="/js/pages/tools/bpm-guide.js"></script>
   <script type="module" src="/js/pages/tools/tuning.js"></script>
+  <script type="module" src="/js/pages/settings.js"></script>
   <script type="module" src="/js/router.js"></script>
   <script type="module" src="/js/app.js"></script>
 
