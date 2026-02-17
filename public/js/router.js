@@ -13,6 +13,13 @@
     { pattern: /^#\/gear\/edit\/(.+)$/,           handler: (m) => Pages.GearForm.render(m[1]) },
     { pattern: /^#\/gear$/,                       handler: () => Pages.Gear.render() },
     { pattern: /^#\/resources\/videos\/new$/,       handler: () => Pages.ResourceVideosEdit.render(null) },
+    { pattern: /^#\/training$/,                   handler: () => Pages.TrainingHome.render() },
+    { pattern: /^#\/training\/providers$/,         handler: () => Pages.TrainingProviders.render() },
+    { pattern: /^#\/training\/provider\/(\d+)$/,   handler: (m) => Pages.TrainingProvider.render(m[1]) },
+    { pattern: /^#\/training\/course\/(\d+)$/,     handler: (m) => Pages.TrainingCourse.render(m[1]) },
+    { pattern: /^#\/training\/module\/(\d+)$/,     handler: (m) => Pages.TrainingModule.render(m[1]) },
+    { pattern: /^#\/training\/lesson\/(\d+)$/,     handler: (m) => Pages.TrainingLesson.render(m[1]) },
+    { pattern: /^#\/training\/session-builder$/,     handler: () => Pages.TrainingSessionBuilder.render() },
     { pattern: /^#\/resources\/videos\/(\d+)\/edit$/, handler: (m) => Pages.ResourceVideosEdit.render(m[1]) },
     { pattern: /^#\/resources\/videos\/(\d+)$/,      handler: (m) => Pages.ResourceVideoDetail.render(m[1]) },
     { pattern: /^#\/resources\/videos(?:\?.*)?$/,     handler: () => Pages.ResourceVideosList.render() },
@@ -92,6 +99,9 @@
       }
       else if (hash.startsWith('#/resources')) {
         if (href.includes('resources')) link.classList.add('active');
+      }
+      else if (hash.startsWith('#/training')) {
+        if (href.includes('training')) link.classList.add('active');
       }
       else if (hash.startsWith('#/presets')) {
         if (href.includes('presets')) link.classList.add('active');
