@@ -62,8 +62,22 @@ jobs:
             -p 3000:9999 \
             faithfulfret:ci-smoke
 
-          # Wait up to ~30s for health
-          for i in {1..30}; do
+          # Immediate debug snapshot (non-fatal)
+          docker ps -a || true
+          docker inspect --format='status={{.State.Status}} running={{.State.Running}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}}' faithfulfret-smoke || true
+          docker logs faithfulfret-smoke || true
+
+          # Wait up to 60s for health, failing fast if the container exits
+          for i in {1..60}; do
+            state="$(docker inspect --format='{{.State.Status}}' faithfulfret-smoke 2>/dev/null || true)"
+            if [[ "$state" != "running" ]]; then
+              echo "Container exited before health check succeeded (state=$state)"
+              docker ps -a || true
+              docker inspect faithfulfret-smoke || true
+              docker logs faithfulfret-smoke || true
+              exit 1
+            fi
+
             if curl -fsS "http://127.0.0.1:3000/api/health" >/dev/null; then
               echo "Smoke OK"
               exit 0
@@ -72,6 +86,8 @@ jobs:
           done
 
           echo "Smoke FAILED — dumping logs"
+          docker ps -a || true
+          docker inspect faithfulfret-smoke || true
           docker logs faithfulfret-smoke || true
           exit 1
 
