@@ -3,18 +3,20 @@
 window.Pages = window.Pages || {};
 
 function normalizeGearStatus(status) {
-  const normalizedStatus = typeof status === 'string' ? status.trim() : status;
-  const map = {
-    'Own it': 'Owned',
+  // Canonical status keys used by filters: owned | wishlist | sold.
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  if (!normalizedStatus || normalizedStatus === 'owned' || normalizedStatus === 'own' || normalizedStatus === 'own it') return 'owned';
+  if (normalizedStatus === 'wishlist' || normalizedStatus === 'wish list' || normalizedStatus === 'wanted' || normalizedStatus === 'watching' || normalizedStatus === 'on loan') return 'wishlist';
+  if (normalizedStatus === 'sold') return 'sold';
+  return 'owned';
+}
+
+function gearStatusLabel(status) {
+  return {
     owned: 'Owned',
-    'Wish List': 'Wishlist',
     wishlist: 'Wishlist',
-    Watching: 'Wishlist',
-    watching: 'Wishlist',
-    'On Loan': 'Wishlist',
     sold: 'Sold',
-  };
-  return map[normalizedStatus] || normalizedStatus || 'Owned';
+  }[normalizeGearStatus(status)] || 'Owned';
 }
 
 function money(v) {
@@ -63,9 +65,9 @@ Pages.Gear = {
     const sortStorageKey = 'df:gearSort';
     const advancedStorageKey = 'df:gearAdvancedFilters';
     const searchStorageKey = 'df:gearSearch';
-    const filters = ['All', 'Owned', 'Wishlist', 'Sold'];
+    const filters = ['all', 'owned', 'wishlist', 'sold'];
     if (!this._filtersInitialized) {
-      this._selectedFilter = 'All';
+      this._selectedFilter = 'all';
       this._searchTerm = '';
       this._advancedFilters = {
         category: 'All',
@@ -77,13 +79,14 @@ Pages.Gear = {
         missingTargetPrice: false,
         expanded: false,
       };
-      localStorage.setItem(filterStorageKey, 'All');
+      localStorage.setItem(filterStorageKey, 'all');
       localStorage.setItem(searchStorageKey, '');
       localStorage.setItem(advancedStorageKey, JSON.stringify(this._advancedFilters));
       this._filtersInitialized = true;
     }
-    const storedFilter = normalizeGearStatus(localStorage.getItem(filterStorageKey) || '');
-    const selectedFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'All');
+    const storedFilterRaw = String(localStorage.getItem(filterStorageKey) || '').trim().toLowerCase();
+    const storedFilter = storedFilterRaw === 'all' ? 'all' : normalizeGearStatus(storedFilterRaw);
+    const selectedFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'all');
     const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
     const searchTerm = this._searchTerm ?? (localStorage.getItem(searchStorageKey) || '');
     const advanced = this._advancedFilters || JSON.parse(localStorage.getItem(advancedStorageKey) || '{}');
@@ -103,7 +106,7 @@ Pages.Gear = {
 
     const stats = Utils.computeGearStats(gear);
     const filtered = this._filterGear(gear, selectedFilter, searchTerm, this._advancedFilters);
-    const isDefaultFilterState = selectedFilter === 'All'
+    const isDefaultFilterState = selectedFilter === 'all'
       && !String(searchTerm || '').trim()
       && (this._advancedFilters.category || 'All') === 'All'
       && (this._advancedFilters.brand || 'All') === 'All'
@@ -139,7 +142,7 @@ Pages.Gear = {
         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
           <div style="flex:1 1 760px;min-width:0;">
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f}</button>`).join('')}
+              ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
             </div>
             <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px;align-items:center;">
               <input class="df-input" id="gear-search" placeholder="Quick search: name, brand, type, notes, tags" value="${searchTerm.replace(/"/g, '&quot;')}">
@@ -174,8 +177,8 @@ Pages.Gear = {
     app.querySelectorAll('[data-status-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const status = btn.getAttribute('data-status-filter');
-        this._selectedFilter = status;
-        localStorage.setItem(filterStorageKey, status);
+        this._selectedFilter = status === 'all' ? 'all' : normalizeGearStatus(status);
+        localStorage.setItem(filterStorageKey, this._selectedFilter);
         this.render();
       });
     });
@@ -215,7 +218,7 @@ Pages.Gear = {
     });
 
     app.querySelector('#gear-reset-filters')?.addEventListener('click', () => {
-      this._selectedFilter = 'All';
+      this._selectedFilter = 'all';
       this._searchTerm = '';
       this._advancedFilters = {
         ...this._advancedFilters,
@@ -227,7 +230,7 @@ Pages.Gear = {
         hasTargetPrice: false,
         missingTargetPrice: false,
       };
-      localStorage.setItem(filterStorageKey, 'All');
+      localStorage.setItem(filterStorageKey, 'all');
       localStorage.setItem(searchStorageKey, '');
       saveAdvanced();
       this.render();
@@ -319,7 +322,7 @@ Pages.Gear = {
   },
 
   _filterGear(gear, selectedFilter, searchTerm, advanced) {
-    let visible = selectedFilter === 'All' ? gear : gear.filter((g) => g.status === selectedFilter);
+    let visible = selectedFilter === 'all' ? gear : gear.filter((g) => normalizeGearStatus(g.status) === selectedFilter);
     const needle = String(searchTerm || '').trim().toLowerCase();
     if (needle) {
       visible = visible.filter((g) => {
@@ -331,13 +334,13 @@ Pages.Gear = {
     if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.displayType) === advanced.category);
     if (advanced.brand && advanced.brand !== 'All') visible = visible.filter((g) => g.brand === advanced.brand);
     if (advanced.linksOnly) visible = visible.filter((g) => (g.linksList || []).some((l) => l.url));
-    if (advanced.hasTargetPrice) visible = visible.filter((g) => g.status === 'Wishlist' && Number.isFinite(Number(g.targetPrice)));
-    if (advanced.missingTargetPrice) visible = visible.filter((g) => g.status === 'Wishlist' && !Number.isFinite(Number(g.targetPrice)));
+    if (advanced.hasTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'wishlist' && Number.isFinite(Number(g.targetPrice)));
+    if (advanced.missingTargetPrice) visible = visible.filter((g) => normalizeGearStatus(g.status) === 'wishlist' && !Number.isFinite(Number(g.targetPrice)));
     const min = Number(advanced.minPrice);
     const max = Number(advanced.maxPrice);
     if (Number.isFinite(min) || Number.isFinite(max)) {
       visible = visible.filter((g) => {
-        if (g.status !== 'Wishlist') return false;
+        if (normalizeGearStatus(g.status) !== 'wishlist') return false;
         const best = this._bestPrice(g);
         const target = Number(g.targetPrice);
         const p = Number.isFinite(best) ? best : target;
@@ -416,15 +419,15 @@ Pages.Gear = {
     const manualUrl = g.manualUrl || '/manual.pdf';
     const primaryUrl = g.primaryUrl || g.primaryLink || g.primary || g.buyUrl || '';
     const statusBadge = {
-      Owned: 'df-badge--green',
-      Sold: 'df-badge--red',
-      Wishlist: 'df-badge--orange',
-    }[g.status] || 'df-badge--muted';
+      owned: 'df-badge--green',
+      sold: 'df-badge--red',
+      wishlist: 'df-badge--orange',
+    }[normalizeGearStatus(g.status)] || 'df-badge--muted';
     const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
     const topLink = sortedLinks.find((l) => l.url);
 
     let wishlistMeta = '';
-    if (g.status === 'Wishlist') {
+    if (normalizeGearStatus(g.status) === 'wishlist') {
       const bestPrice = this._bestPrice(g);
       const bestLink = sortedLinks.find((l) => money(l.price) === bestPrice);
       const targetPrice = Number(g.targetPrice);
@@ -451,13 +454,13 @@ Pages.Gear = {
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
-          ${g.status === 'Owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+          ${normalizeGearStatus(g.status) === 'owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
             <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
             <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           </div>` : ''}
           <div class="gear-card__footer">
             ${g.boughtPrice || g.price ? `<span class="gear-card__price">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
-            ${g.status ? `<span class="df-badge ${statusBadge}">${g.status}</span>` : ''}
+            ${g.status ? `<span class="df-badge ${statusBadge}">${gearStatusLabel(g.status)}</span>` : ''}
             <div class="gear-card__links">
               ${topLink ? `<a href="${topLink.url}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">${topLink.label || 'Link'}</a>` : ''}
               ${primaryUrl ? `<a href="${primaryUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}

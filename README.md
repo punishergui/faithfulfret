@@ -102,6 +102,7 @@ docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /d
 docker exec -it daily-fret sh -lc "node --check /app/server.js"
 docker exec -it daily-fret sh -lc "node --check /app/data-store.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/router.js"
 # Hotfix validation: gear_links now uses isPrimary (not SQLite reserved word primary)
 docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA table_info(gear_links);" | rg -n isPrimary'
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "SqliteError|isPrimary|primaryUrl"
@@ -109,6 +110,9 @@ docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-for
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/progress.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/stats.js" # only if stats.js exists
+# regression check shortcuts
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
+docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/progress.js || node --check /app/public/js/pages/stats.js"
 # Verify presets editor script syntax in running container
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke checks after deploy
