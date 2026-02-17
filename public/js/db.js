@@ -200,6 +200,56 @@
 
 
 
+
+    async getProviders() { return api('/api/providers'); },
+    async saveProvider(data) {
+      return data.id ? api(`/api/providers/${data.id}`, { method: 'PUT', body: JSON.stringify(data) }) : api('/api/providers', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async getCourses(providerId) {
+      const q = providerId ? `?providerId=${encodeURIComponent(providerId)}` : '';
+      return api(`/api/courses${q}`);
+    },
+    async saveCourse(data) { return api('/api/courses', { method: 'POST', body: JSON.stringify(data) }); },
+    async getModules(courseId) {
+      const q = courseId ? `?courseId=${encodeURIComponent(courseId)}` : '';
+      return api(`/api/modules${q}`);
+    },
+    async saveModule(data) { return api('/api/modules', { method: 'POST', body: JSON.stringify(data) }); },
+    async getLessons(filters = {}) {
+      const params = new URLSearchParams();
+      Object.entries(filters || {}).forEach(([key, value]) => {
+        if (value == null || value === '') return;
+        params.set(key, String(value));
+      });
+      const query = params.toString();
+      return api(`/api/lessons${query ? `?${query}` : ''}`);
+    },
+    async getLesson(id) { return api(`/api/lessons/${id}`); },
+    async saveLesson(data) {
+      return data.id ? api(`/api/lessons/${data.id}`, { method: 'PUT', body: JSON.stringify(data) }) : api('/api/lessons', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async deleteLesson(id) { return api(`/api/lessons/${id}`, { method: 'DELETE' }); },
+    async getLessonStats(id) { return api(`/api/lesson-stats/${id}`); },
+    async createTrainingSession(data = {}) { return api('/api/sessions', { method: 'POST', body: JSON.stringify(data) }); },
+    async addSessionItem(sessionId, data) { return api(`/api/sessions/${sessionId}/items`, { method: 'POST', body: JSON.stringify(data) }); },
+    async updateSessionItem(id, data) { return api(`/api/session-items/${id}`, { method: 'PUT', body: JSON.stringify(data) }); },
+    async deleteSessionItem(id) { return api(`/api/session-items/${id}`, { method: 'DELETE' }); },
+    async finishTrainingSession(sessionId) { return api(`/api/sessions/${sessionId}/finish`, { method: 'PUT' }); },
+    async getTrainingSession(id) { return api(`/api/sessions/${id}`); },
+    async getAttachments(entityType, entityId) { return api(`/api/attachments?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`); },
+    async uploadAttachment({ entity_type, entity_id, caption, file }) {
+      const form = new FormData();
+      form.append('entity_type', entity_type);
+      form.append('entity_id', String(entity_id));
+      if (caption) form.append('caption', caption);
+      form.append('file', file);
+      const res = await fetch('/api/attachments', { method: 'POST', body: form });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `Request failed: ${res.status}`);
+      return JSON.parse(text);
+    },
+    async deleteAttachment(id) { return api(`/api/attachments/${id}`, { method: 'DELETE' }); },
+
     // Training Videos
     async fetchOEmbed(url) {
       return api(`/api/oembed?url=${encodeURIComponent(url || '')}`);

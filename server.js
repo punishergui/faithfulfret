@@ -17,11 +17,21 @@ const uploadsDir = '/data/uploads';
 const presetAudioDir = '/data/uploads/preset-audio';
 if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
 if (!fs.existsSync(gearMediaDir)) fs.mkdirSync(gearMediaDir, { recursive: true });
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(presetAudioDir)) fs.mkdirSync(presetAudioDir, { recursive: true });
 const restoreBackupDir = '/data/_restore_backup';
 if (!fs.existsSync(restoreBackupDir)) fs.mkdirSync(restoreBackupDir, { recursive: true });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 * 1024 } });
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) return cb(new Error('unsupported file type'));
+    cb(null, true);
+  },
+});
 let isMaintenanceMode = false;
 
 app.use(express.json({ limit: '20mb' }));
@@ -169,6 +179,15 @@ function parseRepoOwnerRepo(remoteUrl) {
 }
 
 
+
+function sanitizeUploadFileName(name = '') {
+  return String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function getVideoIdFromUrl(value) {
+  return extractYouTubeId(value);
+}
+
 function extractYouTubeId(value) {
   if (!value) return '';
   const raw = String(value).trim();
@@ -292,17 +311,42 @@ apiRouter.get('/sessions', (req, res) => {
 });
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
 apiRouter.post('/sessions', (req, res) => {
-  if (!req.body?.date) return res.status(400).json({ error: 'date is required' });
+  if (!req.body?.date) {
+    const session = Store.createDraftSession(req.body || {});
+    return res.status(201).json({ id: session.id, ...session });
+  }
   return res.json(Store.saveSession(req.body));
 });
 apiRouter.get('/sessions/:id', (req, res) => {
-  const row = Store.getSession(req.params.id);
+  const row = Store.getSessionWithItems(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json({ ...row, gear: Store.listSessionGear(req.params.id) });
 });
 apiRouter.put('/sessions/:id', (req, res) => {
   const saved = Store.saveSession({ ...req.body, id: req.params.id });
   res.json(saved);
+});
+apiRouter.post('/sessions/:id/items', (req, res) => {
+  const session = Store.getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'session not found' });
+  const item = req.body || {};
+  if (!item.type) return res.status(400).json({ error: 'type is required' });
+  const saved = Store.addSessionItem({ ...item, session_id: req.params.id });
+  return res.status(201).json(saved);
+});
+apiRouter.put('/session-items/:id', (req, res) => {
+  const updated = Store.updateSessionItem(req.params.id, req.body || {});
+  if (!updated) return res.status(404).json({ error: 'not found' });
+  return res.json(updated);
+});
+apiRouter.delete('/session-items/:id', (req, res) => {
+  Store.deleteSessionItem(req.params.id);
+  return res.json({ ok: true });
+});
+apiRouter.put('/sessions/:id/finish', (req, res) => {
+  const finished = Store.finishSession(req.params.id);
+  if (!finished) return res.status(404).json({ error: 'not found' });
+  return res.json(finished);
 });
 apiRouter.delete('/sessions/:id', (req, res) => {
   Store.deleteSession(req.params.id);
@@ -555,12 +599,186 @@ apiRouter.get('/oembed', async (req, res) => {
   const videoId = extractYouTubeId(normalizedUrl);
   if (!videoId) return res.status(400).json({ error: 'only valid youtube URLs are supported' });
   try {
-    const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
+    const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const oembedUrl = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(canonicalUrl)}`;
     const data = await fetchJson(oembedUrl, { 'User-Agent': 'faithfulfret' });
-    return res.json({ title: data.title || '', author_name: data.author_name || '', thumbnail_url: data.thumbnail_url || '' });
+    return res.json({
+      title: data.title || '',
+      author: data.author_name || '',
+      author_name: data.author_name || '',
+      thumb_url: data.thumbnail_url || '',
+      thumbnail_url: data.thumbnail_url || '',
+      provider: 'youtube',
+      video_id: videoId,
+      url: canonicalUrl,
+    });
   } catch (error) {
     return res.status(502).json({ error: 'failed to fetch oembed metadata' });
   }
+});
+
+apiRouter.get('/providers', (req, res) => {
+  res.json(Store.listProviders());
+});
+
+apiRouter.post('/providers', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const saved = Store.saveProvider(req.body || {});
+    return res.status(201).json(saved);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to save provider' });
+  }
+});
+
+apiRouter.get('/courses', (req, res) => {
+  res.json(Store.listCourses(req.query.providerId));
+});
+
+apiRouter.post('/courses', (req, res) => {
+  if (!req.body?.provider_id) return res.status(400).json({ error: 'provider_id is required' });
+  if (!req.body?.title) return res.status(400).json({ error: 'title is required' });
+  try {
+    return res.status(201).json(Store.saveCourse(req.body || {}));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to save course' });
+  }
+});
+
+apiRouter.get('/modules', (req, res) => {
+  res.json(Store.listModules(req.query.courseId));
+});
+
+apiRouter.post('/modules', (req, res) => {
+  if (!req.body?.course_id) return res.status(400).json({ error: 'course_id is required' });
+  if (!req.body?.title) return res.status(400).json({ error: 'title is required' });
+  try {
+    return res.status(201).json(Store.saveModule(req.body || {}));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to save module' });
+  }
+});
+
+apiRouter.get('/lessons', (req, res) => {
+  const lessons = Store.listLessons({ moduleId: req.query.moduleId, q: req.query.q, skill: req.query.skill, type: req.query.type });
+  res.json(lessons);
+});
+
+apiRouter.get('/lessons/:id', (req, res) => {
+  const lesson = Store.getLesson(req.params.id);
+  if (!lesson) return res.status(404).json({ error: 'not found' });
+  const stats = Store.getLessonStats(req.params.id);
+  const history = Store.getLessonHistory(req.params.id);
+  return res.json({
+    ...lesson,
+    stats: {
+      times_completed: Number(stats?.times_completed) || 0,
+      total_minutes_spent: Number(stats?.total_minutes_spent) || 0,
+      first_completed_at: stats?.first_completed_at || null,
+      last_completed_at: stats?.last_completed_at || null,
+    },
+    history_summary: {
+      attempts: history.length,
+      completed_attempts: history.filter((row) => Number(row.completed) === 1).length,
+    },
+    history,
+    attachments: Store.listAttachments('lesson', req.params.id),
+  });
+});
+
+apiRouter.post('/lessons', async (req, res) => {
+  const payload = req.body || {};
+  if (!payload.module_id) return res.status(400).json({ error: 'module_id is required' });
+  if (!payload.title && !payload.video_url) return res.status(400).json({ error: 'title is required' });
+  if (payload.video_url) {
+    try {
+      const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(payload.video_url)}`, { 'User-Agent': 'faithfulfret' });
+      payload.title = payload.title || meta.title || '';
+      payload.thumb_url = payload.thumb_url || meta.thumbnail_url || '';
+      payload.author = payload.author || meta.author_name || '';
+      payload.video_provider = payload.video_provider || 'youtube';
+      payload.video_id = payload.video_id || getVideoIdFromUrl(payload.video_url);
+    } catch {
+      // ignore metadata failure for create
+    }
+  }
+  try {
+    return res.status(201).json(Store.saveLesson(payload));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to save lesson' });
+  }
+});
+
+apiRouter.put('/lessons/:id', (req, res) => {
+  const existing = Store.getLesson(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  try {
+    const saved = Store.saveLesson({ ...existing, ...req.body, id: Number(req.params.id) });
+    return res.json(saved);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to update lesson' });
+  }
+});
+
+apiRouter.delete('/lessons/:id', (req, res) => {
+  const existing = Store.getLesson(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  Store.deleteLesson(req.params.id);
+  return res.json({ ok: true });
+});
+
+apiRouter.get('/lesson-stats/:id', (req, res) => {
+  const stats = Store.getLessonStats(req.params.id);
+  return res.json({
+    times_completed: Number(stats?.times_completed) || 0,
+    total_minutes_spent: Number(stats?.total_minutes_spent) || 0,
+    first_completed_at: stats?.first_completed_at || null,
+    last_completed_at: stats?.last_completed_at || null,
+  });
+});
+
+apiRouter.post('/attachments', attachmentUpload.single('file'), (req, res) => {
+  try {
+    if (!req.file?.buffer?.length) return res.status(400).json({ error: 'file is required' });
+    const entityType = String(req.body?.entity_type || '');
+    const entityId = Number(req.body?.entity_id);
+    if (!['lesson', 'video'].includes(entityType)) return res.status(400).json({ error: 'invalid entity_type' });
+    if (!entityId) return res.status(400).json({ error: 'entity_id is required' });
+    const safeOriginal = sanitizeUploadFileName(req.file.originalname || 'upload');
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeOriginal}`;
+    const storagePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(storagePath, req.file.buffer);
+    const kind = req.file.mimetype === 'application/pdf' ? 'pdf' : (req.file.mimetype.startsWith('image/') ? 'image' : 'file');
+    const row = Store.saveAttachment({
+      entity_type: entityType,
+      entity_id: entityId,
+      kind,
+      filename: req.file.originalname || safeOriginal,
+      mime: req.file.mimetype,
+      size_bytes: req.file.size || req.file.buffer.length,
+      storage_path: fileName,
+      caption: req.body?.caption || '',
+    });
+    return res.status(201).json(row);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'failed to upload attachment' });
+  }
+});
+
+apiRouter.get('/attachments', (req, res) => {
+  const entityType = String(req.query.entity_type || '');
+  const entityId = Number(req.query.entity_id);
+  if (!entityType || !entityId) return res.status(400).json({ error: 'entity_type and entity_id are required' });
+  return res.json(Store.listAttachments(entityType, entityId));
+});
+
+apiRouter.delete('/attachments/:id', (req, res) => {
+  const row = Store.getAttachment(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  Store.deleteAttachment(req.params.id);
+  const fullPath = path.join(uploadsDir, path.basename(row.storage_path || ''));
+  if (fullPath.startsWith(uploadsDir) && fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  return res.json({ ok: true });
 });
 
 apiRouter.get('/training-videos', (req, res) => {
@@ -935,6 +1153,11 @@ apiRouter.post('/update', (req, res) => {
   }
 });
 
+apiRouter.use((err, req, res, next) => {
+  if (!err) return next();
+  return res.status(400).json({ error: err.message || 'request failed' });
+});
+
 app.use('/api', apiRouter);
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'not found' });
@@ -942,7 +1165,14 @@ app.use('/api', (req, res) => {
 
 app.use('/media/presets', express.static(presetMediaDir));
 app.use('/media/gear', express.static(gearMediaDir));
-app.use('/uploads', express.static(uploadsDir));
+app.get('/uploads/:file', (req, res) => {
+  const file = path.basename(String(req.params.file || ''));
+  if (!/^[a-zA-Z0-9._-]+$/.test(file)) return res.status(400).json({ error: 'invalid file path' });
+  const fullPath = path.join(uploadsDir, file);
+  if (!fullPath.startsWith(uploadsDir)) return res.status(400).json({ error: 'invalid file path' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'not found' });
+  return res.sendFile(fullPath);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route

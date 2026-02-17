@@ -482,3 +482,90 @@ PWA won't install: Must be served over HTTP (localhost) or HTTPS
 ## License
 
 MIT — do whatever you want with it.
+
+---
+
+## Training Engine Phase 1 (A–G + Notes/Attachments)
+
+### New SPA routes
+
+- `#/training`
+- `#/training/providers`
+- `#/training/provider/:id`
+- `#/training/course/:id`
+- `#/training/module/:id`
+- `#/training/lesson/:id`
+- `#/training/session-builder`
+
+### New API endpoints
+
+- `GET /api/oembed?url=...` (normalized + legacy oEmbed fields)
+- `GET/POST /api/providers`
+- `GET/POST /api/courses`
+- `GET/POST /api/modules`
+- `GET /api/lessons`
+- `GET/POST/PUT/DELETE /api/lessons/:id` (POST uses server-side oEmbed autofill when `video_url` is provided)
+- `GET /api/lesson-stats/:id`
+- `POST /api/sessions` (keeps legacy create; creates draft when `date` is omitted)
+- `POST /api/sessions/:id/items`
+- `PUT/DELETE /api/session-items/:id`
+- `PUT /api/sessions/:id/finish`
+- `GET /api/sessions/:id` (includes `items`)
+- `POST /api/attachments` (multipart form-data)
+- `GET /api/attachments?entity_type=lesson&entity_id=123`
+- `DELETE /api/attachments/:id`
+- `GET /uploads/:file` (validated file serving from `/data/uploads`)
+
+### New DB schema (idempotent)
+
+Tables:
+- `providers`
+- `courses`
+- `modules`
+- `lessons`
+- `lesson_skills`
+- `session_items`
+- `lesson_repeat_goals`
+- `attachments`
+
+New columns (via `ensureColumn`):
+- `sessions.ended_at`
+- `sessions.total_minutes`
+- `sessions.status`
+- `lessons.notes_md`
+- `lessons.practice_plan_md`
+- `lessons.chords_md`
+
+Indexes:
+- `lessons(module_id)`
+- `modules(course_id)`
+- `courses(provider_id)`
+- `session_items(lesson_id)`
+- `session_items(session_id)`
+- `attachments(entity_type, entity_id)`
+
+### Upload/storage behavior
+
+- Upload directory: `/data/uploads` (created automatically on startup)
+- Max file size: `25MB`
+- Allowed MIME: `application/pdf`, `image/png`, `image/jpeg`, `image/webp`
+
+### localStorage keys used
+
+No new training-specific localStorage keys were added.
+Existing app keys still apply (for example: `theme`, `handedness`).
+
+### Deploy verification additions
+
+After deploy, run:
+
+```bash
+curl -s http://127.0.0.1:3000/api/providers | jq
+curl -s http://127.0.0.1:3000/api/courses | jq
+curl -s http://127.0.0.1:3000/api/modules | jq
+curl -s http://127.0.0.1:3000/api/lessons | jq
+curl -s http://127.0.0.1:3000/api/attachments?entity_type=lesson\&entity_id=1 | jq
+curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ' | jq
+```
+
+Keep rollback path unchanged: publish immutable tags (`vX.Y.Z`) and pin `docker-compose.prod.yml` image to the selected tag when rolling back.
