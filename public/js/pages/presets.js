@@ -297,17 +297,62 @@ Pages.Presets = {
   },
 
   renderAudioSection(preset) {
-    if (preset.audioPath) {
+    const support = this.getAudioRecordingSupport();
+    const presetId = this.escapeHtml(preset.id);
+    const audioSrc = preset.audioData || (preset.audioPath ? `/${this.escapeHtml(String(preset.audioPath).replace(/^\/+/, ''))}` : '');
+    if (audioSrc) {
       return `<div style="margin-top:8px;display:grid;gap:6px;">
-        <audio controls preload="none" src="/${this.escapeHtml(String(preset.audioPath).replace(/^\/+/, ''))}" style="width:100%;height:32px;"></audio>
-        <div><button class="df-btn df-btn--danger" data-remove-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Remove audio</button></div>
+        <audio controls preload="none" src="${audioSrc}" style="width:100%;"></audio>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="df-btn df-btn--outline" data-remove-audio="${presetId}">Remove audio</button>
+          <button class="df-btn df-btn--outline" data-upload-audio="${presetId}">Upload</button>
+          ${support.supported ? `<button class="df-btn df-btn--outline" data-record-audio="${presetId}">${this.audioRecordings?.get(preset.id) ? 'Stop' : 'Record'}</button>` : ''}
+          <input type="file" accept="audio/*" data-audio-file="${presetId}" style="display:none;">
+        </div>
+        ${support.supported ? '' : `<div style="font-size:12px;color:var(--text2);">Recording not supported here — use Upload instead.</div>`}
       </div>`;
     }
     return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
-      <button class="df-btn" data-record-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Record</button>
-      <button class="df-btn" data-upload-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Upload</button>
-      <input type="file" accept="audio/*" data-audio-file="${this.escapeHtml(preset.id)}" style="display:none;">
+      ${support.supported ? `<button class="df-btn df-btn--outline" data-record-audio="${presetId}">${this.audioRecordings?.get(preset.id) ? 'Stop' : 'Record'}</button>` : ''}
+      <button class="df-btn df-btn--outline" data-upload-audio="${presetId}">Upload</button>
+      <input type="file" accept="audio/*" data-audio-file="${presetId}" style="display:none;">
+      ${support.supported ? '' : `<div style="font-size:12px;color:var(--text2);">Recording not supported here — use Upload instead.</div>`}
     </div>`;
+  },
+
+  getAudioRecordingSupport() {
+    if (!window.isSecureContext) return { supported: false, mimeType: '', reason: 'secure-context' };
+    if (!navigator.mediaDevices?.getUserMedia) return { supported: false, mimeType: '', reason: 'media-devices' };
+    if (typeof window.MediaRecorder === 'undefined') return { supported: false, mimeType: '', reason: 'media-recorder' };
+
+    const mimeFallbacks = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+    ];
+    const chosenMime = mimeFallbacks.find((type) => {
+      if (typeof window.MediaRecorder.isTypeSupported !== 'function') return type === mimeFallbacks[0];
+      return window.MediaRecorder.isTypeSupported(type);
+    }) || '';
+
+    return { supported: true, mimeType: chosenMime, reason: '' };
+  },
+
+  blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Could not read audio file.'));
+      reader.readAsDataURL(blob);
+    });
+  },
+
+  async savePresetAudioData(presetId, audioData, audioMime = null) {
+    const preset = (this.presets || []).find((item) => String(item.id) === String(presetId)) || await DB.getPreset(presetId);
+    if (!preset) throw new Error('Preset not found.');
+    return DB.savePreset({ ...preset, audioData, audioMime, audioPath: null, audioDuration: null });
   },
 
   stopRecordingSession(session) {
@@ -334,7 +379,8 @@ Pages.Presets = {
       const presetId = input.dataset.audioFile;
       if (!file || !presetId) return;
       try {
-        await DB.uploadPresetAudio(presetId, file, file.name || 'preset-audio');
+        const audioData = await this.blobToDataUrl(file);
+        await this.savePresetAudioData(presetId, audioData, file.type || 'application/octet-stream');
         Utils.toast?.('Audio uploaded.');
         await this.render();
       } catch (err) {
@@ -346,7 +392,7 @@ Pages.Presets = {
 
     app.querySelectorAll('[data-remove-audio]').forEach((btn) => btn.addEventListener('click', async () => {
       try {
-        await DB.deletePresetAudio(btn.dataset.removeAudio);
+        await this.savePresetAudioData(btn.dataset.removeAudio, null, null);
         Utils.toast?.('Audio removed.');
         await this.render();
       } catch (err) {
@@ -362,15 +408,15 @@ Pages.Presets = {
         return;
       }
 
-      if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === 'undefined') {
-        Utils.toast?.('Audio recording is not supported on this device/browser.', 'error');
+      const support = this.getAudioRecordingSupport();
+      if (!support.supported) {
         return;
       }
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const options = {};
-        if (window.MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) options.mimeType = 'audio/webm;codecs=opus';
+        if (support.mimeType) options.mimeType = support.mimeType;
         const recorder = new MediaRecorder(stream, options);
         const chunks = [];
         const session = { presetId, recorder, stream, chunks, mimeType: recorder.mimeType || options.mimeType || 'audio/webm' };
@@ -392,9 +438,9 @@ Pages.Presets = {
             Utils.toast?.('No audio captured.', 'error');
             return;
           }
-          const ext = String((session.mimeType || '').split('/')[1] || 'webm').replace(/[^a-zA-Z0-9]+/g, '');
           try {
-            await DB.uploadPresetAudio(presetId, blob, `preset-recording.${ext || 'webm'}`);
+            const audioData = await this.blobToDataUrl(blob);
+            await this.savePresetAudioData(presetId, audioData, session.mimeType || 'application/octet-stream');
             Utils.toast?.('Audio recorded and saved.');
             await this.render();
           } catch (err) {
