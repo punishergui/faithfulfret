@@ -212,24 +212,27 @@ window.Utils = {
   },
 
   getTheme: () => {
-    const fallback = window.FF_THEME_DEFAULT || 'shed';
+    const fallback = window.FF_THEME_DEFAULT || 'backroom-amp';
     const theme = localStorage.getItem('theme') || fallback;
     return window.Utils.getThemeMap()[theme] ? theme : fallback;
   },
 
-  applyThemeColorMeta: () => {
+  applyThemeColorMeta: (themeId) => {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) return;
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-    if (accent) meta.setAttribute('content', accent);
+    const theme = window.Utils.getThemeMap()[themeId || window.Utils.getTheme()];
+    const fallback = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    const color = theme?.metaColor || theme?.vars?.['--accent'] || fallback;
+    if (color) meta.setAttribute('content', color);
   },
 
-  setTheme: (theme) => {
-    const fallback = window.FF_THEME_DEFAULT || 'shed';
-    const value = window.Utils.getThemeMap()[theme] ? theme : fallback;
+  setTheme: (themeId) => {
+    const fallback = window.FF_THEME_DEFAULT || 'backroom-amp';
+    const value = window.Utils.getThemeMap()[themeId] ? themeId : fallback;
     localStorage.setItem('theme', value);
     document.documentElement.dataset.theme = value;
-    window.Utils.applyThemeColorMeta();
+    window.Utils.applyThemeColorMeta(value);
+    return value;
   },
 
   isLeftHanded: () => (localStorage.getItem('handedness') || 'right') === 'left',
@@ -264,7 +267,7 @@ Utils.toast = Utils.toast || function(message, type = 'success', ms = 2400) {
   const border = type === 'error' ? 'var(--red)' : 'var(--accent)';
   el.style.cssText =
     'padding:12px 14px;border-radius:12px;border:1px solid ' + border +
-    ';background:var(--panelBg);backdrop-filter:blur(10px);color:var(--text);font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.35);';
+    ';background:var(--panel);backdrop-filter:blur(10px);color:var(--text);font-family:system-ui;box-shadow:0 10px 30px rgba(0,0,0,.35);';
   el.textContent = message;
 
   root.appendChild(el);

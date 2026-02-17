@@ -28,7 +28,7 @@ Pages.SessionForm = {
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
         <form id="session-form" class="df-panel df-panel--wide" style="padding:16px;" novalidate>
-          <div id="form-error" style="display:none;margin-bottom:14px;padding:12px 14px;border:1px solid #ff3b30;border-radius:12px;background:rgba(0,0,0,.35);color:#fff;font-family:system-ui;"></div>
+          <div id="form-error" style="display:none;margin-bottom:14px;padding:12px 14px;border:1px solid var(--red);border-radius:12px;background:var(--panel);color:var(--text);font-family:system-ui;"></div>
           <div class="form-grid">
             <div class="df-field">
               <label class="df-label" for="f-date">Date *</label>

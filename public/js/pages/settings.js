@@ -10,9 +10,7 @@ Pages.Settings = {
     const bpmStep = Utils.getBpmStep();
     const defaultSessionMinutes = Utils.getDefaultSessionMinutes();
     const displayName = Utils.getDisplayName();
-
     const themes = Utils.getThemes();
-
 
     app.innerHTML = `
       <div class="page-hero">
@@ -23,19 +21,15 @@ Pages.Settings = {
       </div>
 
       <div class="page-wrap" style="padding:28px 24px 40px;display:grid;gap:16px;">
-        <section class="df-panel df-panel--wide settings-panel">
+        <section class="df-panel df-panel--wide ff-panel--page settings-panel">
           <div class="df-label">Theme Picker</div>
-          <div class="settings-theme-grid">
+          <div class="ff-theme-grid">
             ${themes.map((t) => `
-              <button type="button" class="ff-theme-opt ${t.id === theme ? 'is-active' : ''}" data-theme-value="${t.id}">
-                <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text1);margin-bottom:8px;">${t.name}</div>
-                <div style="display:flex;gap:6px;margin-bottom:8px;">
-                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--bg']};display:inline-block;"></span>
-                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--panel']};display:inline-block;"></span>
-                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--accent']};display:inline-block;"></span>
-                  <span style="width:18px;height:18px;border:1px solid var(--line2);background:${t.vars['--text']};display:inline-block;"></span>
+              <button type="button" class="ff-theme-card ${t.id === theme ? 'is-active' : ''}" data-theme-value="${t.id}">
+                <div class="ff-theme-swatches">
+                  ${t.swatches.map((swatch) => `<span class="ff-theme-swatch" style="background:${swatch};"></span>`).join('')}
                 </div>
-                <div class="ff-theme-opt__preview" style="--theme-preview-accent:${t.vars['--accent']};--theme-preview-glow:${t.vars['--glow']};"></div>
+                <div class="ff-theme-nameplate"><span class="${t.fontClass}">${t.name}</span></div>
               </button>
             `).join('')}
           </div>

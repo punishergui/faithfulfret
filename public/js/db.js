@@ -219,7 +219,7 @@
     async importAll(data) {
       const result = await api('/api/backup/import', { method: 'POST', body: JSON.stringify(data) });
       if (data && data.localSettings && typeof data.localSettings === 'object') writeLocalSettings(data.localSettings);
-      if (window.Utils?.setTheme) window.Utils.setTheme(localStorage.getItem('theme') || (window.FF_THEME_DEFAULT || 'shed'));
+      if (window.Utils?.setTheme) window.Utils.setTheme(localStorage.getItem('theme') || (window.FF_THEME_DEFAULT || 'backroom-amp'));
       return result;
     },
   };

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Daily Fret — Guitar practice tracker">
-  <meta name="theme-color" content="#101010">
+  <meta name="theme-color" content="#111111">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,7 +14,7 @@
   <script>
     (function() {
       var themes = Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [];
-      var fallback = window.FF_THEME_DEFAULT || 'shed';
+      var fallback = window.FF_THEME_DEFAULT || 'backroom-amp';
       var map = {};
       themes.forEach(function (t) { map[t.id] = t; });
       var rawTheme = localStorage.getItem('theme') || fallback;
@@ -23,7 +23,7 @@
       document.documentElement.dataset.theme = theme;
       document.documentElement.dataset.handedness = hand;
       var meta = document.querySelector('meta[name="theme-color"]');
-      var accent = (map[theme] && map[theme].vars && map[theme].vars['--accent']) || '#101010';
+      var accent = (map[theme] && (map[theme].metaColor || (map[theme].vars && map[theme].vars['--accent']))) || '#111111';
       if (meta) meta.setAttribute('content', accent);
     })();
   </script>
@@ -36,7 +36,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@300;400;500;700&family=Mulish:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/css/global.css?v=fa68d74">
+  <link rel="stylesheet" href="/css/global.css?v=themecards10">
   <link rel="stylesheet" href="/css/animations.css?v=fa68d74">
 
   <title>Daily Fret</title>

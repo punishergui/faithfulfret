@@ -7,7 +7,7 @@
   </defs>
   <rect width="1200" height="500" fill="url(#g)"/>
   <rect x="40" y="90" width="1120" height="320" rx="18" fill="#1d2331" stroke="#2d3548"/>
-  <text x="70" y="70" fill="#ff7a1a" font-family="Arial" font-size="28">Peavey Vypyr X2 Front Panel (reference)</text>
+  <text x="70" y="70" fill="#c48d56" font-family="Arial" font-size="28">Peavey Vypyr X2 Front Panel (reference)</text>
   <g fill="#9fb2d4" font-family="Arial" font-size="16">
     <circle cx="160" cy="250" r="44" fill="#2a3347"/><text x="145" y="256">Input</text>
     <circle cx="330" cy="250" r="44" fill="#2a3347"/><text x="306" y="256">Gain</text>
