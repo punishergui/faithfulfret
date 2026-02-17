@@ -313,7 +313,7 @@ apiRouter.get('/export', (req, res) => {
   res.json({
     sessions: Store.listSessions(),
     gear: Store.listGear(false),
-    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary ?? link.primary) ? 1 : 0 }))),
+    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary) ? 1 : 0 }))),
     session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
     resources: Store.listResources(),
     presets: Store.listPresets(),
@@ -331,7 +331,7 @@ apiRouter.post('/import', (req, res) => {
       Store.replaceGearLinks(saved.id, row.linksList);
     }
   }
-  for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary ?? row?.primary) ? 1 : 0 });
+  for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
   const sessionGear = payload.session_gear || payload.sessionGear || [];
   const grouped = {};
   sessionGear.forEach((row) => {

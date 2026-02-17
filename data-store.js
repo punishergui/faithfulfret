@@ -110,8 +110,11 @@ ensureColumn('gear_items', 'priority', 'TEXT');
 ensureColumn('gear_items', 'desiredCondition', 'TEXT');
 ensureColumn('gear_links', 'isPrimary', 'INTEGER DEFAULT 0');
 if (hasColumn('gear_links', 'primary')) {
-  db.exec('UPDATE gear_links SET isPrimary = CASE WHEN COALESCE(isPrimary, 0) = 0 THEN COALESCE("primary", 0) ELSE isPrimary END');
+  db.exec('UPDATE gear_links SET isPrimary = COALESCE(isPrimary, "primary")');
 }
+
+const LEGACY_PRIMARY_KEY = 'primary';
+const readPrimaryFlag = (row = {}) => Number(row.isPrimary ?? row[LEGACY_PRIMARY_KEY]) ? 1 : 0;
 
 const uid = () => `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -192,7 +195,7 @@ function coerceGearLink(input = {}) {
     price: n(input.price),
     lastChecked: input.lastChecked || '',
     note: input.note || '',
-    isPrimary: Number(input.isPrimary ?? input.primary) ? 1 : 0,
+    isPrimary: readPrimaryFlag(input),
   };
 }
 function coercePreset(input = {}) {
@@ -289,7 +292,7 @@ const deleteGear = (id) => {
   return run('DELETE FROM gear_items WHERE id = ?', id);
 };
 
-const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY isPrimary DESC, lastChecked DESC, id DESC').all(gearId);
+const getGearLinks = (gearId) => db.prepare('SELECT * FROM gear_links WHERE gearId = ? ORDER BY isPrimary DESC, lastChecked DESC, id DESC').all(gearId).map((row) => ({ ...row, isPrimary: readPrimaryFlag(row) }));
 const saveGearLink = (data) => {
   const row = coerceGearLink(data);
   if (!row.gearId) throw new Error('gearId is required');
