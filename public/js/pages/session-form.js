@@ -84,7 +84,10 @@ Pages.SessionForm = {
               <textarea id="f-links" name="links" class="df-input" rows="3" placeholder="Label | https://url (one per line)&#10;e.g. JustinGuitar Lesson | https://justinguitar.com/...">${session.links || ''}</textarea>
             </div>
             <div class="df-field full-width">
-              <label class="df-label">Gear Used</label>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <label class="df-label" style="margin:0;">Gear Used</label>
+                <button type="button" class="df-btn df-btn--outline" id="use-last-gear">Use last gear</button>
+              </div>
               <div id="session-gear-choices" style="display:flex;gap:8px;flex-wrap:wrap;">
                 ${ownedGear.length ? ownedGear.map((item) => `<button type="button" class="df-btn ${selectedGearIds.has(item.id) ? 'df-btn--primary' : 'df-btn--outline'}" data-gear-id="${item.id}">${item.name}</button>`).join('') : '<span style="color:var(--text3);font-size:12px;">No owned gear available.</span>'}
               </div>
@@ -118,6 +121,7 @@ Pages.SessionForm = {
     // __FF_SESSIONFORM_UX__
     const errBox = container.querySelector('#form-error');
     const lastFocusKey = 'df:lastFocus';
+    const lastGearKey = 'df:lastGearIds';
 
     function showError(msg) {
       if (!errBox) return alert(msg);
@@ -158,6 +162,23 @@ Pages.SessionForm = {
     });
 
     const selectedGearIds = new Set(Array.isArray(session.gear) ? session.gear.map((row) => row.id) : []);
+    const useLastGearBtn = container.querySelector('#use-last-gear');
+    useLastGearBtn?.addEventListener('click', () => {
+      const saved = JSON.parse(localStorage.getItem(lastGearKey) || '[]');
+      if (!Array.isArray(saved) || !saved.length) {
+        Utils.toast?.('No previous gear found', 'error');
+        return;
+      }
+      selectedGearIds.clear();
+      saved.forEach((id) => selectedGearIds.add(id));
+      container.querySelectorAll('[data-gear-id]').forEach((btn) => {
+        const gearId = btn.getAttribute('data-gear-id');
+        btn.classList.toggle('df-btn--primary', selectedGearIds.has(gearId));
+        btn.classList.toggle('df-btn--outline', !selectedGearIds.has(gearId));
+      });
+      Utils.toast?.('Applied last gear');
+    });
+
     container.querySelectorAll('[data-gear-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const gearId = btn.getAttribute('data-gear-id');
@@ -198,7 +219,9 @@ Pages.SessionForm = {
       }
 
       const saved = await DB.saveSess(data);
-      await DB.saveSessionGear(saved.id, [...selectedGearIds]);
+      const nextGearIds = [...selectedGearIds];
+      await DB.saveSessionGear(saved.id, nextGearIds);
+      try { localStorage.setItem(lastGearKey, JSON.stringify(nextGearIds)); } catch (e) {}
       if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
       Utils.toast?.('Saved session ✅');
       go(`#/session/${saved.id}`);
