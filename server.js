@@ -147,10 +147,13 @@ apiRouter.delete('/sessions/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-apiRouter.get('/gear-items', (req, res) => {
+function sendGearItems(req, res) {
   const includeLinks = req.query.includeLinks !== 'false';
   res.json(Store.listGear(includeLinks));
-});
+}
+
+apiRouter.get('/gear-items', sendGearItems);
+apiRouter.get('/gear', sendGearItems);
 apiRouter.post('/gear-items', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
   return res.json(Store.saveGear(req.body));
@@ -188,6 +191,7 @@ apiRouter.put('/sessions/:id/gear', (req, res) => {
 });
 apiRouter.get('/sessions/:id/gear', (req, res) => res.json(Store.listSessionGear(req.params.id)));
 apiRouter.get('/gear-usage', (req, res) => res.json(Store.getGearUsage()));
+apiRouter.get('/gear/usage', (req, res) => res.json(Store.getGearUsage()));
 
 apiRouter.get('/presets', (req, res) => res.json(Store.listPresets()));
 apiRouter.post('/presets', (req, res) => {

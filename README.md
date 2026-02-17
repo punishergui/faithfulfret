@@ -65,6 +65,8 @@ docker compose -f docker-compose.prod.yml up -d
 
 ```bash
 curl -s http://127.0.0.1:3000/api/health | jq
+curl -s http://127.0.0.1:3000/api/gear | jq
+curl -s http://127.0.0.1:3000/api/gear-items | jq
 curl -s http://127.0.0.1:3000/api/sessions | jq
 curl -s http://127.0.0.1:3000/api/stats | jq
 curl -s http://127.0.0.1:3000/media/presets/ | head -n 20
