@@ -1,8 +1,11 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { execSync, exec } = require('child_process');
 const https = require('https');
+const JSZip = require('jszip');
+const multer = require('multer');
 const Store = require('./data-store');
 
 const app = express();
@@ -12,8 +15,61 @@ const presetMediaDir = '/data/presets';
 const gearMediaDir = '/data/gear';
 if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
 if (!fs.existsSync(gearMediaDir)) fs.mkdirSync(gearMediaDir, { recursive: true });
+const restoreBackupDir = '/data/_restore_backup';
+if (!fs.existsSync(restoreBackupDir)) fs.mkdirSync(restoreBackupDir, { recursive: true });
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 * 1024 } });
+let isMaintenanceMode = false;
 
 app.use(express.json({ limit: '20mb' }));
+app.use('/api', (req, res, next) => {
+  if (!isMaintenanceMode) return next();
+  if (req.path === '/health') return next();
+  return res.status(503).json({ error: 'maintenance mode: restore in progress' });
+});
+
+function buildJsonExport() {
+  return {
+    sessions: Store.listSessions(),
+    gear: Store.listGear(false),
+    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary) ? 1 : 0 }))),
+    gear_images: Store.listGear(false).flatMap((item) => (item.imagesList || [])),
+    session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
+    resources: Store.listResources(),
+    presets: Store.listPresets(),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
+function copyTreeIntoZip(zip, basePath, zipPath) {
+  if (!fs.existsSync(basePath)) return;
+  const entries = fs.readdirSync(basePath, { withFileTypes: true });
+  entries.forEach((entry) => {
+    const abs = path.join(basePath, entry.name);
+    const rel = `${zipPath}/${entry.name}`;
+    if (entry.isDirectory()) {
+      copyTreeIntoZip(zip, abs, rel);
+      return;
+    }
+    zip.file(rel, fs.readFileSync(abs));
+  });
+}
+
+function copyTreeFromTemp(sourceDir, targetDir, replace = true) {
+  if (!fs.existsSync(sourceDir)) return;
+  if (replace && fs.existsSync(targetDir)) fs.rmSync(targetDir, { recursive: true, force: true });
+  fs.mkdirSync(targetDir, { recursive: true });
+  const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+  entries.forEach((entry) => {
+    const src = path.join(sourceDir, entry.name);
+    const dst = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyTreeFromTemp(src, dst, false);
+      return;
+    }
+    fs.copyFileSync(src, dst);
+  });
+}
 
 function gitExec(cmd) {
   try {
@@ -370,16 +426,57 @@ apiRouter.delete('/resources/:id', (req, res) => {
 });
 
 apiRouter.get('/export', (req, res) => {
-  res.json({
-    sessions: Store.listSessions(),
-    gear: Store.listGear(false),
-    gear_links: Store.listGear().flatMap((item) => (item.linksList || []).map((link) => ({ ...link, isPrimary: Number(link.isPrimary) ? 1 : 0 }))),
-    gear_images: Store.listGear(false).flatMap((item) => (item.imagesList || [])),
-    session_gear: Store.listSessions().flatMap((session) => Store.listSessionGear(session.id).map((gear) => ({ sessionId: session.id, gearId: gear.id }))),
-    resources: Store.listResources(),
-    presets: Store.listPresets(),
-    exportedAt: new Date().toISOString(),
-  });
+  res.json(buildJsonExport());
+});
+
+
+
+function createSafeSqliteBackup() {
+  Store.checkpointWal();
+  const source = Store.dbPath;
+  const tmpPath = path.join(os.tmpdir(), `faithfulfret-sqlite-backup-${Date.now()}.sqlite`);
+
+  if (typeof Store.backupToFile === 'function') {
+    try {
+      Store.backupToFile(tmpPath);
+      return tmpPath;
+    } catch (error) {
+      console.warn('[EXPORT ZIP] sqlite backup API failed, trying sqlite3 shell:', error.message);
+    }
+  }
+
+  try {
+    execSync(`sqlite3 ${JSON.stringify(source)} ".backup ${tmpPath}"`, { stdio: 'ignore' });
+    return tmpPath;
+  } catch (error) {
+    console.warn('[EXPORT ZIP] sqlite3 backup failed, using file copy fallback:', error.message);
+  }
+
+  fs.copyFileSync(source, tmpPath);
+  return tmpPath;
+}
+
+apiRouter.get('/export/zip', async (req, res) => {
+  let backupPath = null;
+  try {
+    backupPath = createSafeSqliteBackup();
+    const zip = new JSZip();
+    zip.file('faithfulfret.sqlite', fs.readFileSync(backupPath));
+    zip.file('export.json', JSON.stringify(buildJsonExport(), null, 2));
+    copyTreeIntoZip(zip, gearMediaDir, 'gear');
+    copyTreeIntoZip(zip, presetMediaDir, 'presets');
+
+    const payload = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `faithfulfret-backup-${dateStr}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(payload);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'failed to export zip backup' });
+  } finally {
+    if (backupPath && fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+  }
 });
 
 apiRouter.post('/import', (req, res) => {
@@ -407,6 +504,89 @@ apiRouter.post('/import', (req, res) => {
   for (const row of (payload.resources || [])) Store.saveResource(row);
   for (const row of (payload.presets || [])) Store.savePreset(row);
   res.json({ ok: true });
+});
+
+
+
+apiRouter.post('/import/zip', upload.single('backupZip'), async (req, res) => {
+  if (!req.file?.buffer?.length) return res.status(400).json({ error: 'backup zip file is required' });
+
+  const timestamp = Date.now();
+  const stamp = new Date(timestamp).toISOString().replace(/[:.]/g, '-');
+  const tempRoot = path.join(os.tmpdir(), `faithfulfret-restore-${timestamp}`);
+  const tempExtract = path.join(tempRoot, 'extract');
+  const backupStampDir = path.join(restoreBackupDir, stamp);
+
+  isMaintenanceMode = true;
+  try {
+    fs.mkdirSync(tempExtract, { recursive: true });
+    fs.mkdirSync(backupStampDir, { recursive: true });
+
+    const zip = await JSZip.loadAsync(req.file.buffer);
+    const files = Object.values(zip.files);
+    for (const file of files) {
+      if (file.dir) continue;
+      const rel = file.name.replace(/^\/+/, '');
+      const outPath = path.join(tempExtract, rel);
+      if (!outPath.startsWith(tempExtract)) throw new Error('invalid zip path');
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      const content = await file.async('nodebuffer');
+      fs.writeFileSync(outPath, content);
+    }
+
+    const dbFromZip = path.join(tempExtract, 'faithfulfret.sqlite');
+    const oldDbPath = Store.dbPath;
+
+    if (fs.existsSync(oldDbPath)) {
+      fs.copyFileSync(oldDbPath, path.join(backupStampDir, `faithfulfret.sqlite.${stamp}.bak`));
+    }
+
+    if (fs.existsSync(gearMediaDir)) fs.cpSync(gearMediaDir, path.join(backupStampDir, 'gear'), { recursive: true });
+    if (fs.existsSync(presetMediaDir)) fs.cpSync(presetMediaDir, path.join(backupStampDir, 'presets'), { recursive: true });
+
+    if (fs.existsSync(dbFromZip)) {
+      Store.close();
+      fs.copyFileSync(dbFromZip, oldDbPath);
+      Store.reopen();
+    }
+
+    copyTreeFromTemp(path.join(tempExtract, 'gear'), gearMediaDir, true);
+    copyTreeFromTemp(path.join(tempExtract, 'presets'), presetMediaDir, true);
+
+    if (!fs.existsSync(dbFromZip) && fs.existsSync(path.join(tempExtract, 'export.json'))) {
+      const payload = JSON.parse(fs.readFileSync(path.join(tempExtract, 'export.json'), 'utf8'));
+      Store.clearAll();
+      for (const row of (payload.sessions || [])) Store.saveSession(row);
+      for (const row of (payload.gear || [])) {
+        const saved = Store.saveGear(row);
+        if (Array.isArray(row.linksList) && row.linksList.length) Store.replaceGearLinks(saved.id, row.linksList);
+      }
+      for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
+      for (const row of (payload.gear_images || [])) {
+        if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
+      }
+      const sessionGear = payload.session_gear || payload.sessionGear || [];
+      const grouped = {};
+      sessionGear.forEach((row) => {
+        if (!row?.sessionId || !row?.gearId) return;
+        if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
+        grouped[row.sessionId].push(row.gearId);
+      });
+      Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
+      for (const row of (payload.resources || [])) Store.saveResource(row);
+      for (const row of (payload.presets || [])) Store.savePreset(row);
+    }
+
+    res.json({ ok: true, dbInfo: Store.getDbInfo() });
+  } catch (e) {
+    try {
+      Store.reopen();
+    } catch (ignored) {}
+    res.status(400).json({ error: e.message || 'failed to import zip backup' });
+  } finally {
+    isMaintenanceMode = false;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 // GET /api/version

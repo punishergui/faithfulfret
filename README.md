@@ -248,11 +248,6 @@ Check stats:       Click "STATS"
 
 ---
 
-## Optional Theme Texture Assets
-
-- Place optional theme textures at: `/public/img/textures/tex1.png` through `/public/img/textures/tex9.png`.
-- Themes still render when textures are missing (gradient overlays and fallback colors are always applied).
-
 ---
 
 ## Port / Network
@@ -270,12 +265,29 @@ The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:3000` when 
 
 ## Data Backup
 
-```
-Stats page (#/progress route) → "Export All Data" → saves daily-fret-backup-DATE.json
-To restore: Stats page (#/progress route) → "Import Data" → select backup file
-```
+### Backup & Restore (ZIP + JSON)
 
-Primary data is stored in `/data/faithfulfret.sqlite`; export/import is still useful for moving data between environments or creating portable backups.
+Stats page (`#/progress`) now supports:
+- **Export All Data** → downloads `faithfulfret-backup-YYYY-MM-DD.zip` from `GET /api/export/zip`
+- **Import Backup ZIP** → uploads ZIP to `POST /api/import/zip`
+- **Import JSON** (legacy portable import) → uploads JSON to `POST /api/import`
+
+ZIP backup contents:
+- `faithfulfret.sqlite` (safe checkpointed backup copy)
+- `gear/` media folder (if present)
+- `presets/` media folder (if present)
+- `export.json` (reference JSON export)
+
+Restore behavior:
+- App enters temporary maintenance mode during ZIP restore.
+- Current DB + media are moved to `/data/_restore_backup/<timestamp>/` before replacement.
+- Default media policy is **replace** from uploaded ZIP.
+- After restore, verify counts from `GET /api/db-info`.
+
+Rollback path:
+1. Publish immutable image tags (`vX.Y.Z`) for each release.
+2. Pin `docker-compose.prod.yml` to a known-good tag.
+3. Redeploy (`docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`).
 
 ---
 
