@@ -248,6 +248,26 @@ window.Utils = {
   },
 
   getDisplayName: () => (localStorage.getItem('displayName') || '').trim(),
+
+  renderPageHero: ({ title = '', subtitle = '', leftExtra = '', actions = '', image = '', texture = true } = {}) => {
+    const heroClasses = `page-hero ${image ? 'page-hero--img' : ''} ${texture ? 'vert-texture' : ''}`.trim();
+    const bgStyle = image ? ` style="background-image:url('${image}');"` : '';
+    return `
+      <div class="${heroClasses}"${bgStyle}>
+        <div class="page-hero__inner">
+          <div class="ff-hero__layout">
+            <div class="ff-hero__left">
+              <div class="page-title">${title}</div>
+              ${subtitle ? `<p style="font-family:var(--f-mono);font-size:12px;color:var(--text2);max-width:760px;">${subtitle}</p>` : ''}
+              ${leftExtra || ''}
+            </div>
+            <div class="ff-hero__right">${actions || ''}</div>
+          </div>
+        </div>
+        <div class="fret-line"></div>
+      </div>
+    `;
+  },
 };
 
 // __FF_TOAST__

@@ -165,20 +165,12 @@ Pages.Gear = {
     const brands = ['All', ...new Set(gear.map((g) => g.brand).filter(Boolean).sort())];
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
-        <div class="page-hero__inner">
-          <div>
-            <div class="page-title">Gear</div>
-            <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-              ${filters.map((f) => `<button type="button" class="df-btn ${activeStatusFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}
-            </div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <a href="#/gear/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Gear</a>
-          </div>
-        </div>
-        <div class="fret-line"></div>
-      </div>
+      ${Utils.renderPageHero({
+        title: 'Gear',
+        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
+        leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;">${filters.map((f) => `<button type="button" class="df-btn ${activeStatusFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}</div>`,
+        actions: '<a href="#/gear/add" class="df-btn df-btn--primary">+ Add Gear</a>',
+      })}
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">

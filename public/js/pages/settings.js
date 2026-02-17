@@ -13,12 +13,11 @@ Pages.Settings = {
     const themes = Utils.getThemes();
 
     app.innerHTML = `
-      <div class="page-hero">
-        <div class="page-hero__inner">
-          <div class="page-title">Settings</div>
-          <p style="color:var(--text2);max-width:760px;">Personalize your theme and local practice defaults. These settings stay on this device via localStorage.</p>
-        </div>
-      </div>
+      ${Utils.renderPageHero({
+        title: 'Settings',
+        subtitle: 'Personalize your theme and local practice defaults. These settings stay on this device via localStorage.',
+        texture: false,
+      })}
 
       <div class="page-wrap" style="padding:28px 24px 40px;display:grid;gap:16px;">
         <section class="df-panel df-panel--wide ff-panel--page settings-panel">

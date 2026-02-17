@@ -19,15 +19,11 @@ Pages.Progress = {
     const chrono = [...sessions].reverse();
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
-        <div class="page-hero__inner">
-          <div class="page-title">Stats</div>
-          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-            ${this._renderTabs(activeTab)}
-          </div>
-        </div>
-        <div class="fret-line"></div>
-      </div>
+      ${Utils.renderPageHero({
+        title: 'Stats',
+        image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80',
+        leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;">${this._renderTabs(activeTab)}</div>`,
+      })}
 
       <div class="page-wrap" style="padding:24px 24px 60px;display:grid;gap:16px;">
         ${activeTab === 'overview' ? `

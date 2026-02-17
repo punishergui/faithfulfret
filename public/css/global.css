@@ -26,8 +26,8 @@
   --accentGlow: var(--glow);
   --heroBg: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 65%);
   --heroGlow: color-mix(in srgb, var(--accent) 30%, transparent);
-  --heroH: 92px;
-  --heroTitleSize: clamp(18px, 2.2vw, 22px);
+  --heroH: 120px;
+  --heroTitleSize: clamp(17px, 2vw, 20px);
   --heroSubtitleSize: clamp(12px, 1.5vw, 14px);
   --btnBg: var(--accent);
   --btnHover: var(--accent2);
@@ -1512,16 +1512,41 @@ select.df-input option {
 .page-hero__inner {
   max-width: 1200px;
   margin: 0 auto;
-  height: var(--heroH);
-  padding: 10px 24px;
+  min-height: var(--heroH);
+  padding: 12px 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   gap: 6px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   text-align: left;
+}
+
+.ff-hero__layout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ff-hero__left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ff-hero__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .page-hero__inner > * {
@@ -1532,6 +1557,11 @@ select.df-input option {
 .page-hero .df-pillrow,
 .page-hero [data-stats-tab] {
   margin-left: 0 !important;
+}
+
+.ff-hero__left .df-pillrow,
+.ff-hero__left [data-stats-tab] {
+  margin-top: 2px;
 }
 
 .two-col {
@@ -2526,6 +2556,16 @@ select.df-input option {
 
   .page-hero__inner {
     padding: 12px 16px;
+  }
+
+  .ff-hero__layout {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ff-hero__right {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .session-hero__inner {
