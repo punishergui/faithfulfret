@@ -102,6 +102,7 @@ docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /d
 docker exec -it daily-fret sh -lc "node --check /app/server.js"
 docker exec -it daily-fret sh -lc "node --check /app/data-store.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
+# Gear UI smoke: open Gear page and verify All/Owned/Wishlist/Sold filters + wishlist-only advanced filters
 docker exec -it daily-fret sh -lc "node --check /app/public/js/router.js"
 # Hotfix validation: gear_links now uses isPrimary (not SQLite reserved word primary)
 docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA table_info(gear_links);" | rg -n isPrimary'
