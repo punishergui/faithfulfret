@@ -134,6 +134,8 @@ Production uses prebuilt GHCR images and Watchtower auto-updates.
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 
+# If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
+
 # Verify DB path after deploy
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
 # Syntax checks for key app files after deploy

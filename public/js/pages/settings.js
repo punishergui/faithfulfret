@@ -16,8 +16,10 @@ Pages.Settings = {
       { id: 'faithful', name: 'Faithful', swatches: ['#14100d', '#2a2219', '#c9a96e', '#e9ddca'] },
       { id: 'stage', name: 'Stage', swatches: ['#070b10', '#152132', '#00ffaa', '#d7f4ea'] },
       { id: 'acoustic', name: 'Acoustic', swatches: ['#26211b', '#4a3d30', '#b88858', '#f1e1cc'] },
-      { id: 'neon_green', name: 'Neon Green', swatches: ['#08100b', '#173123', '#39ff88', '#e2ffee'] },
-      { id: 'neon_purple', name: 'Neon Purple', swatches: ['#0e0a16', '#2b2348', '#b85cff', '#efe5ff'] },
+      { id: 'neon_green', name: 'Neon Green', swatches: ['#050b08', '#15251c', '#39ff88', '#e8f4ed'] },
+      { id: 'neon_purple', name: 'Neon Purple', swatches: ['#090610', '#231a3d', '#b85cff', '#ece8f8'] },
+      { id: 'carbon_blue', name: 'Carbon Blue', swatches: ['#05090f', '#152740', '#45baff', '#e6eff8'] },
+      { id: 'blood_moon', name: 'Blood Moon', swatches: ['#0d0608', '#311b25', '#d33f52', '#f1e8ea'] },
       { id: 'midnight_blue', name: 'Midnight Blue', swatches: ['#070d16', '#1d3250', '#4db6ff', '#e3f3ff'] },
       { id: 'carbon', name: 'Carbon', swatches: ['#111214', '#29303a', '#7de2d1', '#e5edf5'] },
     ];
