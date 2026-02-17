@@ -3,16 +3,18 @@
 window.Pages = window.Pages || {};
 
 function normalizeGearStatus(status) {
+  const normalizedStatus = typeof status === 'string' ? status.trim() : status;
   const map = {
     'Own it': 'Owned',
     owned: 'Owned',
     'Wish List': 'Wishlist',
     wishlist: 'Wishlist',
-    watching: 'Watching',
-    'On Loan': 'Watching',
+    Watching: 'Wishlist',
+    watching: 'Wishlist',
+    'On Loan': 'Wishlist',
     sold: 'Sold',
   };
-  return map[status] || status || 'Owned';
+  return map[normalizedStatus] || normalizedStatus || 'Owned';
 }
 
 function money(v) {
@@ -26,7 +28,13 @@ Pages.Gear = {
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
     const gear = (await DB.getAllGear()).map((g) => ({ ...g, status: normalizeGearStatus(g.status) }));
-    const selectedFilter = (location.hash.match(/status=([^&]+)/)?.[1] || 'All');
+    const filterStorageKey = 'df:gearStatusFilter';
+    const filters = ['All', 'Owned', 'Wishlist', 'Sold'];
+    const storedFilter = normalizeGearStatus(localStorage.getItem(filterStorageKey) || '');
+    const selectedFilter = filters.includes(this._selectedFilter)
+      ? this._selectedFilter
+      : (filters.includes(storedFilter) ? storedFilter : 'All');
+    this._selectedFilter = selectedFilter;
 
     const owned = gear.filter((g) => g.status === 'Owned').length;
     const sold = gear.filter((g) => g.status === 'Sold').length;
@@ -40,8 +48,6 @@ Pages.Gear = {
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(g);
     });
-
-    const filters = ['All', 'Owned', 'Wishlist', 'Watching', 'Sold'];
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
@@ -73,7 +79,9 @@ Pages.Gear = {
     app.querySelectorAll('[data-status-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const status = btn.getAttribute('data-status-filter');
-        location.hash = status === 'All' ? '#/gear' : `#/gear?status=${status}`;
+        this._selectedFilter = status;
+        localStorage.setItem(filterStorageKey, status);
+        this.render();
       });
     });
 
@@ -96,7 +104,6 @@ Pages.Gear = {
       Owned: 'df-badge--green',
       Sold: 'df-badge--red',
       Wishlist: 'df-badge--orange',
-      Watching: 'df-badge--yellow',
     }[g.status] || 'df-badge--muted';
     const topLink = (g.linksList || []).find((l) => l.url);
 
@@ -145,7 +152,7 @@ Pages.GearForm = {
     }
 
     const categories = ['Guitar', 'Amp', 'Pedal', 'Strings', 'Interface', 'Picks', 'Tuner', 'Cable', 'Case', 'DAW', 'Strap', 'Other'];
-    const statuses = ['Owned', 'Wishlist', 'Watching', 'Sold'];
+    const statuses = ['Owned', 'Wishlist', 'Sold'];
     const linksList = Array.isArray(gear.linksList) ? gear.linksList : [];
 
     const totalCost = money(gear.boughtPrice || gear.pricePaid || gear.price) + money(gear.tax) + money(gear.shipping);
