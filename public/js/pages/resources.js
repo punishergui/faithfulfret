@@ -19,7 +19,7 @@ Pages.Resources = {
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80');">
-        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+        <div class="page-hero__inner">
           <div class="page-title">Resources</div>
           <a href="#/resources/add" class="df-btn df-btn--primary" style="margin-bottom:4px;">+ Add Resource</a>
         </div>

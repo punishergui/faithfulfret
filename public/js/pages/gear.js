@@ -166,7 +166,7 @@ Pages.Gear = {
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
-        <div class="page-hero__inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+        <div class="page-hero__inner">
           <div>
             <div class="page-title">Gear</div>
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
