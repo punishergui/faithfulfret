@@ -119,6 +119,10 @@
       return api(`/api/sessions/${sessionId}/gear`);
     },
 
+    async getGearUsage() {
+      return api('/api/gear-usage');
+    },
+
     // Presets
     async savePreset(data) {
       return data.id

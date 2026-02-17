@@ -84,10 +84,15 @@ Pages.SessionForm = {
               <textarea id="f-links" name="links" class="df-input" rows="3" placeholder="Label | https://url (one per line)&#10;e.g. JustinGuitar Lesson | https://justinguitar.com/...">${session.links || ''}</textarea>
             </div>
             <div class="df-field full-width">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
                 <label class="df-label" style="margin:0;">Gear Used</label>
-                <button type="button" class="df-btn df-btn--outline" id="use-last-gear">Use last gear</button>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="df-btn df-btn--outline" id="use-last-gear">Use last gear</button>
+                  <button type="button" class="df-btn df-btn--outline" id="clear-gear">Clear</button>
+                </div>
               </div>
+              <div id="last-gear-hint" style="margin-bottom:8px;color:var(--text3);font-size:12px;"></div>
+              <input class="df-input" id="gear-picker-search" placeholder="Search owned gear" style="margin-bottom:8px;">
               <div id="session-gear-choices" style="display:flex;gap:8px;flex-wrap:wrap;">
                 ${ownedGear.length ? ownedGear.map((item) => `<button type="button" class="df-btn ${selectedGearIds.has(item.id) ? 'df-btn--primary' : 'df-btn--outline'}" data-gear-id="${item.id}">${item.name}</button>`).join('') : '<span style="color:var(--text3);font-size:12px;">No owned gear available.</span>'}
               </div>
@@ -162,6 +167,22 @@ Pages.SessionForm = {
     });
 
     const selectedGearIds = new Set(Array.isArray(session.gear) ? session.gear.map((row) => row.id) : []);
+    const gearButtons = [...container.querySelectorAll('[data-gear-id]')];
+    const updateGearButtons = () => {
+      gearButtons.forEach((btn) => {
+        const gearId = btn.getAttribute('data-gear-id');
+        btn.classList.toggle('df-btn--primary', selectedGearIds.has(gearId));
+        btn.classList.toggle('df-btn--outline', !selectedGearIds.has(gearId));
+      });
+    };
+    const updateLastGearHint = () => {
+      const hint = container.querySelector('#last-gear-hint');
+      if (!hint) return;
+      const saved = JSON.parse(localStorage.getItem(lastGearKey) || '[]');
+      hint.textContent = Array.isArray(saved) && saved.length ? `Last used: ${saved.length} items` : '';
+    };
+    updateLastGearHint();
+
     const useLastGearBtn = container.querySelector('#use-last-gear');
     useLastGearBtn?.addEventListener('click', () => {
       const saved = JSON.parse(localStorage.getItem(lastGearKey) || '[]');
@@ -171,21 +192,30 @@ Pages.SessionForm = {
       }
       selectedGearIds.clear();
       saved.forEach((id) => selectedGearIds.add(id));
-      container.querySelectorAll('[data-gear-id]').forEach((btn) => {
-        const gearId = btn.getAttribute('data-gear-id');
-        btn.classList.toggle('df-btn--primary', selectedGearIds.has(gearId));
-        btn.classList.toggle('df-btn--outline', !selectedGearIds.has(gearId));
-      });
+      updateGearButtons();
       Utils.toast?.('Applied last gear');
     });
 
-    container.querySelectorAll('[data-gear-id]').forEach((btn) => {
+    container.querySelector('#clear-gear')?.addEventListener('click', () => {
+      selectedGearIds.clear();
+      updateGearButtons();
+      Utils.toast?.('Cleared gear');
+    });
+
+    container.querySelector('#gear-picker-search')?.addEventListener('input', (e) => {
+      const needle = String(e.target.value || '').toLowerCase();
+      gearButtons.forEach((btn) => {
+        const match = String(btn.textContent || '').toLowerCase().includes(needle);
+        btn.style.display = match ? '' : 'none';
+      });
+    });
+
+    gearButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const gearId = btn.getAttribute('data-gear-id');
         if (selectedGearIds.has(gearId)) selectedGearIds.delete(gearId);
         else selectedGearIds.add(gearId);
-        btn.classList.toggle('df-btn--primary', selectedGearIds.has(gearId));
-        btn.classList.toggle('df-btn--outline', !selectedGearIds.has(gearId));
+        updateGearButtons();
       });
     });
 

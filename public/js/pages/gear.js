@@ -37,29 +37,46 @@ Pages.Gear = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const gear = (await DB.getAllGear()).map((g) => ({ ...g, status: normalizeGearStatus(g.status) }));
+    const [gearRows, usageByGear] = await Promise.all([
+      DB.getAllGear(),
+      DB.getGearUsage().catch(() => ({})),
+    ]);
+    const gear = gearRows.map((g) => ({ ...g, status: normalizeGearStatus(g.status), usage: usageByGear[g.id] || { usedCount: 0, lastUsed: '' } }));
+
     const filterStorageKey = 'df:gearStatusFilter';
     const sortStorageKey = 'df:gearSort';
-    const wishlistOnlyStorageKey = 'df:gearWishlistOnly';
+    const advancedStorageKey = 'df:gearAdvancedFilters';
+    const searchStorageKey = 'df:gearSearch';
     const filters = ['All', 'Owned', 'Wishlist', 'Sold'];
     const storedFilter = normalizeGearStatus(localStorage.getItem(filterStorageKey) || '');
-    const selectedFilter = filters.includes(this._selectedFilter)
-      ? this._selectedFilter
-      : (filters.includes(storedFilter) ? storedFilter : 'All');
+    const selectedFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'All');
     const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
-    const wishlistOnly = this._wishlistOnly ?? (localStorage.getItem(wishlistOnlyStorageKey) === '1');
+    const searchTerm = this._searchTerm ?? (localStorage.getItem(searchStorageKey) || '');
+    const advanced = this._advancedFilters || JSON.parse(localStorage.getItem(advancedStorageKey) || '{}');
     this._selectedFilter = selectedFilter;
     this._selectedSort = selectedSort;
-    this._wishlistOnly = wishlistOnly;
+    this._searchTerm = searchTerm;
+    this._advancedFilters = {
+      category: advanced.category || 'All',
+      brand: advanced.brand || 'All',
+      minPrice: advanced.minPrice || '',
+      maxPrice: advanced.maxPrice || '',
+      linksOnly: !!advanced.linksOnly,
+      hasTargetPrice: !!advanced.hasTargetPrice,
+      missingTargetPrice: !!advanced.missingTargetPrice,
+      expanded: !!advanced.expanded,
+    };
 
-    const stats = this._computeStats(gear);
-    const visible = this._sortGear(this._filterGear(gear, selectedFilter, wishlistOnly), selectedSort);
+    const stats = Utils.computeGearStats(gear);
+    const visible = this._sortGear(this._filterGear(gear, selectedFilter, searchTerm, this._advancedFilters), selectedSort);
     const byCategory = {};
     visible.forEach((g) => {
       const cat = g.category || 'Other';
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(g);
     });
+    const categories = ['All', ...new Set(gear.map((g) => g.category || g.type).filter(Boolean).sort())];
+    const brands = ['All', ...new Set(gear.map((g) => g.brand).filter(Boolean).sort())];
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80');">
@@ -79,14 +96,26 @@ Pages.Gear = {
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
               ${filters.map((f) => `<button type="button" class="df-btn ${selectedFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f}</button>`).join('')}
             </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px;align-items:center;">
+              <input class="df-input" id="gear-search" placeholder="Quick search: name, brand, type, notes, tags" value="${searchTerm.replace(/"/g, '&quot;')}">
+              <button type="button" class="df-btn df-btn--outline" id="gear-advanced-toggle">${this._advancedFilters.expanded ? 'Hide' : 'Show'} filters</button>
+            </div>
+            <div id="gear-advanced" style="display:${this._advancedFilters.expanded ? 'grid' : 'none'};grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;">
+              <select class="df-input" id="gear-filter-category">${categories.map((cat) => `<option value="${cat}" ${this._advancedFilters.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}</select>
+              <select class="df-input" id="gear-filter-brand">${brands.map((brand) => `<option value="${brand}" ${this._advancedFilters.brand === brand ? 'selected' : ''}>${brand}</option>`).join('')}</select>
+              <input class="df-input" id="gear-filter-min" type="number" step="0.01" placeholder="Min wishlist price" value="${this._advancedFilters.minPrice}">
+              <input class="df-input" id="gear-filter-max" type="number" step="0.01" placeholder="Max wishlist price" value="${this._advancedFilters.maxPrice}">
+              <label><input type="checkbox" id="gear-filter-links" ${this._advancedFilters.linksOnly ? 'checked' : ''}> With links</label>
+              <label><input type="checkbox" id="gear-filter-target" ${this._advancedFilters.hasTargetPrice ? 'checked' : ''}> With target price</label>
+              <label><input type="checkbox" id="gear-filter-missing-target" ${this._advancedFilters.missingTargetPrice ? 'checked' : ''}> Missing target price</label>
+            </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
               <label class="df-label" style="margin:0;">Sort</label>
-              <select class="df-input" id="gear-sort" style="max-width:220px;">
-                ${['Newest', 'Price low->high', 'Priority', 'Brand', 'Type'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+              <select class="df-input" id="gear-sort" style="max-width:240px;">
+                ${['Newest', 'Oldest', 'Name A-Z', 'Price low->high', 'Priority', 'Most used', 'Recently used'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
               </select>
-              <button type="button" class="df-btn ${wishlistOnly ? 'df-btn--primary' : 'df-btn--outline'}" id="gear-wishlist-only">Wishlist only</button>
             </div>
-            ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, wishlistOnly)}
+            ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, !!searchTerm)}
           </div>
 
           <aside style="flex:0 0 290px;max-width:330px;width:100%;position:sticky;top:84px;">
@@ -96,6 +125,7 @@ Pages.Gear = {
       </div>
     `;
 
+    const saveAdvanced = () => localStorage.setItem(advancedStorageKey, JSON.stringify(this._advancedFilters));
     app.querySelectorAll('[data-status-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const status = btn.getAttribute('data-status-filter');
@@ -105,15 +135,37 @@ Pages.Gear = {
       });
     });
 
-    app.querySelector('#gear-sort')?.addEventListener('change', (e) => {
-      this._selectedSort = e.target.value;
-      localStorage.setItem(sortStorageKey, this._selectedSort);
+    app.querySelector('#gear-search')?.addEventListener('input', (e) => {
+      this._searchTerm = e.target.value || '';
+      localStorage.setItem(searchStorageKey, this._searchTerm);
       this.render();
     });
 
-    app.querySelector('#gear-wishlist-only')?.addEventListener('click', () => {
-      this._wishlistOnly = !this._wishlistOnly;
-      localStorage.setItem(wishlistOnlyStorageKey, this._wishlistOnly ? '1' : '0');
+    app.querySelector('#gear-advanced-toggle')?.addEventListener('click', () => {
+      this._advancedFilters.expanded = !this._advancedFilters.expanded;
+      saveAdvanced();
+      this.render();
+    });
+
+    [['#gear-filter-category', 'category'], ['#gear-filter-brand', 'brand'], ['#gear-filter-min', 'minPrice'], ['#gear-filter-max', 'maxPrice']].forEach(([selector, key]) => {
+      app.querySelector(selector)?.addEventListener('input', (e) => {
+        this._advancedFilters[key] = e.target.value;
+        saveAdvanced();
+        this.render();
+      });
+    });
+
+    [['#gear-filter-links', 'linksOnly'], ['#gear-filter-target', 'hasTargetPrice'], ['#gear-filter-missing-target', 'missingTargetPrice']].forEach(([selector, key]) => {
+      app.querySelector(selector)?.addEventListener('change', (e) => {
+        this._advancedFilters[key] = !!e.target.checked;
+        saveAdvanced();
+        this.render();
+      });
+    });
+
+    app.querySelector('#gear-sort')?.addEventListener('change', (e) => {
+      this._selectedSort = e.target.value;
+      localStorage.setItem(sortStorageKey, this._selectedSort);
       this.render();
     });
 
@@ -126,8 +178,22 @@ Pages.Gear = {
         if (!row) return;
         const price = row.querySelector('[name="linkInlinePrice"]')?.value || '';
         const lastChecked = row.querySelector('[name="linkInlineLastChecked"]')?.value || '';
-        await DB.saveGearLink(gearId, { id: linkId, price, lastChecked });
+        const isPrimary = row.querySelector('[name="linkInlinePrimary"]')?.checked ? 1 : 0;
+        if (isPrimary) {
+          const gearItem = gear.find((g) => g.id === gearId);
+          await Promise.all((gearItem?.linksList || []).filter((l) => l.id !== linkId && Number(l.isPrimary)).map((l) => DB.saveGearLink(gearId, { id: l.id, isPrimary: 0 })));
+        }
+        await DB.saveGearLink(gearId, { id: linkId, price, lastChecked, isPrimary });
         Utils.toast?.('Link updated');
+        this.render();
+      });
+    });
+
+    app.querySelectorAll('[data-link-checked-today]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await DB.saveGearLink(btn.getAttribute('data-gear-id'), { id: btn.getAttribute('data-link-id'), lastChecked: Utils.today() });
+        Utils.toast?.('Checked today');
         this.render();
       });
     });
@@ -135,9 +201,35 @@ Pages.Gear = {
     setTimeout(() => Utils.staggerReveal(app, '.gear-card', 0), 50);
   },
 
-  _filterGear(gear, selectedFilter, wishlistOnly) {
+  _filterGear(gear, selectedFilter, searchTerm, advanced) {
     let visible = selectedFilter === 'All' ? gear : gear.filter((g) => g.status === selectedFilter);
-    if (wishlistOnly) visible = visible.filter((g) => g.status === 'Wishlist');
+    const needle = String(searchTerm || '').trim().toLowerCase();
+    if (needle) {
+      visible = visible.filter((g) => {
+        const tags = Array.isArray(g.tags) ? g.tags.join(' ') : String(g.tags || '');
+        const haystack = [g.name, g.brand, g.type, g.category, g.notes, tags].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(needle);
+      });
+    }
+    if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.type) === advanced.category);
+    if (advanced.brand && advanced.brand !== 'All') visible = visible.filter((g) => g.brand === advanced.brand);
+    if (advanced.linksOnly) visible = visible.filter((g) => (g.linksList || []).some((l) => l.url));
+    if (advanced.hasTargetPrice) visible = visible.filter((g) => g.status === 'Wishlist' && Number.isFinite(Number(g.targetPrice)));
+    if (advanced.missingTargetPrice) visible = visible.filter((g) => g.status === 'Wishlist' && !Number.isFinite(Number(g.targetPrice)));
+    const min = Number(advanced.minPrice);
+    const max = Number(advanced.maxPrice);
+    if (Number.isFinite(min) || Number.isFinite(max)) {
+      visible = visible.filter((g) => {
+        if (g.status !== 'Wishlist') return false;
+        const best = this._bestPrice(g);
+        const target = Number(g.targetPrice);
+        const p = Number.isFinite(best) ? best : target;
+        if (!Number.isFinite(p)) return false;
+        if (Number.isFinite(min) && p < min) return false;
+        if (Number.isFinite(max) && p > max) return false;
+        return true;
+      });
+    }
     return visible;
   },
 
@@ -145,20 +237,16 @@ Pages.Gear = {
     const priorityRank = { Dream: 0, High: 1, Medium: 2, Low: 3 };
     const sorted = [...items];
     sorted.sort((a, b) => {
-      if (selectedSort === 'Price low->high') {
-        return this._bestPrice(a) - this._bestPrice(b);
-      }
+      if (selectedSort === 'Oldest') return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+      if (selectedSort === 'Name A-Z') return String(a.name || '').localeCompare(String(b.name || ''));
+      if (selectedSort === 'Price low->high') return this._bestPrice(a) - this._bestPrice(b);
       if (selectedSort === 'Priority') {
         const ra = priorityRank[a.priority] ?? 99;
         const rb = priorityRank[b.priority] ?? 99;
         if (ra !== rb) return ra - rb;
       }
-      if (selectedSort === 'Brand') {
-        return String(a.brand || '').localeCompare(String(b.brand || ''));
-      }
-      if (selectedSort === 'Type') {
-        return String(a.category || a.type || '').localeCompare(String(b.category || b.type || ''));
-      }
+      if (selectedSort === 'Most used') return Number(b.usage?.usedCount || 0) - Number(a.usage?.usedCount || 0);
+      if (selectedSort === 'Recently used') return String(b.usage?.lastUsed || '').localeCompare(String(a.usage?.lastUsed || ''));
       return Number(b.createdAt || 0) - Number(a.createdAt || 0);
     });
     return sorted;
@@ -166,68 +254,12 @@ Pages.Gear = {
 
   _bestPrice(gearItem) {
     const prices = (gearItem.linksList || []).map((l) => money(l.price)).filter((v) => Number.isFinite(v) && v > 0);
+    if (Number.isFinite(Number(gearItem.targetPrice))) prices.push(Number(gearItem.targetPrice));
     return prices.length ? Math.min(...prices) : Number.POSITIVE_INFINITY;
   },
 
   _computeStats(gear) {
-    const owned = gear.filter((g) => g.status === 'Owned');
-    const sold = gear.filter((g) => g.status === 'Sold');
-    const wishlist = gear.filter((g) => g.status === 'Wishlist');
-
-    const ownedInvested = owned.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
-    const ownedAvgPurchase = (() => {
-      const withPrice = owned.filter((g) => Number.isFinite(Number(g.boughtPrice)));
-      if (!withPrice.length) return null;
-      const total = withPrice.reduce((sum, g) => sum + money(g.boughtPrice), 0);
-      return total / withPrice.length;
-    })();
-
-    const soldRecoveredNet = sold.reduce((sum, g) => sum + money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping), 0);
-    const soldCostBasis = sold.reduce((sum, g) => sum + money(g.boughtPrice) + money(g.tax) + money(g.shipping), 0);
-    const soldNetPL = soldRecoveredNet - soldCostBasis;
-
-    const soldWithProfit = sold.map((g) => {
-      const recovered = money(g.soldPrice) - money(g.soldFees) - money(g.soldShipping);
-      const basis = money(g.boughtPrice) + money(g.tax) + money(g.shipping);
-      return { item: g, profit: recovered - basis };
-    });
-
-    const bestFlip = soldWithProfit.length
-      ? soldWithProfit.reduce((best, row) => (row.profit > best.profit ? row : best), soldWithProfit[0])
-      : null;
-    const worstFlip = soldWithProfit.length
-      ? soldWithProfit.reduce((worst, row) => (row.profit < worst.profit ? row : worst), soldWithProfit[0])
-      : null;
-
-    const soldHoldDays = sold
-      .map((g) => {
-        const start = parseDay(g.boughtDate);
-        const end = parseDay(g.soldDate);
-        if (!start || !end) return null;
-        return Math.max(0, Math.round((end - start) / 86400000));
-      })
-      .filter((v) => v != null);
-
-    const avgHoldDays = soldHoldDays.length
-      ? Math.round((soldHoldDays.reduce((a, b) => a + b, 0) / soldHoldDays.length) * 10) / 10
-      : null;
-
-    const wishlistTargetTotal = wishlist.reduce((sum, g) => sum + money(g.targetPrice), 0);
-
-    return {
-      ownedCount: owned.length,
-      ownedInvested,
-      ownedAvgPurchase,
-      soldCount: sold.length,
-      soldRecoveredNet,
-      soldCostBasis,
-      soldNetPL,
-      bestFlip,
-      worstFlip,
-      avgHoldDays,
-      wishlistCount: wishlist.length,
-      wishlistTargetTotal,
-    };
+    return Utils.computeGearStats(gear || []);
   },
 
   _renderStatsCompact(stats) {
@@ -301,6 +333,10 @@ Pages.Gear = {
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
+          ${g.status === 'Owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+            <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
+            <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
+          </div>` : ''}
           <div class="gear-card__footer">
             ${g.boughtPrice || g.price ? `<span class="gear-card__price">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
             ${g.status ? `<span class="df-badge ${statusBadge}">${g.status}</span>` : ''}
@@ -311,11 +347,15 @@ Pages.Gear = {
             </div>
           </div>
           ${sortedLinks.slice(0, 3).map((link) => `
-            <div data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto;gap:6px;align-items:end;">
+            <div data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto auto;gap:6px;align-items:end;">
               <div style="font-size:12px;color:var(--text2);">${link.isPrimary ? '★ Primary' : ''} ${link.label || 'Link'}</div>
               <input class="df-input" name="linkInlinePrice" type="number" step="0.01" value="${link.price ?? ''}" placeholder="Price">
               <input class="df-input" name="linkInlineLastChecked" type="date" value="${link.lastChecked || ''}">
-              <button type="button" class="df-btn df-btn--outline" data-link-inline-save="1" data-gear-id="${g.id}" data-link-id="${link.id}">Save</button>
+              <label style="font-size:12px;color:var(--text2);display:flex;gap:4px;align-items:center;"><input type="checkbox" name="linkInlinePrimary" ${Number(link.isPrimary) ? 'checked' : ''}>Primary</label>
+              <div style="display:flex;gap:4px;">
+                <button type="button" class="df-btn df-btn--outline" data-link-checked-today="1" data-gear-id="${g.id}" data-link-id="${link.id}">Checked today</button>
+                <button type="button" class="df-btn df-btn--outline" data-link-inline-save="1" data-gear-id="${g.id}" data-link-id="${link.id}">Save</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -323,10 +363,10 @@ Pages.Gear = {
     `;
   },
 
-  _renderEmpty(filterLabel, wishlistOnly) {
+  _renderEmpty(filterLabel, hasSearch) {
     return `
       <div class="empty-state" style="padding:80px 0;">
-        <div class="empty-state__title">No ${(wishlistOnly ? 'wishlist ' : '') + (filterLabel === 'All' ? '' : filterLabel.toLowerCase() + ' ')}gear found</div>
+        <div class="empty-state__title">No ${(hasSearch ? 'matching ' : '') + (filterLabel === 'All' ? '' : filterLabel.toLowerCase() + ' ')}gear found</div>
         <div class="empty-state__text">Start tracking your guitars, amps, and accessories.</div>
         <a href="#/gear/add" class="df-btn df-btn--primary">+ Add Your First Item</a>
       </div>
