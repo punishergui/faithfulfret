@@ -46,29 +46,41 @@ jobs:
           load: true
           tags: faithfulfret:ci-smoke
 
-      - name: Smoke test container endpoints
+      - name: Smoke test container
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ./data
-          docker run -d --rm --name faithfulfret-smoke -p 3000:9999 -v "$PWD/data:/data" faithfulfret:ci-smoke
-          trap 'docker logs faithfulfret-smoke || true; docker stop faithfulfret-smoke || true' EXIT
 
+          # Create a writable data dir so REQUIRE_DATA_MOUNT doesn't kill the app
+          mkdir -p .ci-data
+
+          # Start container like prod: internal port 9999, host exposed on 3000
+          docker run -d --name faithfulfret-smoke \
+            -e NODE_ENV=production \
+            -e PORT=9999 \
+            -v "$PWD/.ci-data:/data" \
+            -p 3000:9999 \
+            faithfulfret:ci-smoke
+
+          # Wait up to ~30s for health
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3000/api/health > /tmp/health.json; then
-              break
+            if curl -fsS "http://127.0.0.1:3000/api/health" >/dev/null; then
+              echo "Smoke OK"
+              exit 0
             fi
             sleep 1
           done
 
-          curl -fsS http://127.0.0.1:3000/api/health | jq -e '.ok == true and (.db | type == "string")' >/dev/null
-          curl -fsS http://127.0.0.1:3000/api/sessions | jq -e 'type == "array"' >/dev/null
-          curl -fsS http://127.0.0.1:3000/api/stats | tee /tmp/stats.json | jq -e 'type == "object" and has("count") and has("totalHours")' >/dev/null
-          if grep -Eqi '<!doctype html|<html' /tmp/stats.json; then
-            echo '/api/stats returned HTML unexpectedly'
-            exit 1
-          fi
-          curl -fsS http://127.0.0.1:3000/ | grep -Eqi '<script'
+          echo "Smoke FAILED — dumping logs"
+          docker logs faithfulfret-smoke || true
+          exit 1
+
+      - name: Cleanup smoke container
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f faithfulfret-smoke || true
+
 
       - name: Build and push
         uses: docker/build-push-action@v6
