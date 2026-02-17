@@ -6,11 +6,12 @@ services:
     ports:
       - "3000:9999"
     volumes:
-      - ./data:/data
+      - /opt/stacks/faithfulfret/data:/data
     environment:
       PORT: "9999"
       NODE_ENV: "production"
       TZ: "America/Chicago"
+      REQUIRE_DATA_MOUNT: "true"
 
   faithfulfret-watchtower:
     image: containrrr/watchtower:1.7.1

@@ -31,11 +31,9 @@
   --f-body:  'Mulish', sans-serif;
 
   --tex-bg: none;
-  --tex-card: none;
-  --tex-card2: none;
-  --tex-opacity: 0.05;
+  --tex-opacity: 0.10;
   --tex-blend: soft-light;
-  --tex-scale: 512px 512px;
+  --tex-size: 120% 120%;
   --theme-top-glow: none;
 }
 
@@ -55,8 +53,7 @@ html[data-theme="shed"] {
   --line2: rgba(255,255,255,0.1);
   --border1: rgba(255,255,255,0.08);
   --tex-bg: url('/img/textures/tex1.png');
-  --tex-card: url('/img/textures/tex4.png');
-  --tex-card2: url('/img/textures/tex9.png');
+  --tex-opacity: 0.10;
 }
 
 html[data-theme="faithful"] {
@@ -76,7 +73,7 @@ html[data-theme="faithful"] {
   --border1: rgba(201,169,110,0.2);
   --theme-top-glow: radial-gradient(circle at 50% -10%, rgba(201,169,110,0.25), rgba(0,0,0,0) 60%);
   --tex-bg: url('/img/textures/tex2.png');
-  --tex-card: url('/img/textures/tex8.png');
+  --tex-opacity: 0.12;
 }
 
 html[data-theme="stage"] {
@@ -94,8 +91,8 @@ html[data-theme="stage"] {
   --line: rgba(128,255,220,0.12);
   --line2: rgba(128,255,220,0.2);
   --border1: rgba(128,255,220,0.2);
-  --tex-bg: none;
-  --tex-card: url('/img/textures/tex7.png');
+  --tex-bg: url('/img/textures/tex7.png');
+  --tex-opacity: 0.08;
 }
 
 html[data-theme="acoustic"] {
@@ -115,8 +112,7 @@ html[data-theme="acoustic"] {
   --line3: rgba(47,32,21,0.32);
   --border1: rgba(47,32,21,0.24);
   --tex-bg: url('/img/textures/tex6.png');
-  --tex-card: url('/img/textures/tex3.png');
-  --tex-card2: url('/img/textures/tex5.png');
+  --tex-opacity: 0.14;
 }
 
 /* Reset & Base */
@@ -136,11 +132,10 @@ body {
   background-color: var(--bg1);
   background-image:
     var(--theme-top-glow),
-    linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.24) 30%, rgba(0,0,0,0.48) 100%),
-    var(--tex-bg);
-  background-size: auto, auto, var(--tex-scale);
-  background-position: center top, center top, center top;
-  background-repeat: no-repeat, no-repeat, repeat;
+    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 45%, var(--bg3) 100%);
+  background-size: auto, cover;
+  background-position: center top, center center;
+  background-repeat: no-repeat, no-repeat;
   color: var(--text);
   font-family: var(--f-body);
   font-size: 15px;
@@ -153,13 +148,10 @@ body {
 }
 
 .card {
-  background-color: var(--card);
-  background-image:
-    linear-gradient(160deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18)),
-    var(--tex-card);
-  background-size: auto, var(--tex-scale);
-  background-repeat: no-repeat, repeat;
+  background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(0,0,0,0.20)), var(--card);
   border: 1px solid var(--border1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .ff-theme-opt {
@@ -174,6 +166,33 @@ body {
 .ff-theme-opt.is-active {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 1px var(--accent), 0 0 18px var(--glow);
+}
+
+.settings-panel {
+  padding: 20px;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.ff-theme-opt {
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  background: linear-gradient(165deg, rgba(255,255,255,0.09), rgba(0,0,0,0.22)), var(--card2);
+}
+
+.ff-theme-opt__preview {
+  height: 42px;
+  border: 1px solid var(--line2);
+  background-image: linear-gradient(160deg, rgba(255,255,255,.14), rgba(0,0,0,.22));
+  background-size: cover;
+  background-position: center;
 }
 
 html[data-theme="stage"] .df-btn--primary {
@@ -201,10 +220,13 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 128px 128px;
-  opacity: 0.03;
+  background-image: var(--tex-bg);
+  background-repeat: no-repeat;
+  background-size: var(--tex-size);
+  background-position: center;
+  opacity: var(--tex-opacity);
+  filter: blur(1.5px) contrast(0.88);
+  mix-blend-mode: var(--tex-blend);
 }
 
 a {

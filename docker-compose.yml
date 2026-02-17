@@ -10,4 +10,4 @@ services:
       - PORT=9999
       - NODE_ENV=production
     volumes:
-      - /data:/data
+      - ./data:/data
