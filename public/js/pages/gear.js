@@ -435,7 +435,7 @@ Pages.Gear = {
       return `${prefix}: ${flip.item.name || 'Unnamed'} (${formatCurrency(flip.profit)})`;
     };
     return `
-      <div class="df-panel" style="padding:14px;">
+      <div class="df-panel df-panel--wide" style="padding:14px;">
         <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Gear Stats</div>
         <div style="display:grid;grid-template-columns:1fr;gap:8px;">
           <div class="df-statbar__item"><div class="df-statbar__key">Owned count</div><div class="df-statbar__val">${stats.ownedCount}</div></div>
@@ -468,7 +468,7 @@ Pages.Gear = {
     const statusBadge = {
       owned: 'df-badge--green',
       sold: 'df-badge--red',
-      wishlist: 'df-badge--orange',
+      wishlist: 'df-badge--accent',
     }[normalizeGearStatus(g.status)] || 'df-badge--muted';
     const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
     const topLink = sortedLinks.find((l) => l.url);
@@ -572,7 +572,7 @@ Pages.GearForm = {
       </div>
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
-        <form id="gear-form" novalidate>
+        <form id="gear-form" class="df-panel df-panel--wide" novalidate>
           <div class="form-grid">
             <div class="df-field full-width"><label class="df-label" for="g-name">Name *</label><input type="text" id="g-name" name="name" class="df-input" value="${gear.name || ''}" required></div>
             <div class="df-field"><label class="df-label" for="g-category">Category</label><select id="g-category" name="category" class="df-input"><option value="">— Select —</option>${categories.map((c) => `<option value="${c}" ${gear.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>

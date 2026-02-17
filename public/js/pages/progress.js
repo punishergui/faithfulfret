@@ -31,12 +31,12 @@ Pages.Progress = {
 
       <div class="page-wrap" style="padding:24px 24px 60px;display:grid;gap:16px;">
         ${activeTab === 'overview' ? `
-          <div class="df-panel" style="padding:16px;">${this._renderStatBar(stats)}</div>
-          <div class="df-panel" style="padding:16px;">${this._renderInsightCards(sessions, stats)}</div>
+          <div class="df-panel df-panel--wide" style="padding:16px;">${this._renderStatBar(stats)}</div>
+          <div class="df-panel df-panel--wide" style="padding:16px;">${this._renderInsightCards(sessions, stats)}</div>
         ` : ''}
 
         ${activeTab === 'practice' ? `
-          <div class="df-panel" style="padding:16px;">${this._renderYearHeatmap(heatmapDays, stats)}</div>
+          <div class="df-panel df-panel--wide" style="padding:16px;">${this._renderYearHeatmap(heatmapDays, stats)}</div>
           ${sessions.length >= 2 ? `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
               <div class="df-chart"><div class="df-chart__title">BPM Over Time</div><div id="bpm-chart"></div></div>
@@ -45,10 +45,10 @@ Pages.Progress = {
           ` : ''}
         ` : ''}
 
-        ${activeTab === 'gear' ? `<div class="df-panel" style="padding:16px;">${this._renderGearStats(gearStats)}</div>` : ''}
+        ${activeTab === 'gear' ? `<div class="df-panel df-panel--wide" style="padding:16px;">${this._renderGearStats(gearStats)}</div>` : ''}
 
         ${activeTab === 'presets' ? `
-          <div class="df-panel" style="padding:16px;">
+          <div class="df-panel df-panel--wide" style="padding:16px;">
             <div class="section-header"><span class="section-header__label">Preset Summary</span></div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
               <div class="df-statbar__item"><div class="df-statbar__key">Total presets</div><div class="df-statbar__val">${presets.length}</div></div>
@@ -58,9 +58,9 @@ Pages.Progress = {
           </div>
         ` : ''}
 
-        <div class="df-panel" style="padding:16px;">${this._renderExportImport()}</div>
+        <div class="df-panel df-panel--wide" style="padding:16px;">${this._renderExportImport()}</div>
 
-        ${sessions.length ? `<div class="df-panel" style="padding:16px;">${this._renderTable(sessions)}</div>` : this._renderEmpty()}
+        ${sessions.length ? `<div class="df-panel df-panel--wide" style="padding:16px;">${this._renderTable(sessions)}</div>` : this._renderEmpty()}
       </div>
     `;
 
@@ -351,7 +351,7 @@ Pages.Progress = {
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:24px;">
         ${cards.map(c => `
-          <div class="df-panel" style="padding:14px;">
+          <div class="df-panel df-panel--wide" style="padding:14px;">
             <div style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">${c.k}</div>
             <div style="font-family:var(--f-hero);font-size:30px;line-height:1;color:var(--accent);">${c.v}</div>
             ${c.hint ? `<div style="font-size:12px;color:var(--text2);margin-top:6px;">${c.hint}</div>` : ''}
@@ -413,16 +413,18 @@ Pages.Progress = {
             const sessionCount = (data.sessions || []).length;
             const gearCount = (data.gear || []).length;
             const resourceCount = (data.resources || []).length;
+            const presetCount = (data.presets || []).length;
 
-            if (!confirm(`Import backup? This will REPLACE all existing data.\n\n${sessionCount} sessions, ${gearCount} gear items, ${resourceCount} resources.`)) {
+            if (!confirm(`Import backup? This will REPLACE all existing data.\n\n${sessionCount} sessions, ${gearCount} gear items, ${resourceCount} resources, ${presetCount} presets.`)) {
               importFile.value = '';
               return;
             }
 
-            await DB.importAll(data);
+            const result = await DB.importAll(data);
+            const counts = result?.counts || {};
 
             importStatus.style.display = 'block';
-            importStatus.textContent = `✓ Imported ${sessionCount} sessions, ${gearCount} gear, ${resourceCount} resources.`;
+            importStatus.textContent = `✓ Imported ${counts.sessions ?? sessionCount} sessions, ${counts.gear ?? gearCount} gear, ${counts.resources ?? resourceCount} resources, ${counts.presets ?? (data.presets || []).length} presets.`;
 
             setTimeout(() => {
               importFile.value = '';

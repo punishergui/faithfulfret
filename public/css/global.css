@@ -28,17 +28,25 @@
   --heroGlow: color-mix(in srgb, var(--accent) 30%, transparent);
   --btnBg: var(--accent);
   --btnHover: var(--accent2);
+  --btnActive: color-mix(in srgb, var(--accent) 78%, #000 22%);
+  --link: var(--accent2);
+  --linkHover: var(--accent);
+  --focusRing: color-mix(in srgb, var(--accent) 45%, transparent);
+  --navActiveBg: color-mix(in srgb, var(--accent) 12%, transparent);
   --pillBg: rgba(255, 255, 255, 0.03);
   --pillActiveBg: color-mix(in srgb, var(--accent) 20%, transparent);
-  --pillActiveText: var(--text);
+  --pillActiveText: var(--accent2);
   --panelBg: rgba(16, 16, 14, 0.76);
   --panelBg2: rgba(255,255,255,0.04);
   --panelBorder: var(--border1);
   --panelShadow: 0 10px 28px rgba(0,0,0,0.35);
+  --panelEdgeGlow: color-mix(in srgb, var(--accent) 12%, transparent);
+  --widgetBg: color-mix(in srgb, var(--panelBg) 88%, transparent);
   --heat0: rgba(255,255,255,0.03);
   --heat1: color-mix(in srgb, var(--accent) 28%, transparent);
   --heat2: color-mix(in srgb, var(--accent) 46%, transparent);
   --heat3: color-mix(in srgb, var(--accent) 72%, transparent);
+  --heat4: var(--accent);
   --green:   #39ff14;
   --red:     #ff2d55;
   --yellow:  #ffd60a;
@@ -111,24 +119,104 @@ html[data-theme="stage"] {
 }
 
 html[data-theme="acoustic"] {
-  --bg1: #3a2f24;
-  --bg2: #443629;
-  --bg3: #4d3d2e;
-  --card: #534230;
-  --card2: #5f4c39;
-  --accent: #b18452;
-  --accent2: #c29766;
-  --accentGlow: rgba(177,132,82,0.24);
-  --text: #ead8bf;
-  --text1: #ead8bf;
-  --text2: #c9ae8b;
-  --text3: #a88d6f;
+  --bg1: #26211b;
+  --bg2: #2f2820;
+  --bg3: #3a3127;
+  --card: #3f3529;
+  --card2: #4a3d30;
+  --accent: #b88858;
+  --accent2: #d2a97a;
+  --accentGlow: rgba(184,136,88,0.22);
+  --text: #f1e1cc;
+  --text1: #f1e1cc;
+  --text2: #ceb593;
+  --text3: #a88f71;
   --line: rgba(237,205,163,0.14);
   --line2: rgba(237,205,163,0.24);
   --line3: rgba(237,205,163,0.32);
   --border1: rgba(237,205,163,0.22);
-  --panelBg: rgba(95, 76, 57, 0.66);
-  --panelBg2: rgba(243,219,178,0.08);
+  --panelBg: rgba(74, 61, 48, 0.7);
+  --panelBg2: rgba(243,219,178,0.07);
+}
+
+html[data-theme="neon_green"] {
+  --bg1: #08100b;
+  --bg2: #0b1710;
+  --bg3: #102118;
+  --card: #122419;
+  --card2: #173123;
+  --accent: #39ff88;
+  --accent2: #7dffb3;
+  --accentGlow: rgba(57,255,136,0.25);
+  --text: #e2ffee;
+  --text1: #e2ffee;
+  --text2: #91c7a8;
+  --text3: #5f8670;
+  --line: rgba(126,255,184,0.12);
+  --line2: rgba(126,255,184,0.22);
+  --border1: rgba(126,255,184,0.2);
+  --panelBg: rgba(14, 28, 20, 0.72);
+  --panelBg2: rgba(144,255,203,0.04);
+}
+
+html[data-theme="neon_purple"] {
+  --bg1: #0e0a16;
+  --bg2: #151022;
+  --bg3: #1d1730;
+  --card: #1f1934;
+  --card2: #2b2348;
+  --accent: #b85cff;
+  --accent2: #d597ff;
+  --accentGlow: rgba(184,92,255,0.24);
+  --text: #efe5ff;
+  --text1: #efe5ff;
+  --text2: #bda4d7;
+  --text3: #8d79a7;
+  --line: rgba(208,150,255,0.13);
+  --line2: rgba(208,150,255,0.22);
+  --border1: rgba(208,150,255,0.2);
+  --panelBg: rgba(32, 24, 50, 0.72);
+  --panelBg2: rgba(213,151,255,0.04);
+}
+
+html[data-theme="midnight_blue"] {
+  --bg1: #070d16;
+  --bg2: #0d1724;
+  --bg3: #122032;
+  --card: #142438;
+  --card2: #1d3250;
+  --accent: #4db6ff;
+  --accent2: #8ed4ff;
+  --accentGlow: rgba(77,182,255,0.24);
+  --text: #e3f3ff;
+  --text1: #e3f3ff;
+  --text2: #96b8d4;
+  --text3: #6788a3;
+  --line: rgba(132,200,255,0.14);
+  --line2: rgba(132,200,255,0.24);
+  --border1: rgba(132,200,255,0.2);
+  --panelBg: rgba(18, 34, 52, 0.72);
+  --panelBg2: rgba(157,214,255,0.04);
+}
+
+html[data-theme="carbon"] {
+  --bg1: #111214;
+  --bg2: #16191e;
+  --bg3: #1c2128;
+  --card: #20262f;
+  --card2: #29303a;
+  --accent: #7de2d1;
+  --accent2: #a8efe3;
+  --accentGlow: rgba(125,226,209,0.24);
+  --text: #e5edf5;
+  --text1: #e5edf5;
+  --text2: #9fb0c2;
+  --text3: #748396;
+  --line: rgba(173,198,226,0.14);
+  --line2: rgba(173,198,226,0.24);
+  --border1: rgba(173,198,226,0.2);
+  --panelBg: rgba(28, 33, 40, 0.72);
+  --panelBg2: rgba(198,221,243,0.04);
 }
 
 /* Reset & Base */
@@ -174,9 +262,20 @@ body {
   background: linear-gradient(165deg, var(--panelBg2), transparent 60%), var(--panelBg);
   border: 1px solid var(--panelBorder);
   box-shadow: var(--panelShadow);
+  position: relative;
+  overflow: hidden;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+.df-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at top right, var(--panelEdgeGlow), transparent 56%);
+}
+.df-panel--tight { padding: 12px; }
+.df-panel--wide { padding: 16px; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .df-panel { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
@@ -243,9 +342,11 @@ html[data-theme="acoustic"] .df-btn--primary {
 
 
 a {
-  color: var(--text);
+  color: var(--link);
   text-decoration: none;
 }
+
+a:hover { color: var(--linkHover); }
 
 button {
   cursor: pointer;
@@ -333,6 +434,7 @@ img {
 .nav__link:hover,
 .nav__link.active {
   color: var(--accent);
+  background: var(--navActiveBg);
   text-shadow: 0 0 8px var(--glow);
 }
 
@@ -589,7 +691,7 @@ img {
   white-space: nowrap;
 }
 
-.df-badge--orange { color: var(--accent);  border-color: color-mix(in srgb, var(--accent) 35%, transparent);  background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.df-badge--accent { color: var(--accent);  border-color: color-mix(in srgb, var(--accent) 35%, transparent);  background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .df-badge--green  { color: var(--green);   border-color: rgba(57,255,20,.25); background: rgba(57,255,20,.05); }
 .df-badge--muted  { color: var(--text3);   border-color: var(--line);         background: transparent; }
 .df-badge--red    { color: var(--red);     border-color: rgba(255,45,85,.25); background: rgba(255,45,85,.05); }
@@ -618,7 +720,7 @@ img {
 .df-input:focus,
 .df-input:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--glow2);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--focusRing), 0 0 12px var(--glow2);
 }
 
 input.df-input,
@@ -641,7 +743,7 @@ input.df-input:focus,
 textarea.df-input:focus,
 select.df-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--glow2);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--focusRing), 0 0 12px var(--glow2);
 }
 
 textarea.df-input {
@@ -709,6 +811,8 @@ select.df-input option {
   box-shadow: 0 0 24px var(--accentGlow);
 }
 
+.df-btn--primary:active { background: var(--btnActive); }
+
 .df-btn--outline {
   background: transparent;
   color: var(--text2);
@@ -718,7 +822,10 @@ select.df-input option {
 .df-btn--outline:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
+
+.df-btn--outline:active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 
 .df-btn--danger {
   background: transparent;
@@ -1432,9 +1539,9 @@ select.df-input option {
   inset: 0;
   background: var(--heroBg), linear-gradient(
     180deg,
-    rgba(10,10,8,0.62) 0%,
-    rgba(10,10,8,0.82) 55%,
-    rgba(10,10,8,0.97) 100%
+    color-mix(in srgb, var(--bg1) 62%, transparent) 0%,
+    color-mix(in srgb, var(--bg1) 82%, transparent) 55%,
+    color-mix(in srgb, var(--bg1) 97%, transparent) 100%
   );
   z-index: 0;
 }
@@ -2547,7 +2654,7 @@ select.df-input option {
 }
 
 .heatmap-toggle button.is-active {
-  color: var(--accent2);
+  color: var(--pillActiveText);
   background: var(--pillActiveBg);
 }
 
@@ -2586,7 +2693,7 @@ select.df-input option {
 .heatmap-cell.level-1 { background: var(--heat1); }
 .heatmap-cell.level-2 { background: var(--heat2); }
 .heatmap-cell.level-3 { background: var(--heat3); }
-.heatmap-cell.level-4 { background: var(--accent); box-shadow: 0 0 10px var(--glow); }
+.heatmap-cell.level-4 { background: var(--heat4); box-shadow: 0 0 10px var(--glow); }
 
 .heatmap-legend {
   display: flex;

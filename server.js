@@ -41,6 +41,59 @@ function buildJsonExport() {
   };
 }
 
+
+
+function countExportEntities(payload) {
+  return {
+    sessions: Array.isArray(payload.sessions) ? payload.sessions.length : 0,
+    gear: Array.isArray(payload.gear) ? payload.gear.length : 0,
+    gear_links: Array.isArray(payload.gear_links) ? payload.gear_links.length : 0,
+    gear_images: Array.isArray(payload.gear_images) ? payload.gear_images.length : 0,
+    session_gear: Array.isArray(payload.session_gear) ? payload.session_gear.length : 0,
+    resources: Array.isArray(payload.resources) ? payload.resources.length : 0,
+    presets: Array.isArray(payload.presets) ? payload.presets.length : 0,
+  };
+}
+
+function withExportMeta(payload) {
+  const schemaVersion = 2;
+  const exportedAt = payload.exportedAt || new Date().toISOString();
+  return { ...payload, schemaVersion, exportedAt, counts: countExportEntities(payload) };
+}
+
+function validateImportPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid import payload');
+  const requiredArrays = ['sessions', 'gear', 'resources', 'presets'];
+  requiredArrays.forEach((key) => {
+    if (payload[key] != null && !Array.isArray(payload[key])) throw new Error(`invalid ${key}: expected array`);
+  });
+}
+
+function restoreFromPayload(payload) {
+  validateImportPayload(payload);
+  Store.clearAll();
+  for (const row of (payload.sessions || [])) Store.saveSession(row);
+  for (const row of (payload.gear || [])) {
+    const saved = Store.saveGear(row);
+    if (Array.isArray(row.linksList) && row.linksList.length) Store.replaceGearLinks(saved.id, row.linksList);
+  }
+  for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
+  for (const row of (payload.gear_images || [])) {
+    if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
+  }
+  const sessionGear = payload.session_gear || payload.sessionGear || [];
+  const grouped = {};
+  sessionGear.forEach((row) => {
+    if (!row?.sessionId || !row?.gearId) return;
+    if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
+    grouped[row.sessionId].push(row.gearId);
+  });
+  Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
+  for (const row of (payload.resources || [])) Store.saveResource(row);
+  for (const row of (payload.presets || [])) Store.savePreset(row);
+  return countExportEntities(payload);
+}
+
 function copyTreeIntoZip(zip, basePath, zipPath) {
   if (!fs.existsSync(basePath)) return;
   const entries = fs.readdirSync(basePath, { withFileTypes: true });
@@ -426,7 +479,7 @@ apiRouter.delete('/resources/:id', (req, res) => {
 });
 
 apiRouter.get('/export', (req, res) => {
-  res.json(buildJsonExport());
+  res.json(withExportMeta(buildJsonExport()));
 });
 
 
@@ -462,7 +515,7 @@ apiRouter.get('/export/zip', async (req, res) => {
     backupPath = createSafeSqliteBackup();
     const zip = new JSZip();
     zip.file('faithfulfret.sqlite', fs.readFileSync(backupPath));
-    zip.file('export.json', JSON.stringify(buildJsonExport(), null, 2));
+    zip.file('export.json', JSON.stringify(withExportMeta(buildJsonExport()), null, 2));
     copyTreeIntoZip(zip, gearMediaDir, 'gear');
     copyTreeIntoZip(zip, presetMediaDir, 'presets');
 
@@ -480,30 +533,13 @@ apiRouter.get('/export/zip', async (req, res) => {
 });
 
 apiRouter.post('/import', (req, res) => {
-  const payload = req.body || {};
-  Store.clearAll();
-  for (const row of (payload.sessions || [])) Store.saveSession(row);
-  for (const row of (payload.gear || [])) {
-    const saved = Store.saveGear(row);
-    if (Array.isArray(row.linksList) && row.linksList.length) {
-      Store.replaceGearLinks(saved.id, row.linksList);
-    }
+  try {
+    const payload = req.body || {};
+    const counts = restoreFromPayload(payload);
+    res.json({ ok: true, counts, schemaVersion: payload.schemaVersion || 1 });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'invalid import payload' });
   }
-  for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
-  for (const row of (payload.gear_images || [])) {
-    if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
-  }
-  const sessionGear = payload.session_gear || payload.sessionGear || [];
-  const grouped = {};
-  sessionGear.forEach((row) => {
-    if (!row?.sessionId || !row?.gearId) return;
-    if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
-    grouped[row.sessionId].push(row.gearId);
-  });
-  Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
-  for (const row of (payload.resources || [])) Store.saveResource(row);
-  for (const row of (payload.presets || [])) Store.savePreset(row);
-  res.json({ ok: true });
 });
 
 
@@ -555,26 +591,7 @@ apiRouter.post('/import/zip', upload.single('backupZip'), async (req, res) => {
 
     if (!fs.existsSync(dbFromZip) && fs.existsSync(path.join(tempExtract, 'export.json'))) {
       const payload = JSON.parse(fs.readFileSync(path.join(tempExtract, 'export.json'), 'utf8'));
-      Store.clearAll();
-      for (const row of (payload.sessions || [])) Store.saveSession(row);
-      for (const row of (payload.gear || [])) {
-        const saved = Store.saveGear(row);
-        if (Array.isArray(row.linksList) && row.linksList.length) Store.replaceGearLinks(saved.id, row.linksList);
-      }
-      for (const row of (payload.gear_links || [])) Store.saveGearLink({ ...row, isPrimary: Number(row?.isPrimary) ? 1 : 0 });
-      for (const row of (payload.gear_images || [])) {
-        if (row?.gearId && row?.filePath) Store.addGearImage({ gearId: row.gearId, filePath: row.filePath, sortOrder: row.sortOrder || 0 });
-      }
-      const sessionGear = payload.session_gear || payload.sessionGear || [];
-      const grouped = {};
-      sessionGear.forEach((row) => {
-        if (!row?.sessionId || !row?.gearId) return;
-        if (!grouped[row.sessionId]) grouped[row.sessionId] = [];
-        grouped[row.sessionId].push(row.gearId);
-      });
-      Object.entries(grouped).forEach(([sessionId, gearIds]) => Store.saveSessionGear(sessionId, gearIds));
-      for (const row of (payload.resources || [])) Store.saveResource(row);
-      for (const row of (payload.presets || [])) Store.savePreset(row);
+      restoreFromPayload(payload);
     }
 
     res.json({ ok: true, dbInfo: Store.getDbInfo() });

@@ -164,6 +164,7 @@
   }
 
   window.Pages = window.Pages || {};
+  window.Utils?.applyThemeColorMeta?.();
 })();
 
 
@@ -186,10 +187,10 @@
       const app = document.getElementById("app");
       if (app) {
         app.innerHTML = `
-          <div style="max-width:900px;margin:24px auto;padding:16px;border:1px solid #ff6a00;border-radius:12px;background:rgba(0,0,0,.35)">
+          <div style="max-width:900px;margin:24px auto;padding:16px;border:1px solid var(--accent);border-radius:12px;background:rgba(0,0,0,.35)">
             <h2 style="margin:0 0 8px 0;font-family:system-ui">UI failed to start</h2>
             <p style="margin:0 0 12px 0;opacity:.9;font-family:system-ui">Router did not mount. Open DevTools → Console for details.</p>
-            <button onclick="location.reload()" style="padding:10px 14px;border:0;border-radius:10px;background:#ff6a00;color:#000;font-weight:700;cursor:pointer">Reload</button>
+            <button onclick="location.reload()" style="padding:10px 14px;border:0;border-radius:10px;background:var(--accent);color:#000;font-weight:700;cursor:pointer">Reload</button>
           </div>`;
       }
     }

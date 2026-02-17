@@ -87,7 +87,7 @@ Pages.Sessions = {
           ${s.win ? `<div class="session-card__win">${Utils.truncate(s.win, 80)}</div>` : ''}
           <div class="session-card__chips">
             ${s.minutes ? `<span class="df-badge df-badge--muted">${s.minutes}m</span>` : ''}
-            ${s.bpm ? `<span class="df-badge df-badge--orange">${s.bpm}bpm</span>` : ''}
+            ${s.bpm ? `<span class="df-badge df-badge--accent">${s.bpm}bpm</span>` : ''}
             ${s.videoId ? `<span class="df-badge df-badge--red">&#9654; REC</span>` : ''}
             ${(s.gear || []).slice(0, 2).map((item) => `<span class="df-badge df-badge--muted">${item.name}</span>`).join('')}
             ${(s.gear || []).length > 2 ? `<span class="df-badge df-badge--muted">+${(s.gear || []).length - 2}</span>` : ''}

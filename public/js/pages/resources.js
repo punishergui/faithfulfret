@@ -27,7 +27,7 @@ Pages.Resources = {
       </div>
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
-        ${resources.length ? this._renderByCategory(byCategory) : this._renderEmpty()}
+        ${resources.length ? `<div class="df-panel df-panel--wide">${this._renderByCategory(byCategory)}</div>` : this._renderEmpty()}
       </div>
     `;
   },
@@ -128,7 +128,7 @@ Pages.ResourceForm = {
       </div>
 
       <div class="page-wrap" style="padding:32px 24px 60px;">
-        <form id="resource-form" novalidate>
+        <form id="resource-form" class="df-panel df-panel--wide" novalidate>
           <div class="form-grid">
             <div class="df-field full-width">
               <label class="df-label" for="r-title">Title *</label>
