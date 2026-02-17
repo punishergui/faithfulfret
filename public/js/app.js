@@ -163,6 +163,27 @@
     }, 60 * 1000);
   }
 
+
+  document.addEventListener('click', async (event) => {
+    const actionEl = event.target.closest('[data-action]');
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    try {
+      if (action === 'open-session-builder') {
+        event.preventDefault();
+        window.go?.('#/training/session-builder');
+        return;
+      }
+      if (!window.TrainingUI) return;
+      if (action === 'create-draft-session') await window.TrainingUI.createDraftSession();
+      if (action === 'add-lesson') window.TrainingUI.openLessonModal();
+      if (action === 'add-exercise') await window.TrainingUI.addExercise();
+      if (action === 'add-note') await window.TrainingUI.addNote();
+    } catch (error) {
+      window.TrainingUI?.showMessage?.(`Action failed: ${error.message || error}`, 'error');
+    }
+  });
+
   window.Pages = window.Pages || {};
   window.Utils?.applyThemeColorMeta?.();
 })();

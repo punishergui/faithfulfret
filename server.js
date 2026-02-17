@@ -727,6 +727,46 @@ apiRouter.delete('/lessons/:id', (req, res) => {
   return res.json({ ok: true });
 });
 
+
+apiRouter.get('/training-playlists', (req, res) => {
+  res.json(Store.listTrainingPlaylists());
+});
+
+apiRouter.post('/training-playlists', (req, res) => {
+  if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
+  return res.status(201).json(Store.saveTrainingPlaylist(req.body || {}));
+});
+
+apiRouter.get('/training-playlists/:id', (req, res) => {
+  const row = Store.getTrainingPlaylist(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  return res.json(row);
+});
+
+apiRouter.put('/training-playlists/:id', (req, res) => {
+  const existing = Store.getTrainingPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  return res.json(Store.saveTrainingPlaylist({ ...existing, ...req.body, id: Number(req.params.id) }));
+});
+
+apiRouter.delete('/training-playlists/:id', (req, res) => {
+  const existing = Store.getTrainingPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  Store.deleteTrainingPlaylist(req.params.id);
+  return res.json({ ok: true });
+});
+
+apiRouter.get('/training-playlists/:id/items', (req, res) => {
+  return res.json(Store.listTrainingPlaylistItems(req.params.id));
+});
+
+apiRouter.put('/training-playlists/:id/items', (req, res) => {
+  const existing = Store.getTrainingPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  return res.json(Store.replaceTrainingPlaylistItems(req.params.id, items));
+});
+
 apiRouter.get('/lesson-stats/:id', (req, res) => {
   const stats = Store.getLessonStats(req.params.id);
   return res.json({

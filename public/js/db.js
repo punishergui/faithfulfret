@@ -250,6 +250,21 @@
     },
     async deleteAttachment(id) { return api(`/api/attachments/${id}`, { method: 'DELETE' }); },
 
+    async getTrainingPlaylists() { return api('/api/training-playlists'); },
+    async getTrainingPlaylist(id) {
+      try { return await api(`/api/training-playlists/${id}`); } catch { return null; }
+    },
+    async saveTrainingPlaylist(data) {
+      return data.id
+        ? api(`/api/training-playlists/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
+        : api('/api/training-playlists', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async deleteTrainingPlaylist(id) { return api(`/api/training-playlists/${id}`, { method: 'DELETE' }); },
+    async getTrainingPlaylistItems(id) { return api(`/api/training-playlists/${id}/items`); },
+    async replaceTrainingPlaylistItems(id, items) {
+      return api(`/api/training-playlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) });
+    },
+
     // Training Videos
     async fetchOEmbed(url) {
       return api(`/api/oembed?url=${encodeURIComponent(url || '')}`);

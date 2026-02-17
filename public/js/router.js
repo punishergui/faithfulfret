@@ -20,6 +20,8 @@
     { pattern: /^#\/training\/module\/(\d+)$/,     handler: (m) => Pages.TrainingModule.render(m[1]) },
     { pattern: /^#\/training\/lesson\/(\d+)$/,     handler: (m) => Pages.TrainingLesson.render(m[1]) },
     { pattern: /^#\/training\/session-builder$/,     handler: () => Pages.TrainingSessionBuilder.render() },
+    { pattern: /^#\/training\/playlists$/,     handler: () => Pages.TrainingPlaylists.render() },
+    { pattern: /^#\/training\/playlists\/(\d+)$/,     handler: (m) => Pages.TrainingPlaylistDetail.render(m[1]) },
     { pattern: /^#\/resources\/videos\/(\d+)\/edit$/, handler: (m) => Pages.ResourceVideosEdit.render(m[1]) },
     { pattern: /^#\/resources\/videos\/(\d+)$/,      handler: (m) => Pages.ResourceVideoDetail.render(m[1]) },
     { pattern: /^#\/resources\/videos(?:\?.*)?$/,     handler: () => Pages.ResourceVideosList.render() },

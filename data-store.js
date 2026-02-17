@@ -215,6 +215,20 @@ CREATE TABLE IF NOT EXISTS lesson_repeat_goals (
   target_repeats INTEGER,
   target_minutes INTEGER
 );
+CREATE TABLE IF NOT EXISTS training_playlists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS training_playlist_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  playlist_id INTEGER NOT NULL,
+  lesson_id INTEGER NOT NULL,
+  position INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS attachments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   entity_type TEXT NOT NULL CHECK(entity_type IN ('lesson','video')),
@@ -279,6 +293,7 @@ ensureColumn('sessions', 'status', 'TEXT');
 ensureColumn('lessons', 'notes_md', 'TEXT');
 ensureColumn('lessons', 'practice_plan_md', 'TEXT');
 ensureColumn('lessons', 'chords_md', 'TEXT');
+ensureColumn('courses', 'level', 'INTEGER');
 
 db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_module_id ON lessons(module_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_modules_course_id ON modules(course_id)');
@@ -286,6 +301,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_courses_provider_id ON courses(provider_
 db.exec('CREATE INDEX IF NOT EXISTS idx_session_items_lesson_id ON session_items(lesson_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_session_items_session_id ON session_items(session_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_training_playlist_items_playlist_id ON training_playlist_items(playlist_id)');
 }
 
 function openDb() {
@@ -741,14 +757,16 @@ const listCourses = (providerId) => {
 const getCourse = (id) => one('SELECT * FROM courses WHERE id = ?', Number(id));
 const saveCourse = (data = {}) => {
   const now = Date.now();
+  const level = Number(data.level);
+  const normalizedLevel = Number.isFinite(level) && level > 0 ? Math.floor(level) : null;
   if (data.id) {
     run(`UPDATE courses SET provider_id=@provider_id,title=@title,slug=@slug,description=@description,level=@level,sort_order=@sort_order WHERE id=@id`, {
-      id: Number(data.id), provider_id: Number(data.provider_id), title: data.title || '', slug: data.slug || slugify(data.title), description: data.description || '', level: data.level || '', sort_order: Number(data.sort_order) || 0,
+      id: Number(data.id), provider_id: Number(data.provider_id), title: data.title || '', slug: data.slug || slugify(data.title), description: data.description || '', level: normalizedLevel, sort_order: Number(data.sort_order) || 0,
     });
     return getCourse(data.id);
   }
   const result = db.prepare(`INSERT INTO courses (provider_id,title,slug,description,level,sort_order,created_at) VALUES (@provider_id,@title,@slug,@description,@level,@sort_order,@created_at)`).run({
-    provider_id: Number(data.provider_id), title: data.title || '', slug: data.slug || slugify(data.title), description: data.description || '', level: data.level || '', sort_order: Number(data.sort_order) || 0, created_at: now,
+    provider_id: Number(data.provider_id), title: data.title || '', slug: data.slug || slugify(data.title), description: data.description || '', level: normalizedLevel, sort_order: Number(data.sort_order) || 0, created_at: now,
   });
   return getCourse(result.lastInsertRowid);
 };
@@ -958,6 +976,58 @@ const replacePlaylistItems = (playlistId, items = []) => {
   return listPlaylistItems(playlistId);
 };
 
+const listTrainingPlaylists = () => all('SELECT * FROM training_playlists ORDER BY updated_at DESC, name COLLATE NOCASE ASC');
+const getTrainingPlaylist = (id) => one('SELECT * FROM training_playlists WHERE id = ?', Number(id));
+const saveTrainingPlaylist = (data = {}) => {
+  const now = Date.now();
+  if (data.id) {
+    run('UPDATE training_playlists SET name=@name, description=@description, updated_at=@updated_at WHERE id=@id', {
+      id: Number(data.id),
+      name: data.name || '',
+      description: data.description || '',
+      updated_at: now,
+    });
+    return getTrainingPlaylist(data.id);
+  }
+  const result = db.prepare('INSERT INTO training_playlists (name,description,created_at,updated_at) VALUES (@name,@description,@created_at,@updated_at)').run({
+    name: data.name || '',
+    description: data.description || '',
+    created_at: now,
+    updated_at: now,
+  });
+  return getTrainingPlaylist(result.lastInsertRowid);
+};
+const deleteTrainingPlaylist = (id) => {
+  const playlistId = Number(id);
+  const tx = db.transaction((targetId) => {
+    run('DELETE FROM training_playlist_items WHERE playlist_id = ?', targetId);
+    run('DELETE FROM training_playlists WHERE id = ?', targetId);
+  });
+  tx(playlistId);
+};
+const listTrainingPlaylistItems = (playlistId) => db.prepare(`
+  SELECT i.*, l.title AS lesson_title, l.module_id
+  FROM training_playlist_items i
+  LEFT JOIN lessons l ON l.id = i.lesson_id
+  WHERE i.playlist_id = ?
+  ORDER BY i.position ASC, i.id ASC
+`).all(Number(playlistId));
+const replaceTrainingPlaylistItems = (playlistId, items = []) => {
+  const targetId = Number(playlistId);
+  const tx = db.transaction((id, nextItems) => {
+    run('DELETE FROM training_playlist_items WHERE playlist_id = ?', id);
+    const stmt = db.prepare('INSERT INTO training_playlist_items (playlist_id,lesson_id,position,created_at) VALUES (?,?,?,?)');
+    nextItems.forEach((item, idx) => {
+      const lessonId = Number(item.lesson_id || item.lessonId);
+      if (!lessonId) return;
+      stmt.run(id, lessonId, Number(item.position) || idx + 1, Date.now());
+    });
+    run('UPDATE training_playlists SET updated_at = ? WHERE id = ?', Date.now(), id);
+  });
+  tx(targetId, items);
+  return listTrainingPlaylistItems(targetId);
+};
+
 const clearAll = () => db.exec('DELETE FROM session_items; DELETE FROM lesson_skills; DELETE FROM lessons; DELETE FROM modules; DELETE FROM courses; DELETE FROM providers; DELETE FROM attachments; DELETE FROM session_gear; DELETE FROM gear_links; DELETE FROM gear_images; DELETE FROM sessions; DELETE FROM gear_items; DELETE FROM resources; DELETE FROM presets;');
 
 
@@ -1029,4 +1099,4 @@ const getDbInfo = () => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

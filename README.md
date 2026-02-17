@@ -560,6 +560,12 @@ Existing app keys still apply (for example: `theme`, `handedness`).
 After deploy, run:
 
 ```bash
+# Training migration checks (course.level + training playlists tables)
+docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA table_info(courses);" | rg -n "level"'
+docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite ".tables" | rg -n "training_playlists|training_playlist_items"'
+# Training API checks
+curl -s http://localhost:3000/api/training-playlists | head -c 200
+
 curl -s http://127.0.0.1:3000/api/providers | jq
 curl -s http://127.0.0.1:3000/api/courses | jq
 curl -s http://127.0.0.1:3000/api/modules | jq
