@@ -142,6 +142,18 @@
       return api('/api/preset-image', { method: 'POST', body: JSON.stringify(payload) });
     },
 
+    async uploadGearImage(payload) {
+      return api('/api/gear-image', { method: 'POST', body: JSON.stringify(payload) });
+    },
+
+    async getGearImages(gearId) {
+      return api(`/api/gear/${gearId}/images`);
+    },
+
+    async deleteGearImage(imageId) {
+      return api(`/api/gear-image/${imageId}`, { method: 'DELETE' });
+    },
+
     // Resources legacy
     async saveResource(data) {
       return data.id

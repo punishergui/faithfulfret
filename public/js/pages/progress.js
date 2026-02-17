@@ -7,77 +7,89 @@ Pages.Progress = {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const [sessions, stats, heatmapDays, gear] = await Promise.all([
+    const activeTab = this._getActiveTab();
+    const [sessions, stats, heatmapDays, gear, presets] = await Promise.all([
       DB.getAllSess(),
       DB.getStats(),
       DB.getSessionHeatmap(),
       DB.getAllGear(),
+      DB.getAllPresets(),
     ]);
     const gearStats = this._computeGearStats(gear);
-
-    // Reverse for chronological order (charts)
     const chrono = [...sessions].reverse();
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
         <div class="page-hero__inner">
           <div class="page-title">Stats</div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            ${this._renderTabs(activeTab)}
+          </div>
         </div>
         <div class="fret-line"></div>
       </div>
 
-      ${this._renderStatBar(stats)}
-      ${this._renderGearStats(gearStats)}
+      <div class="page-wrap" style="padding:24px 24px 60px;display:grid;gap:16px;">
+        ${activeTab === 'overview' ? `
+          <div class="df-panel" style="padding:16px;">${this._renderStatBar(stats)}</div>
+          <div class="df-panel" style="padding:16px;">${this._renderInsightCards(sessions, stats)}</div>
+        ` : ''}
 
-      <div class="page-wrap" style="padding:32px 24px 60px;">
-        ${this._renderInsightCards(sessions, stats)}
-        ${this._renderYearHeatmap(heatmapDays, stats)}
-
-        ${sessions.length >= 2 ? `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;">
-            <div class="df-chart">
-              <div class="df-chart__title">BPM Over Time</div>
-              <div id="bpm-chart"></div>
+        ${activeTab === 'practice' ? `
+          <div class="df-panel" style="padding:16px;">${this._renderYearHeatmap(heatmapDays, stats)}</div>
+          ${sessions.length >= 2 ? `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="df-chart"><div class="df-chart__title">BPM Over Time</div><div id="bpm-chart"></div></div>
+              <div class="df-chart"><div class="df-chart__title">Minutes Per Session</div><div id="min-chart"></div></div>
             </div>
-            <div class="df-chart">
-              <div class="df-chart__title">Minutes Per Session</div>
-              <div id="min-chart"></div>
+          ` : ''}
+        ` : ''}
+
+        ${activeTab === 'gear' ? `<div class="df-panel" style="padding:16px;">${this._renderGearStats(gearStats)}</div>` : ''}
+
+        ${activeTab === 'presets' ? `
+          <div class="df-panel" style="padding:16px;">
+            <div class="section-header"><span class="section-header__label">Preset Summary</span></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+              <div class="df-statbar__item"><div class="df-statbar__key">Total presets</div><div class="df-statbar__val">${presets.length}</div></div>
+              <div class="df-statbar__item"><div class="df-statbar__key">Tagged presets</div><div class="df-statbar__val">${presets.filter((p) => (p.tags || '').trim()).length}</div></div>
+              <div class="df-statbar__item"><div class="df-statbar__key">Amp models</div><div class="df-statbar__val">${new Set(presets.map((p) => p.ampModel).filter(Boolean)).size}</div></div>
             </div>
           </div>
         ` : ''}
 
-        ${this._renderExportImport()}
+        <div class="df-panel" style="padding:16px;">${this._renderExportImport()}</div>
 
-        ${sessions.length ? `
-          <div style="margin-top:32px;">
-            <div class="section-header"><span class="section-header__label">Session History</span></div>
-            <div style="overflow-x:auto;">
-              ${this._renderTable(sessions)}
-            </div>
-          </div>
-        ` : this._renderEmpty()}
+        ${sessions.length ? `<div class="df-panel" style="padding:16px;">${this._renderTable(sessions)}</div>` : this._renderEmpty()}
       </div>
     `;
 
-    if (sessions.length >= 2) {
-      const bpmData = chrono.map(s => ({
-        label: Utils.formatDate(s.date, 'short'),
-        value: s.bpm || 0,
-        id: s.id,
-      })).filter(d => d.value);
+    app.querySelectorAll('[data-stats-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-stats-tab');
+        location.hash = `#/progress?tab=${tab}`;
+      });
+    });
 
-      const minData = chrono.map(s => ({
-        label: Utils.formatDate(s.date, 'short'),
-        value: s.minutes || 0,
-        id: s.id,
-      })).filter(d => d.value);
-
+    if (activeTab === 'practice' && sessions.length >= 2) {
+      const bpmData = chrono.map((row) => ({ label: Utils.formatDate(row.date, 'short'), value: row.bpm || 0, id: row.id })).filter((row) => row.value);
+      const minData = chrono.map((row) => ({ label: Utils.formatDate(row.date, 'short'), value: row.minutes || 0, id: row.id })).filter((row) => row.value);
       if (bpmData.length) this._renderBarChart(app.querySelector('#bpm-chart'), bpmData);
       if (minData.length) this._renderBarChart(app.querySelector('#min-chart'), minData);
+      this._initYearHeatmap(app);
     }
 
     this._initExportImport(app);
-    this._initYearHeatmap(app);
+  },
+
+  _getActiveTab() {
+    const match = String(location.hash || '').match(/tab=([^&]+)/);
+    const tab = match ? decodeURIComponent(match[1]).toLowerCase() : 'overview';
+    return ['overview', 'practice', 'gear', 'presets'].includes(tab) ? tab : 'overview';
+  },
+
+  _renderTabs(activeTab) {
+    return ['overview', 'practice', 'gear', 'presets'].map((tab) => `<button type="button" class="df-btn ${activeTab === tab ? 'df-btn--primary' : 'df-btn--outline'}" data-stats-tab="${tab}">${tab[0].toUpperCase() + tab.slice(1)}</button>`).join('');
   },
 
   _renderStatBar(stats) {
@@ -91,7 +103,7 @@ Pages.Progress = {
       { key: 'Last Session', val: stats.daysSinceLastSession == null ? '—' : `${stats.daysSinceLastSession}d ago` },
     ];
     return `
-      <div class="df-statbar">
+      <div class="df-statbar" style="margin:0;">
         ${items.map(item => `
           <div class="df-statbar__item">
             <div class="df-statbar__key">${item.key}</div>
@@ -124,8 +136,7 @@ Pages.Progress = {
     ];
 
     return `
-      <div class="page-wrap" style="padding:18px 24px 0;">
-        <div class="df-panel" style="padding:16px;">
+        <div>
           <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Gear Stats</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
             ${items.map((item) => `
@@ -154,7 +165,6 @@ Pages.Progress = {
             </div>
           </div>
         </div>
-      </div>
     `;
   },
 
@@ -169,7 +179,7 @@ Pages.Progress = {
     const totalSessions = (rows || []).reduce((sum, row) => sum + Number(row.sessionCount || 0), 0);
 
     return `
-      <div class="df-chart" style="margin-bottom:24px;">
+      <div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
           <div class="df-chart__title" style="margin-bottom:0;">Practice Activity Heatmap</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
