@@ -104,7 +104,7 @@ docker exec -it daily-fret sh -lc "node --check /app/data-store.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/gear.js"
 # Hotfix validation: gear_links now uses isPrimary (not SQLite reserved word primary)
 docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA table_info(gear_links);" | rg -n isPrimary'
-docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "SqliteError|isPrimary"
+docker compose -f docker-compose.prod.yml logs daily-fret --tail=100 | rg -n "SqliteError|isPrimary|primaryUrl"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-form.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/session-single.js"
 docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/progress.js"

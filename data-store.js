@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS gear_items (
   price REAL,
   dateAcquired TEXT,
   buyUrl TEXT,
+  primaryUrl TEXT,
   mfrUrl TEXT,
   manualUrl TEXT,
   imageData TEXT
@@ -89,12 +90,6 @@ function ensureColumn(table, column, definition) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
-
-function hasColumn(table, column) {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
-  return columns.some((row) => row.name === column);
-}
-
 ensureColumn('gear_items', 'boughtDate', 'TEXT');
 ensureColumn('gear_items', 'boughtPrice', 'REAL');
 ensureColumn('gear_items', 'boughtFrom', 'TEXT');
@@ -108,10 +103,8 @@ ensureColumn('gear_items', 'soldShipping', 'REAL');
 ensureColumn('gear_items', 'targetPrice', 'REAL');
 ensureColumn('gear_items', 'priority', 'TEXT');
 ensureColumn('gear_items', 'desiredCondition', 'TEXT');
+ensureColumn('gear_items', 'primaryUrl', 'TEXT');
 ensureColumn('gear_links', 'isPrimary', 'INTEGER DEFAULT 0');
-if (hasColumn('gear_links', 'primary')) {
-  db.exec('UPDATE gear_links SET isPrimary = COALESCE(isPrimary, "primary")');
-}
 
 const LEGACY_PRIMARY_KEY = 'primary';
 const readPrimaryFlag = (row = {}) => Number(row.isPrimary ?? row[LEGACY_PRIMARY_KEY]) ? 1 : 0;
@@ -166,7 +159,8 @@ function coerceGear(input = {}) {
     model: input.model || '',
     price: n(input.price ?? input.pricePaid),
     dateAcquired: input.dateAcquired || '',
-    buyUrl: input.buyUrl || '',
+    primaryUrl: input.primaryUrl || input.primaryLink || input.primary || input.buyUrl || '',
+    buyUrl: input.buyUrl || input.primaryUrl || input.primaryLink || input.primary || '',
     mfrUrl: input.mfrUrl || '',
     manualUrl: input.manualUrl || '',
     imageData: input.imageData || null,
@@ -229,12 +223,12 @@ const Q = {
       date=excluded.date,title=excluded.title,durationMinutes=excluded.durationMinutes,youtubeId=excluded.youtubeId,focusTag=excluded.focusTag,
       notes=excluded.notes,bpm=excluded.bpm,dayNumber=excluded.dayNumber,focus=excluded.focus,mood=excluded.mood,win=excluded.win,
       checklist=excluded.checklist,links=excluded.links,videoId=excluded.videoId`),
-  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping,targetPrice,priority,desiredCondition)
-    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping,:targetPrice,:priority,:desiredCondition)
+  upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,primaryUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping,targetPrice,priority,desiredCondition)
+    VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:primaryUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping,:targetPrice,:priority,:desiredCondition)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name,type=excluded.type,status=excluded.status,pricePaid=excluded.pricePaid,priceSold=excluded.priceSold,vendor=excluded.vendor,
       links=excluded.links,notes=excluded.notes,category=excluded.category,brand=excluded.brand,model=excluded.model,price=excluded.price,
-      dateAcquired=excluded.dateAcquired,buyUrl=excluded.buyUrl,mfrUrl=excluded.mfrUrl,manualUrl=excluded.manualUrl,imageData=excluded.imageData,
+      dateAcquired=excluded.dateAcquired,buyUrl=excluded.buyUrl,primaryUrl=excluded.primaryUrl,mfrUrl=excluded.mfrUrl,manualUrl=excluded.manualUrl,imageData=excluded.imageData,
       boughtDate=excluded.boughtDate,boughtPrice=excluded.boughtPrice,boughtFrom=excluded.boughtFrom,tax=excluded.tax,shipping=excluded.shipping,
       soldDate=excluded.soldDate,soldPrice=excluded.soldPrice,soldFees=excluded.soldFees,soldWhere=excluded.soldWhere,soldShipping=excluded.soldShipping,
       targetPrice=excluded.targetPrice,priority=excluded.priority,desiredCondition=excluded.desiredCondition`),
