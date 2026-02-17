@@ -41,13 +41,42 @@ Pages.Gear = {
       DB.getAllGear(),
       DB.getGearUsage().catch(() => ({})),
     ]);
-    const gear = gearRows.map((g) => ({ ...g, status: normalizeGearStatus(g.status), usage: usageByGear[g.id] || { usedCount: 0, lastUsed: '' } }));
+    const gear = gearRows.map((g) => {
+      const type = (g.type || '').trim();
+      const brand = (g.brand || g.vendor || '').trim();
+      return {
+        ...g,
+        type,
+        brand,
+        displayType: type || '(Uncategorized)',
+        status: normalizeGearStatus(g.status),
+        usage: usageByGear[g.id] || { usedCount: 0, lastUsed: '' },
+      };
+    });
 
     const filterStorageKey = 'df:gearStatusFilter';
     const sortStorageKey = 'df:gearSort';
     const advancedStorageKey = 'df:gearAdvancedFilters';
     const searchStorageKey = 'df:gearSearch';
     const filters = ['All', 'Owned', 'Wishlist', 'Sold'];
+    if (!this._filtersInitialized) {
+      this._selectedFilter = 'All';
+      this._searchTerm = '';
+      this._advancedFilters = {
+        category: 'All',
+        brand: 'All',
+        minPrice: '',
+        maxPrice: '',
+        linksOnly: false,
+        hasTargetPrice: false,
+        missingTargetPrice: false,
+        expanded: false,
+      };
+      localStorage.setItem(filterStorageKey, 'All');
+      localStorage.setItem(searchStorageKey, '');
+      localStorage.setItem(advancedStorageKey, JSON.stringify(this._advancedFilters));
+      this._filtersInitialized = true;
+    }
     const storedFilter = normalizeGearStatus(localStorage.getItem(filterStorageKey) || '');
     const selectedFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'All');
     const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
@@ -68,14 +97,25 @@ Pages.Gear = {
     };
 
     const stats = Utils.computeGearStats(gear);
-    const visible = this._sortGear(this._filterGear(gear, selectedFilter, searchTerm, this._advancedFilters), selectedSort);
+    const filtered = this._filterGear(gear, selectedFilter, searchTerm, this._advancedFilters);
+    const isDefaultFilterState = selectedFilter === 'All'
+      && !String(searchTerm || '').trim()
+      && (this._advancedFilters.category || 'All') === 'All'
+      && (this._advancedFilters.brand || 'All') === 'All'
+      && !this._advancedFilters.linksOnly
+      && !this._advancedFilters.hasTargetPrice
+      && !this._advancedFilters.missingTargetPrice
+      && !this._advancedFilters.minPrice
+      && !this._advancedFilters.maxPrice;
+    const visibleList = (gear.length > 0 && filtered.length === 0 && isDefaultFilterState) ? gear : filtered;
+    const visible = this._sortGear(visibleList, selectedSort);
     const byCategory = {};
     visible.forEach((g) => {
-      const cat = g.category || 'Other';
+      const cat = g.category || g.displayType;
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(g);
     });
-    const categories = ['All', ...new Set(gear.map((g) => g.category || g.type).filter(Boolean).sort())];
+    const categories = ['All', ...new Set(gear.map((g) => g.category || g.displayType).filter(Boolean).sort())];
     const brands = ['All', ...new Set(gear.map((g) => g.brand).filter(Boolean).sort())];
 
     app.innerHTML = `
@@ -101,8 +141,8 @@ Pages.Gear = {
               <button type="button" class="df-btn df-btn--outline" id="gear-advanced-toggle">${this._advancedFilters.expanded ? 'Hide' : 'Show'} filters</button>
             </div>
             <div id="gear-advanced" style="display:${this._advancedFilters.expanded ? 'grid' : 'none'};grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;">
-              <select class="df-input" id="gear-filter-category">${categories.map((cat) => `<option value="${cat}" ${this._advancedFilters.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}</select>
-              <select class="df-input" id="gear-filter-brand">${brands.map((brand) => `<option value="${brand}" ${this._advancedFilters.brand === brand ? 'selected' : ''}>${brand}</option>`).join('')}</select>
+              <select class="df-input" id="gear-filter-category">${['All', ...categories.filter((cat) => cat !== 'All')].map((cat) => `<option value="${cat}" ${this._advancedFilters.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}</select>
+              <select class="df-input" id="gear-filter-brand">${['All', ...brands.filter((brand) => brand !== 'All')].map((brand) => `<option value="${brand}" ${this._advancedFilters.brand === brand ? 'selected' : ''}>${brand}</option>`).join('')}</select>
               <input class="df-input" id="gear-filter-min" type="number" step="0.01" placeholder="Min wishlist price" value="${this._advancedFilters.minPrice}">
               <input class="df-input" id="gear-filter-max" type="number" step="0.01" placeholder="Max wishlist price" value="${this._advancedFilters.maxPrice}">
               <label><input type="checkbox" id="gear-filter-links" ${this._advancedFilters.linksOnly ? 'checked' : ''}> With links</label>
@@ -115,7 +155,7 @@ Pages.Gear = {
                 ${['Newest', 'Oldest', 'Name A-Z', 'Price low->high', 'Priority', 'Most used', 'Recently used'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
               </select>
             </div>
-            ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty(selectedFilter, !!searchTerm)}
+            ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty()}
           </div>
 
           <aside style="flex:0 0 290px;max-width:330px;width:100%;position:sticky;top:84px;">
@@ -169,6 +209,25 @@ Pages.Gear = {
       this.render();
     });
 
+    app.querySelector('#gear-reset-filters')?.addEventListener('click', () => {
+      this._selectedFilter = 'All';
+      this._searchTerm = '';
+      this._advancedFilters = {
+        ...this._advancedFilters,
+        category: 'All',
+        brand: 'All',
+        minPrice: '',
+        maxPrice: '',
+        linksOnly: false,
+        hasTargetPrice: false,
+        missingTargetPrice: false,
+      };
+      localStorage.setItem(filterStorageKey, 'All');
+      localStorage.setItem(searchStorageKey, '');
+      saveAdvanced();
+      this.render();
+    });
+
     app.querySelectorAll('[data-link-inline-save]').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -211,7 +270,7 @@ Pages.Gear = {
         return haystack.includes(needle);
       });
     }
-    if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.type) === advanced.category);
+    if (advanced.category && advanced.category !== 'All') visible = visible.filter((g) => (g.category || g.displayType) === advanced.category);
     if (advanced.brand && advanced.brand !== 'All') visible = visible.filter((g) => g.brand === advanced.brand);
     if (advanced.linksOnly) visible = visible.filter((g) => (g.linksList || []).some((l) => l.url));
     if (advanced.hasTargetPrice) visible = visible.filter((g) => g.status === 'Wishlist' && Number.isFinite(Number(g.targetPrice)));
@@ -363,12 +422,12 @@ Pages.Gear = {
     `;
   },
 
-  _renderEmpty(filterLabel, hasSearch) {
+  _renderEmpty() {
     return `
       <div class="empty-state" style="padding:80px 0;">
-        <div class="empty-state__title">No ${(hasSearch ? 'matching ' : '') + (filterLabel === 'All' ? '' : filterLabel.toLowerCase() + ' ')}gear found</div>
-        <div class="empty-state__text">Start tracking your guitars, amps, and accessories.</div>
-        <a href="#/gear/add" class="df-btn df-btn--primary">+ Add Your First Item</a>
+        <div class="empty-state__title">No matches — clear filters</div>
+        <div class="empty-state__text">Try resetting filters to see all gear items again.</div>
+        <button type="button" id="gear-reset-filters" class="df-btn df-btn--outline">Reset filters</button>
       </div>
     `;
   },

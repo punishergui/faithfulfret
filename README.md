@@ -113,6 +113,8 @@ docker exec -it daily-fret sh -lc "node --check /app/public/js/pages/presets.js"
 # optional quick smoke checks after deploy
 curl -s http://localhost:3000/api/session-heatmap | head -c 200
 curl -s http://localhost:3000/api/gear-usage | head -c 200
+curl -s http://localhost:3000/api/gear-items | head
+# optional UI smoke check: Gear list should show items by default (All filters)
 # optional UI smoke check: Gear page filter buttons (All/Owned/Wishlist/Sold) should not change route from #/gear
 # optional UI smoke check: Gear page keeps filters/list unchanged and shows compact Gear Stats in right sidebar
 # optional UI smoke check: Stats page (#/progress) title reads "Stats" and shows full Gear Stats section near top
