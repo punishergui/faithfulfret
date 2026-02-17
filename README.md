@@ -574,6 +574,10 @@ docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite "PRAGMA tab
 docker exec -it daily-fret sh -lc 'sqlite3 /data/faithfulfret.sqlite ".tables" | rg -n "training_playlists|training_playlist_items"'
 # Training API checks
 curl -s http://localhost:3000/api/training-playlists | head -c 200
+curl -s http://127.0.0.1:3000/api/video-playlists | jq '.[0]'
+curl -s http://127.0.0.1:3000/api/video-playlists | jq 'map({id,name,sort_order})'
+# verify DELETE /api/video-playlists/:id (replace 123 with test playlist id)
+curl -i -X DELETE http://127.0.0.1:3000/api/video-playlists/123
 
 curl -s http://127.0.0.1:3000/api/providers | jq
 curl -s http://127.0.0.1:3000/api/courses | jq

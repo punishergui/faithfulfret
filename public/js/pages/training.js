@@ -117,16 +117,34 @@ Pages.TrainingAdmin = { async render() { await renderWithError(async () => {
 Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   const app = document.getElementById('app');
   const playlists = await DB.getVideoPlaylists();
+  const status = sessionStorage.getItem('trainingPlaylistStatus') || '';
+  sessionStorage.removeItem('trainingPlaylistStatus');
   app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
+      <div id="playlist-status" class="df-panel" style="padding:10px;${status ? '' : 'display:none;'}">${esc(status)}</div>
       <form id="playlist-create" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr 2fr auto;gap:8px;">
         <input class="df-input" name="name" placeholder="Playlist name" required>
         <input class="df-input" name="description" placeholder="Description">
         <button class="df-btn df-btn--primary">Create</button>
       </form>
-      <div class="df-panel" style="padding:12px;">${playlists.map((p)=>`<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:10px 0;"><div><strong>${esc(p.name || `Playlist ${p.id}`)}</strong><div style="color:var(--text2);">${esc(p.description || '')}</div></div><a class="df-btn df-btn--outline" href="#/training/playlists/${p.id}">Open</a></div>`).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}</div>
+      <div class="df-panel" style="padding:12px;">${playlists.map((p, idx)=>`<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:10px 0;gap:10px;"><div style="display:flex;align-items:center;gap:8px;"><button class="df-btn df-btn--outline" type="button" data-playlist-up="${idx}" ${idx < 1 ? 'disabled' : ''}>↑</button><button class="df-btn df-btn--outline" type="button" data-playlist-down="${idx}" ${idx >= playlists.length - 1 ? 'disabled' : ''}>↓</button><div><strong>${esc(p.name || `Playlist ${p.id}`)}</strong><div style="color:var(--text2);">${esc(p.description || '')}</div></div></div><div style="display:flex;gap:8px;"><a class="df-btn df-btn--outline" href="#/training/playlists/${p.id}">Open</a><button class="df-btn df-btn--danger" type="button" data-playlist-delete="${p.id}">Delete</button></div></div>`).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}</div>
     </div>`;
-  app.querySelector('#playlist-create')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); await DB.saveVideoPlaylist(data); go('#/training/playlists'); });
+
+  async function movePlaylist(index, delta) {
+    const current = playlists[index];
+    const neighbor = playlists[index + delta];
+    if (!current || !neighbor) return;
+    const currentOrder = Number(current.sort_order) || 0;
+    const neighborOrder = Number(neighbor.sort_order) || 0;
+    await DB.saveVideoPlaylist({ ...current, sort_order: neighborOrder });
+    await DB.saveVideoPlaylist({ ...neighbor, sort_order: currentOrder });
+    go('#/training/playlists');
+  }
+
+  app.querySelector('#playlist-create')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); data.sort_order = playlists.length ? ((Number(playlists[playlists.length - 1].sort_order) || 0) + 10) : 10; await DB.saveVideoPlaylist(data); sessionStorage.setItem('trainingPlaylistStatus', 'Playlist created.'); go('#/training/playlists'); });
+  app.querySelectorAll('[data-playlist-delete]').forEach((button)=>button.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; const playlistId = Number(button.dataset.playlistDelete); await DB.deleteVideoPlaylist(playlistId); button.closest('div[style*="border-top"]')?.remove(); const statusEl = app.querySelector('#playlist-status'); statusEl.textContent = 'Playlist deleted.'; statusEl.style.display = 'block'; }));
+  app.querySelectorAll('[data-playlist-up]').forEach((button)=>button.addEventListener('click', async ()=>{ await movePlaylist(Number(button.dataset.playlistUp), -1); }));
+  app.querySelectorAll('[data-playlist-down]').forEach((button)=>button.addEventListener('click', async ()=>{ await movePlaylist(Number(button.dataset.playlistDown), 1); }));
 }); }};
 
 Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async () => {
@@ -136,7 +154,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   const items = Array.isArray(playlist.items) ? playlist.items.slice().sort((a,b)=>(a.position||0)-(b.position||0)) : [];
   const map = new Map(videos.map((v)=>[Number(v.id), v]));
   const available = videos.filter((v)=>!items.find((i)=>Number(i.videoId || i.video_id)===Number(v.id)));
-  app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a>' })}
+  app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a><button id="delete-playlist" class="df-btn df-btn--danger" style="margin-left:8px;" type="button">Delete Playlist</button>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
       <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><span>${esc(video?.title || `Video ${item.videoId}`)}</span><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
       <form id="playlist-add" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;">
@@ -153,4 +171,5 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   app.querySelectorAll('[data-remove]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.remove); const next=items.filter((_,i)=>i!==idx); await save(next); }));
   app.querySelectorAll('[data-up]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.up); if (idx<1) return; const next=items.slice(); [next[idx-1], next[idx]]=[next[idx], next[idx-1]]; await save(next); }));
   app.querySelectorAll('[data-down]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.down); if (idx>=items.length-1) return; const next=items.slice(); [next[idx+1], next[idx]]=[next[idx], next[idx+1]]; await save(next); }));
+  app.querySelector('#delete-playlist')?.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; await DB.deleteVideoPlaylist(id); sessionStorage.setItem('trainingPlaylistStatus', 'Playlist deleted.'); go('#/training/playlists'); });
 }); }};

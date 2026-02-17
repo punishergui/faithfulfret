@@ -303,6 +303,7 @@ ensureColumn('video_playlist_items', 'videoId', 'INTEGER');
 ensureColumn('video_playlist_items', 'position', 'INTEGER');
 ensureColumn('video_playlists', 'created_at', 'INTEGER');
 ensureColumn('video_playlists', 'updated_at', 'INTEGER');
+ensureColumn('video_playlists', 'sort_order', 'INTEGER DEFAULT 0');
 ensureColumn('video_playlist_items', 'playlist_id', 'INTEGER');
 ensureColumn('video_playlist_items', 'video_id', 'INTEGER');
 ensureColumn('video_attachments', 'video_id', 'INTEGER');
@@ -584,10 +585,12 @@ function coerceTrainingVideo(input = {}) {
 
 function coerceVideoPlaylist(input = {}) {
   const now = Date.now();
+  const sortOrder = input.sort_order == null || input.sort_order === '' ? 0 : Number(input.sort_order);
   return {
     id: input.id == null || input.id === '' ? null : Number(input.id),
     name: input.name || '',
     description: input.description || '',
+    sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
     createdAt: Number(input.createdAt) || now,
     updatedAt: Number(input.updatedAt) || now,
   };
@@ -837,23 +840,23 @@ const saveVideoTimestamp = (data) => {
 };
 const deleteVideoTimestamp = (id) => run('DELETE FROM video_timestamps WHERE id = ?', Number(id));
 
-const listVideoPlaylists = () => all('SELECT * FROM video_playlists ORDER BY updatedAt DESC, name COLLATE NOCASE ASC');
+const listVideoPlaylists = () => all('SELECT * FROM video_playlists ORDER BY COALESCE(sort_order, 0) ASC, name COLLATE NOCASE ASC');
 const getVideoPlaylist = (id) => one('SELECT * FROM video_playlists WHERE id = ?', Number(id));
 const saveVideoPlaylist = (data) => {
   const row = coerceVideoPlaylist(data);
   const existing = row.id ? getVideoPlaylist(row.id) : null;
   if (existing) {
-    db.prepare('UPDATE video_playlists SET name=@name, description=@description, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
+    db.prepare('UPDATE video_playlists SET name=@name, description=@description, sort_order=@sort_order, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
       .run({ ...row, createdAt: existing.createdAt || row.createdAt, updatedAt: Date.now() });
     return getVideoPlaylist(row.id);
   }
-  const result = db.prepare('INSERT INTO video_playlists (name,description,createdAt,updatedAt) VALUES (@name,@description,@createdAt,@updatedAt)')
+  const result = db.prepare('INSERT INTO video_playlists (name,description,sort_order,createdAt,updatedAt) VALUES (@name,@description,@sort_order,@createdAt,@updatedAt)')
     .run({ ...row, updatedAt: Date.now() });
   return getVideoPlaylist(result.lastInsertRowid);
 };
 const deleteVideoPlaylist = (id) => {
   const tx = db.transaction((playlistId) => {
-    run('DELETE FROM video_playlist_items WHERE playlistId = ?', playlistId);
+    run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', playlistId);
     run('DELETE FROM video_playlists WHERE id = ?', playlistId);
   });
   tx(Number(id));
