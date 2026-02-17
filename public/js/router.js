@@ -32,10 +32,12 @@
 
   function navigate(hash) {
     const h = hash || getHash();
+    const routeName = h.replace(/^#\/?/, '').split('?')[0];
+    const routeHash = `#/${routeName}`;
 
     // Find matching route
     for (const route of routes) {
-      const m = h.match(route.pattern);
+      const m = routeHash.match(route.pattern);
       if (m) {
         // Page transition
         const app = document.getElementById('app');
@@ -47,7 +49,7 @@
           app.classList.add('page-in');
 
           // Update nav active state
-          updateNav(h);
+          updateNav(routeHash);
 
           // Scroll to top
           window.scrollTo(0, 0);
