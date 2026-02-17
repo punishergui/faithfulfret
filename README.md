@@ -133,6 +133,8 @@ Production uses prebuilt GHCR images and Watchtower auto-updates.
 # Start/refresh production stack (no local build, no bind mounts)
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
+# Smoke-check API on host port 3000 (must map to container 9999)
+curl -fsS http://127.0.0.1:3000/api/health | jq -e ' .ok == true '
 
 # If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
 
