@@ -27,12 +27,19 @@ if (!hasDataMount) {
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 console.log(`DB: ${dbPath}`);
 let db = null;
+let Q;
 
 function openDb() {
   db = new Database(dbPath);
   db.exec('PRAGMA journal_mode = WAL;');
   if (typeof initQueries === 'function') initQueries();
   return db;
+}
+
+function assertQueriesInitialized() {
+  if (!Q || typeof Q !== 'object') {
+    throw new Error('Query preparation failed: Q is undefined. Ensure Q is declared before initQueries() runs.');
+  }
 }
 
 openDb();
@@ -251,11 +258,6 @@ function coerceResource(input = {}) {
   };
 }
 
-// TDZ_FIX: let Q = null;
-
-// TDZ_FIX: let Q = {};
-
-
 function initQueries() {
 Q = {
   upsertSession: db.prepare(`INSERT INTO sessions (id,date,title,durationMinutes,youtubeId,focusTag,notes,createdAt,bpm,dayNumber,focus,mood,win,checklist,links,videoId)
@@ -285,6 +287,7 @@ Q = {
   insertGearImage: db.prepare(`INSERT INTO gear_images (id,gearId,filePath,createdAt,sortOrder)
     VALUES (:id,:gearId,:filePath,:createdAt,:sortOrder)`),
 };
+assertQueriesInitialized();
 }
 
 initQueries();
