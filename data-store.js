@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS presets (
   ampModel TEXT,
   settings TEXT,
   tags TEXT,
+  audioPath TEXT,
+  audioMime TEXT,
+  audioDuration REAL,
   createdAt INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS resources (
@@ -129,6 +132,9 @@ ensureColumn('gear_items', 'targetPrice', 'REAL');
 ensureColumn('gear_items', 'priority', 'TEXT');
 ensureColumn('gear_items', 'desiredCondition', 'TEXT');
 ensureColumn('gear_items', 'primaryUrl', 'TEXT');
+ensureColumn('presets', 'audioPath', 'TEXT');
+ensureColumn('presets', 'audioMime', 'TEXT');
+ensureColumn('presets', 'audioDuration', 'REAL');
 }
 
 function openDb() {
@@ -250,6 +256,9 @@ function coercePreset(input = {}) {
     ampModel: input.ampModel || '',
     settings: settings || '{}',
     tags: Array.isArray(input.tags) ? input.tags.join(',') : (input.tags || ''),
+    audioPath: input.audioPath || null,
+    audioMime: input.audioMime || null,
+    audioDuration: n(input.audioDuration),
     createdAt: Number(input.createdAt) || Date.now(),
   };
 }
@@ -285,9 +294,9 @@ Q = {
   upsertGearLink: db.prepare(`INSERT INTO gear_links (id,gearId,label,url,price,lastChecked,note,isPrimary)
     VALUES (:id,:gearId,:label,:url,:price,:lastChecked,:note,:isPrimary)
     ON CONFLICT(id) DO UPDATE SET gearId=excluded.gearId,label=excluded.label,url=excluded.url,price=excluded.price,lastChecked=excluded.lastChecked,note=excluded.note,isPrimary=excluded.isPrimary`),
-  upsertPreset: db.prepare(`INSERT INTO presets (id,name,ampModel,settings,tags,createdAt)
-    VALUES (:id,:name,:ampModel,:settings,:tags,:createdAt)
-    ON CONFLICT(id) DO UPDATE SET name=excluded.name,ampModel=excluded.ampModel,settings=excluded.settings,tags=excluded.tags`),
+  upsertPreset: db.prepare(`INSERT INTO presets (id,name,ampModel,settings,tags,audioPath,audioMime,audioDuration,createdAt)
+    VALUES (:id,:name,:ampModel,:settings,:tags,:audioPath,:audioMime,:audioDuration,:createdAt)
+    ON CONFLICT(id) DO UPDATE SET name=excluded.name,ampModel=excluded.ampModel,settings=excluded.settings,tags=excluded.tags,audioPath=excluded.audioPath,audioMime=excluded.audioMime,audioDuration=excluded.audioDuration`),
   upsertResource: db.prepare(`INSERT INTO resources (id,title,url,category,rating,notes,createdAt)
     VALUES (:id,:title,:url,:category,:rating,:notes,:createdAt)
     ON CONFLICT(id) DO UPDATE SET title=excluded.title,url=excluded.url,category=excluded.category,rating=excluded.rating,notes=excluded.notes`),

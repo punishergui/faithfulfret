@@ -296,6 +296,122 @@ Pages.Presets = {
     </div>`;
   },
 
+  renderAudioSection(preset) {
+    if (preset.audioPath) {
+      return `<div style="margin-top:8px;display:grid;gap:6px;">
+        <audio controls preload="none" src="/${this.escapeHtml(String(preset.audioPath).replace(/^\/+/, ''))}" style="width:100%;height:32px;"></audio>
+        <div><button class="df-btn df-btn--danger" data-remove-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Remove audio</button></div>
+      </div>`;
+    }
+    return `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="df-btn" data-record-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Record</button>
+      <button class="df-btn" data-upload-audio="${this.escapeHtml(preset.id)}" style="padding:4px 8px;font-size:10px;">Upload</button>
+      <input type="file" accept="audio/*" data-audio-file="${this.escapeHtml(preset.id)}" style="display:none;">
+    </div>`;
+  },
+
+  stopRecordingSession(session) {
+    if (!session) return;
+    try { session.recorder.ondataavailable = null; } catch (_) {}
+    try { session.recorder.onstop = null; } catch (_) {}
+    try {
+      if (session.recorder && session.recorder.state !== 'inactive') session.recorder.stop();
+    } catch (_) {}
+    try { (session.stream?.getTracks?.() || []).forEach((track) => track.stop()); } catch (_) {}
+    this.audioRecordings.delete(session.presetId);
+  },
+
+  bindAudioControls(app) {
+    this.audioRecordings = this.audioRecordings || new Map();
+
+    app.querySelectorAll('[data-upload-audio]').forEach((btn) => btn.addEventListener('click', () => {
+      const id = btn.dataset.uploadAudio;
+      app.querySelector(`[data-audio-file="${id}"]`)?.click();
+    }));
+
+    app.querySelectorAll('[data-audio-file]').forEach((input) => input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      const presetId = input.dataset.audioFile;
+      if (!file || !presetId) return;
+      try {
+        await DB.uploadPresetAudio(presetId, file, file.name || 'preset-audio');
+        Utils.toast?.('Audio uploaded.');
+        await this.render();
+      } catch (err) {
+        Utils.toast?.(err.message || 'Audio upload failed.', 'error');
+      } finally {
+        input.value = '';
+      }
+    }));
+
+    app.querySelectorAll('[data-remove-audio]').forEach((btn) => btn.addEventListener('click', async () => {
+      try {
+        await DB.deletePresetAudio(btn.dataset.removeAudio);
+        Utils.toast?.('Audio removed.');
+        await this.render();
+      } catch (err) {
+        Utils.toast?.(err.message || 'Could not remove audio.', 'error');
+      }
+    }));
+
+    app.querySelectorAll('[data-record-audio]').forEach((btn) => btn.addEventListener('click', async () => {
+      const presetId = btn.dataset.recordAudio;
+      const active = this.audioRecordings.get(presetId);
+      if (active) {
+        try { active.recorder.stop(); } catch (_) { this.stopRecordingSession(active); }
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === 'undefined') {
+        Utils.toast?.('Audio recording is not supported on this device/browser.', 'error');
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const options = {};
+        if (window.MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) options.mimeType = 'audio/webm;codecs=opus';
+        const recorder = new MediaRecorder(stream, options);
+        const chunks = [];
+        const session = { presetId, recorder, stream, chunks, mimeType: recorder.mimeType || options.mimeType || 'audio/webm' };
+        this.audioRecordings.set(presetId, session);
+        btn.textContent = 'Stop';
+        btn.classList.add('df-btn--danger');
+
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size) chunks.push(event.data);
+        };
+
+        recorder.onstop = async () => {
+          (stream.getTracks() || []).forEach((track) => track.stop());
+          this.audioRecordings.delete(presetId);
+          btn.textContent = 'Record';
+          btn.classList.remove('df-btn--danger');
+          const blob = new Blob(chunks, { type: session.mimeType || 'audio/webm' });
+          if (!blob.size) {
+            Utils.toast?.('No audio captured.', 'error');
+            return;
+          }
+          const ext = String((session.mimeType || '').split('/')[1] || 'webm').replace(/[^a-zA-Z0-9]+/g, '');
+          try {
+            await DB.uploadPresetAudio(presetId, blob, `preset-recording.${ext || 'webm'}`);
+            Utils.toast?.('Audio recorded and saved.');
+            await this.render();
+          } catch (err) {
+            Utils.toast?.(err.message || 'Could not save recording.', 'error');
+          }
+        };
+
+        recorder.start();
+      } catch (err) {
+        const message = err?.name === 'NotAllowedError'
+          ? 'Microphone access was denied. Please allow mic permission to record.'
+          : 'Could not start audio recording.';
+        Utils.toast?.(message, 'error');
+      }
+    }));
+  },
+
   card(p) {
     const settings = this.parseSettings(p.settings, p.ampModel);
     return `<div class="df-panel df-panel--wide" style="padding:14px;">
@@ -311,6 +427,7 @@ Pages.Presets = {
       <div style="font-size:12px;color:var(--text2);margin-top:8px;">Tags: ${this.escapeHtml(this.prettyTags(p))}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">Notes: ${this.escapeHtml(this.getNotesPreview(settings.notes))}</div>
       ${settings.imagePath ? `<img src="${settings.imagePath}" alt="Preset amp" style="margin-top:8px;width:100%;max-height:120px;object-fit:cover;border:1px solid var(--line2);" />` : ''}
+      ${this.renderAudioSection(p)}
       <details style="margin-top:8px;">
         <summary style="cursor:pointer;font-size:12px;color:var(--text2);">Raw data</summary>
         <pre style="white-space:pre-wrap;color:var(--text2);font-size:11px;margin-top:6px;">${this.escapeHtml(JSON.stringify(settings, null, 2))}</pre>
@@ -384,6 +501,8 @@ Pages.Presets = {
       this.showForm(preset);
       document.getElementById('preset-form-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }));
+
+    this.bindAudioControls(app);
   },
 
   showForm(existing = null) {

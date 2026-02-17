@@ -13,8 +13,11 @@ const apiRouter = express.Router();
 const PORT = process.env.PORT || 9999;
 const presetMediaDir = '/data/presets';
 const gearMediaDir = '/data/gear';
+const uploadsDir = '/data/uploads';
+const presetAudioDir = '/data/uploads/preset-audio';
 if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
 if (!fs.existsSync(gearMediaDir)) fs.mkdirSync(gearMediaDir, { recursive: true });
+if (!fs.existsSync(presetAudioDir)) fs.mkdirSync(presetAudioDir, { recursive: true });
 const restoreBackupDir = '/data/_restore_backup';
 if (!fs.existsSync(restoreBackupDir)) fs.mkdirSync(restoreBackupDir, { recursive: true });
 
@@ -337,6 +340,41 @@ apiRouter.get('/presets/:id', (req, res) => {
   res.json(row);
 });
 apiRouter.put('/presets/:id', (req, res) => res.json(Store.savePreset({ ...req.body, id: req.params.id })));
+apiRouter.post('/presets/:id/audio', upload.single('file'), (req, res) => {
+  const preset = Store.getPreset(req.params.id);
+  if (!preset) return res.status(404).json({ error: 'not found' });
+  const file = req.file;
+  if (!file || !file.buffer?.length) return res.status(400).json({ error: 'audio file is required' });
+  const safePresetId = String(req.params.id).replace(/[^a-zA-Z0-9_-]/g, '') || 'preset';
+  const sourceExt = path.extname(file.originalname || '').replace(/[^a-zA-Z0-9.]/g, '').toLowerCase();
+  const fallbackExtByMime = {
+    'audio/webm': '.webm',
+    'audio/mp4': '.m4a',
+    'audio/mpeg': '.mp3',
+    'audio/wav': '.wav',
+    'audio/x-wav': '.wav',
+    'audio/ogg': '.ogg',
+  };
+  const ext = sourceExt || fallbackExtByMime[String(file.mimetype || '').toLowerCase()] || '.webm';
+  const fileName = `${safePresetId}-${Date.now()}${ext}`;
+  fs.writeFileSync(path.join(presetAudioDir, fileName), file.buffer);
+  const updated = Store.savePreset({
+    ...preset,
+    audioPath: `uploads/preset-audio/${fileName}`,
+    audioMime: file.mimetype || 'application/octet-stream',
+  });
+  return res.json({ ok: true, preset: updated });
+});
+apiRouter.delete('/presets/:id/audio', (req, res) => {
+  const preset = Store.getPreset(req.params.id);
+  if (!preset) return res.status(404).json({ error: 'not found' });
+  if (preset.audioPath) {
+    const absolutePath = path.join('/data', String(preset.audioPath).replace(/^\/+/, ''));
+    if (absolutePath.startsWith('/data/') && fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
+  }
+  const updated = Store.savePreset({ ...preset, audioPath: null, audioMime: null, audioDuration: null });
+  return res.json({ ok: true, preset: updated });
+});
 apiRouter.delete('/presets/:id', (req, res) => {
   Store.deletePreset(req.params.id);
   res.json({ ok: true });
@@ -767,6 +805,7 @@ app.use('/api', (req, res) => {
 
 app.use('/media/presets', express.static(presetMediaDir));
 app.use('/media/gear', express.static(gearMediaDir));
+app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route
