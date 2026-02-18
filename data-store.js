@@ -312,6 +312,9 @@ ensureColumn('training_videos', 'upload_mime', 'TEXT');
 ensureColumn('training_videos', 'upload_size', 'INTEGER');
 ensureColumn('training_videos', 'upload_original_name', 'TEXT');
 ensureColumn('training_videos', 'thumbnail_url', 'TEXT');
+ensureColumn('training_videos', 'local_video_path', 'TEXT');
+ensureColumn('training_videos', 'thumbnail_path', 'TEXT');
+ensureColumn('training_videos', 'thumbnail_updated_at', 'TEXT');
 db.prepare(`UPDATE training_videos
   SET source_type = COALESCE(NULLIF(source_type, ''), 'youtube'),
       youtube_url = COALESCE(NULLIF(youtube_url, ''), NULLIF(url, '')),
@@ -993,6 +996,9 @@ const saveTrainingVideoUpload = (id, data = {}) => {
         upload_mime = @upload_mime,
         upload_size = @upload_size,
         upload_original_name = @upload_original_name,
+        local_video_path = COALESCE(@local_video_path, local_video_path),
+        thumbnail_path = COALESCE(@thumbnail_path, thumbnail_path),
+        thumbnail_updated_at = CASE WHEN @thumbnail_url IS NULL THEN thumbnail_updated_at ELSE @thumbnail_updated_at END,
         thumbnail_url = COALESCE(@thumbnail_url, thumbnail_url),
         thumbUrl = COALESCE(@thumbnail_url, thumbnail_url, thumbUrl),
         thumb_url = COALESCE(@thumbnail_url, thumbnail_url, thumb_url),
@@ -1003,7 +1009,28 @@ const saveTrainingVideoUpload = (id, data = {}) => {
     upload_mime: data.upload_mime || '',
     upload_size: n(data.upload_size),
     upload_original_name: data.upload_original_name || '',
+    local_video_path: data.local_video_path || null,
+    thumbnail_path: data.thumbnail_path || null,
+    thumbnail_updated_at: data.thumbnail_url ? new Date().toISOString() : null,
     thumbnail_url: data.thumbnail_url || null,
+    updatedAt: Date.now(),
+  });
+  return getTrainingVideo(id);
+};
+
+const saveTrainingVideoThumbnail = (id, data = {}) => {
+  run(`UPDATE training_videos
+    SET thumbnail_path = @thumbnail_path,
+        thumbnail_url = @thumbnail_url,
+        thumbUrl = @thumbnail_url,
+        thumb_url = @thumbnail_url,
+        thumbnail_updated_at = @thumbnail_updated_at,
+        updatedAt = @updatedAt
+    WHERE id = @id`, {
+    id: Number(id),
+    thumbnail_path: data.thumbnail_path || null,
+    thumbnail_url: data.thumbnail_url || null,
+    thumbnail_updated_at: new Date().toISOString(),
     updatedAt: Date.now(),
   });
   return getTrainingVideo(id);
@@ -1637,4 +1664,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

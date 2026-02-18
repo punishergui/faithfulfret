@@ -62,8 +62,9 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
+After deploy, verify ffmpeg exists in the app container: `docker compose exec daily-fret ffmpeg -version`.
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
-After deploy, verify uploaded training videos: upload mp4/webm/ogg in Edit Video, playback works in Video Detail, and if ffmpeg is missing the UI shows "Thumbnail pending / ffmpeg not installed" instead of broken images.
+After deploy, verify uploaded training videos: upload mp4/webm/ogg/mov in Edit Video, playback works in Video Detail, and if ffmpeg is missing the UI shows "Thumbnail pending / ffmpeg not installed" instead of broken images.
 After deploy, verify Training Playlists list uses 70/30 layout (cards left, create/sort sidebar right), cards open on click, and each card thumbnail matches the first playlist video by position (or placeholder when empty).
 After deploy, verify Playlist detail thumbnails keep a fixed 16:9 size with object-fit cover and do not squish when reorder/remove controls are visible.
 After deploy, verify Dashboard → Start Practice works: Continue Last Video, Continue Last Playlist, and Quick Start Playlist should enable only after opening training content, and should show helper text when empty.
@@ -537,7 +538,9 @@ MIT — do whatever you want with it.
 - `GET /api/attachments?entity_type=lesson&entity_id=123`
 - `DELETE /api/attachments/:id`
 - `POST /api/training/videos/:id/upload` (multipart upload field: `file`, stores self-hosted training videos)
-- `GET /uploads/...` (static serving from `/data/uploads`, including `training-videos/` + `training-thumbs/`)
+- `POST /api/training/videos/:id/thumbnail` (generate/refresh local thumbnail on demand)
+- `GET /api/training/videos/:id` (normalized single-video view with local upload metadata)
+- `GET /uploads/...` (static serving from `/data/uploads`, including `/uploads/videos` + `/uploads/thumbnails`)
 
 ### New DB schema (idempotent)
 
@@ -553,6 +556,13 @@ Tables:
 
 New columns (via `ensureColumn`):
 - `sessions.ended_at`
+- `training_videos.local_video_path`
+- `training_videos.thumbnail_path`
+- `training_videos.thumbnail_updated_at`
+
+Persistent media paths:
+- uploaded training videos: `/data/uploads/videos/<video-id>/...`
+- generated thumbnails: `/data/uploads/thumbnails/<video-id>.jpg`
 - `sessions.total_minutes`
 - `sessions.status`
 - `lessons.notes_md`

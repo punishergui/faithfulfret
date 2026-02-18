@@ -8,6 +8,7 @@ const https = require('https');
 const JSZip = require('jszip');
 const multer = require('multer');
 const Store = require('./data-store');
+const { generateVideoThumbnail } = require('./server/thumbs');
 
 const app = express();
 const apiRouter = express.Router();
@@ -15,8 +16,8 @@ const PORT = process.env.PORT || 9999;
 const presetMediaDir = '/data/presets';
 const gearMediaDir = '/data/gear';
 const uploadsDir = '/data/uploads';
-const trainingVideosDir = '/data/uploads/training-videos';
-const trainingThumbsDir = '/data/uploads/training-thumbs';
+const trainingVideosDir = '/data/uploads/videos';
+const trainingThumbsDir = '/data/uploads/thumbnails';
 const presetAudioDir = '/data/uploads/preset-audio';
 const trainingUploadMaxMb = Number(process.env.TRAINING_UPLOAD_MAX_MB ?? 2048);
 const trainingUploadMaxBytes = Number.isFinite(trainingUploadMaxMb) && trainingUploadMaxMb > 0 ? Math.floor(trainingUploadMaxMb * 1024 * 1024) : 0;
@@ -34,7 +35,7 @@ const trainingVideoUpload = multer({
   storage: multer.memoryStorage(),
   ...(trainingUploadMaxBytes > 0 ? { limits: { fileSize: trainingUploadMaxBytes } } : {}),
   fileFilter: (req, file, cb) => {
-    const allowed = ['video/mp4', 'video/webm', 'video/ogg'];
+    const allowed = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
     if (!allowed.includes(file.mimetype)) return cb(new Error('unsupported file type'));
     cb(null, true);
   },
@@ -240,18 +241,29 @@ function hasFfmpeg() {
   });
 }
 
-function generateVideoThumbnail(videoFilePath, thumbFilePath) {
-  return new Promise((resolve, reject) => {
-    const args = ['-y', '-ss', '2', '-i', videoFilePath, '-frames:v', '1', '-q:v', '2', thumbFilePath];
-    const child = spawn('ffmpeg', args);
-    let err = '';
-    child.stderr.on('data', (chunk) => { err += String(chunk || ''); });
-    child.on('error', reject);
-    child.on('exit', (code) => {
-      if (code === 0) return resolve(true);
-      reject(new Error(err || `ffmpeg exited ${code}`));
-    });
-  });
+function normalizeTrainingVideo(row = {}) {
+  const thumb = resolveTrainingThumb(row);
+  const hasLocalVideo = Boolean(row.local_video_path || row.upload_url);
+  return {
+    ...row,
+    hasLocalVideo,
+    thumbUrl: thumb,
+    thumb_url: thumb,
+    thumbnail_url: thumb,
+    watch_url: resolveTrainingWatchUrl(row),
+  };
+}
+
+async function buildLocalVideoThumbnail(video = {}) {
+  const videoPath = video.local_video_path || filePathFromUploadUrl(video.upload_url, trainingVideosDir);
+  if (!videoPath) return { ok: false, error: 'local video path is not set' };
+  const thumbName = `${Number(video.id)}.jpg`;
+  const thumbPath = path.join(trainingThumbsDir, thumbName);
+  const thumbUrl = `/uploads/thumbnails/${thumbName}`;
+  const result = await generateVideoThumbnail({ inputPath: videoPath, outputPath: thumbPath, outputUrl: thumbUrl, seekSeconds: 2 });
+  if (!result.ok) return result;
+  Store.saveTrainingVideoThumbnail(video.id, { thumbnail_path: thumbPath, thumbnail_url: thumbUrl });
+  return { ...result, thumbnailUrl: thumbUrl, thumbnail_path: thumbPath };
 }
 
 function extractYouTubeId(value) {
@@ -1017,22 +1029,23 @@ apiRouter.get('/training-videos', (req, res) => {
     difficulty_level: Number.isFinite(level) ? level : undefined,
     includeProgress: req.query.includeProgress,
   });
-  res.json(rows.map((row) => ({ ...row, thumbUrl: resolveTrainingThumb(row), thumb_url: resolveTrainingThumb(row), thumbnail_url: resolveTrainingThumb(row), watch_url: resolveTrainingWatchUrl(row) })));
+  res.json(rows.map(normalizeTrainingVideo));
 });
 
 apiRouter.get('/training-videos/:id', (req, res) => {
   const row = Store.getTrainingVideo(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
-  const thumb = resolveTrainingThumb(row);
   return res.json({
-    ...row,
-    thumbUrl: thumb,
-    thumb_url: thumb,
-    thumbnail_url: thumb,
-    watch_url: resolveTrainingWatchUrl(row),
+    ...normalizeTrainingVideo(row),
     timestamps: Store.listVideoTimestamps(req.params.id),
     playlists: Store.listPlaylistsByVideo(req.params.id),
   });
+});
+
+apiRouter.get('/training/videos/:id', (req, res) => {
+  const row = Store.getTrainingVideo(req.params.id);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  return res.json(normalizeTrainingVideo(row));
 });
 
 apiRouter.get('/training/videos/:id/progress', (req, res) => {
@@ -1059,33 +1072,47 @@ apiRouter.post('/training/videos/:id/upload', trainingVideoUpload.single('file')
 
   const ext = (path.extname(req.file.originalname || '').replace(/[^a-zA-Z0-9.]/g, '').toLowerCase() || '.mp4').slice(0, 10);
   const safeExt = ext.startsWith('.') ? ext : `.${ext}`;
-  const unique = `${Number(req.params.id)}-${crypto.randomUUID()}`;
-  const fileName = `${unique}${safeExt}`;
-  const videoPath = path.join(trainingVideosDir, fileName);
+  const safeName = sanitizeUploadFileName(path.basename(req.file.originalname || `video${safeExt}`));
+  const fileName = `${Date.now()}-${safeName || `video${safeExt}`}`;
+  const videoDir = path.join(trainingVideosDir, String(Number(req.params.id)));
+  fs.mkdirSync(videoDir, { recursive: true });
+  const videoPath = path.join(videoDir, fileName);
   fs.writeFileSync(videoPath, req.file.buffer);
 
   let thumbnailUrl = null;
+  let thumbnailPath = null;
   try {
-    const ffmpegReady = await hasFfmpeg();
-    if (ffmpegReady) {
-      const thumbName = `${unique}.jpg`;
-      const thumbPath = path.join(trainingThumbsDir, thumbName);
-      await generateVideoThumbnail(videoPath, thumbPath);
-      thumbnailUrl = `/uploads/training-thumbs/${thumbName}`;
+    const result = await buildLocalVideoThumbnail({ id: Number(req.params.id), local_video_path: videoPath, upload_url: '' });
+    if (result.ok) {
+      thumbnailUrl = result.thumbnailUrl;
+      thumbnailPath = result.thumbnail_path;
     }
   } catch (error) {
     console.warn('[training] thumbnail generation failed:', error.message || error);
   }
 
   const saved = Store.saveTrainingVideoUpload(req.params.id, {
-    upload_url: `/uploads/training-videos/${fileName}`,
+    upload_url: `/uploads/videos/${Number(req.params.id)}/${fileName}`,
     upload_mime: req.file.mimetype || '',
     upload_size: req.file.size || req.file.buffer.length || 0,
     upload_original_name: req.file.originalname || fileName,
+    local_video_path: videoPath,
+    thumbnail_path: thumbnailPath,
     thumbnail_url: thumbnailUrl,
   });
 
-  return res.json({ ...saved, thumbnail_url: saved.thumbnail_url || saved.thumb_url || saved.thumbUrl || null });
+  return res.json(normalizeTrainingVideo(saved));
+});
+
+apiRouter.post('/training/videos/:id/thumbnail', async (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  const ffmpegReady = await hasFfmpeg();
+  if (!ffmpegReady) return res.status(503).json({ error: 'ffmpeg not available' });
+  const result = await buildLocalVideoThumbnail(video);
+  if (!result.ok) return res.status(400).json({ error: result.error || 'thumbnail generation failed' });
+  const updated = Store.getTrainingVideo(req.params.id);
+  return res.json({ thumbnailUrl: result.thumbnailUrl, video: normalizeTrainingVideo(updated) });
 });
 
 apiRouter.post('/training-videos', async (req, res) => {
@@ -1154,10 +1181,8 @@ apiRouter.delete('/training-videos/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'not found' });
 
   if (existing.source_type === 'upload' && existing.upload_url) {
-    safeUnlink(filePathFromUploadUrl(existing.upload_url, trainingVideosDir));
-    if (String(existing.thumbnail_url || '').startsWith('/uploads/training-thumbs/')) {
-      safeUnlink(filePathFromUploadUrl(existing.thumbnail_url, trainingThumbsDir));
-    }
+    safeUnlink(existing.local_video_path || filePathFromUploadUrl(existing.upload_url, trainingVideosDir));
+    safeUnlink(existing.thumbnail_path || filePathFromUploadUrl(existing.thumbnail_url, trainingThumbsDir));
   }
 
   Store.deleteTrainingVideo(req.params.id);
@@ -1573,6 +1598,8 @@ app.use('/api', (req, res) => {
 
 app.use('/media/presets', express.static(presetMediaDir));
 app.use('/media/gear', express.static(gearMediaDir));
+app.use('/uploads/videos', express.static(trainingVideosDir, { maxAge: 0 }));
+app.use('/uploads/thumbnails', express.static(trainingThumbsDir, { maxAge: 0 }));
 app.use('/uploads', express.static('/data/uploads', { maxAge: 0 }));
 app.use(express.static(path.join(__dirname, 'public')));
 

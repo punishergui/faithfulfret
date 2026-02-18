@@ -366,6 +366,14 @@
       });
     },
 
+    async generateTrainingVideoThumbnail(id) {
+      return api(`/api/training/videos/${encodeURIComponent(id)}/thumbnail`, { method: 'POST' });
+    },
+
+    async getTrainingVideoLocal(id) {
+      return api(`/api/training/videos/${encodeURIComponent(id)}`);
+    },
+
 
     async getTrainingVideoProgress(id) {
       return api(`/api/training/videos/${id}/progress`);

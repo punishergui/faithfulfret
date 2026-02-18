@@ -90,7 +90,7 @@ Pages.ResourceVideoDetail = {
       : [{ label: 'Training', href: '#/training' }, { label: 'Videos', href: '#/training/videos' }, { label: video.title || 'Video' }];
     const embedBase = `https://www.youtube-nocookie.com/embed/${video.videoId || video.video_id || ''}`;
     const isUpload = video.source_type === 'upload';
-    const uploadThumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || '';
+    const uploadThumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || ((video.videoId || video.video_id) ? Utils.ytThumb(video.videoId || video.video_id) : '');
     const watchUrl = video.watch_url || (isUpload ? (video.upload_url || '') : (video.youtube_url || video.url || ''));
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
