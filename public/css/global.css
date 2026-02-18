@@ -2808,3 +2808,115 @@ select.df-input option {
   color: var(--text2);
   font-size: 13px;
 }
+
+.prog-diatonic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.prog-diatonic-item {
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.prog-role--tonic { border-color: var(--accent); }
+.prog-role--dominant { border-color: var(--warn); }
+.prog-role--sub { border-color: var(--ok); }
+
+.prog-note {
+  color: var(--text3);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.prog-output {
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--bg2);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.prog-chord-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.prog-chord-card {
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 8px;
+}
+
+.prog-chord-card--theory { border-color: var(--accent); }
+
+.chord-chart-wrap {
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.chord-chart-header,
+.chord-chart-row {
+  min-width: 1680px;
+  display: grid;
+  grid-template-columns: 110px repeat(11, minmax(140px, 1fr));
+  border-bottom: 1px solid var(--line2);
+}
+
+.chord-chart-header {
+  background: var(--bg2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.chord-chart-col,
+.chord-chart-root {
+  padding: 8px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  border-right: 1px solid var(--line2);
+}
+
+.chord-chart-cell {
+  padding: 8px;
+  border-right: 1px solid var(--line2);
+}
+
+.chord-chart-name {
+  font-size: 12px;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+
+body.print-view {
+  background: #ffffff;
+  color: #111111;
+}
+
+body.print-view .page-hero,
+body.print-view nav,
+body.print-view .fret-line,
+body.print-view .df-help-card,
+body.print-view #update-banner {
+  display: none !important;
+}
+
+body.print-view .page-wrap,
+body.print-view .chord-chart-wrap,
+body.print-view .chord-chart-cell,
+body.print-view .chord-chart-root,
+body.print-view .chord-chart-col,
+body.print-view .chord-chart-header,
+body.print-view .chord-chart-row {
+  background: #ffffff !important;
+  color: #111111 !important;
+  border-color: #d0d0d0 !important;
+}

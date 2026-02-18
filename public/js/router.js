@@ -38,6 +38,8 @@
     { pattern: /^#\/tools\/metronome/,            handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/chords$/,              handler: () => Pages.Chords.render() },
     { pattern: /^#\/tools\/scales$/,              handler: () => Pages.Scales.render() },
+    { pattern: /^#\/tools\/progressions$/,        handler: () => Pages.Progressions.render() },
+    { pattern: /^#\/tools\/chord-chart$/,         handler: () => Pages.ChordChart.render() },
     { pattern: /^#\/tools\/bpm$/,                 handler: () => Pages.Metronome.render() },
     { pattern: /^#\/tools\/tunings$/,             handler: () => Pages.Tuning.render() },
     { pattern: /^#\/tools\/tuning$/,              handler: () => navigate('#/tools/tunings') },

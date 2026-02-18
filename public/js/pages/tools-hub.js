@@ -31,6 +31,18 @@ Pages.ToolsHub = {
         title: 'SCALES',
         desc: 'Choose key + scale type and view scale tones on a fretboard.',
       },
+      {
+        href: '#/tools/progressions',
+        icon: '🧭',
+        title: 'PROGRESSIONS',
+        desc: 'Build common progressions by key and view why they resolve.',
+      },
+      {
+        href: '#/tools/chord-chart',
+        icon: '🗂️',
+        title: 'CHORD CHART',
+        desc: 'Open the full reference chart with major, minor, extended, and altered shapes.',
+      },
     ];
 
     app.innerHTML = `
