@@ -1,34 +1,16 @@
-// Daily Fret — Scale Reference
+// Daily Fret — Scales Tool
 
 window.Pages = window.Pages || {};
 
-const SCALES = {
-  'E Minor Pentatonic': {
-    strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2], 4:[2,5], 5:[0,3] },
-    roots:   { 0:[0], 5:[0] },
-    desc: 'Box 1 — the foundation of rock and blues. Learn this first.',
-  },
-  'A Minor Pentatonic': {
-    strings: { 0:[0,3], 1:[1,3], 2:[0,2], 3:[0,2], 4:[0,2], 5:[0,3] },
-    roots:   { 0:[0], 1:[1] },
-    desc: 'Box 1 — most-used soloing pattern in rock and blues.',
-  },
-  'G Major Scale': {
-    strings: { 0:[0,2,3], 1:[0,2,3], 2:[0,2], 3:[0,2,4], 4:[0,2,4], 5:[0,2,3] },
-    roots:   {},
-    desc: 'Open position major scale. Essential for understanding harmony.',
-  },
-  'C Major Pentatonic': {
-    strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2], 4:[3,5], 5:[0,3] },
-    roots:   {},
-    desc: 'Major pentatonic — bright, happy sound. Country and pop staple.',
-  },
-  'E Blues Scale': {
-    strings: { 0:[0,3], 1:[0,3], 2:[0,2], 3:[0,2,4], 4:[2,5], 5:[0,2,3] },
-    roots:   { 0:[0], 5:[0] },
-    desc: 'Minor pentatonic + flat 5. The core of blues guitar.',
-  },
+const SCALE_INTERVALS = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  pentatonicMinor: [0, 3, 5, 7, 10],
 };
+
+const SCALE_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const NOTE_INDEX = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const STRING_OPEN_NOTES = ['E', 'A', 'D', 'G', 'B', 'E'];
 
 Pages.Scales = {
   render() {
@@ -43,97 +25,90 @@ Pages.Scales = {
         <div class="fret-line"></div>
       </div>
 
-      <div class="scales-wrap">
-        <div class="df-field scale-select">
-          <label class="df-label" for="scale-picker">Scale Pattern</label>
-          <select id="scale-picker" class="df-input">
-            ${Object.keys(SCALES).map(name => `<option value="${name}">${name}</option>`).join('')}
+      <div class="scales-wrap" style="display:grid;gap:14px;">
+        <div class="df-field">
+          <label class="df-label" for="scale-type">Scale Type</label>
+          <select id="scale-type" class="df-input">
+            <option value="major">Major</option>
+            <option value="minor">Natural Minor</option>
+            <option value="pentatonicMinor">Minor Pentatonic</option>
           </select>
         </div>
 
-        <div class="scale-fretboard" id="scale-fretboard"></div>
-        <div class="scale-desc" id="scale-desc"></div>
-
-        <div class="scale-help">
-          <div class="scale-help__title">How to use this tool</div>
-          <ul>
-            <li><strong>Read top → bottom:</strong> top row is high <strong>e</strong>, bottom row is low <strong>E</strong>.</li>
-            <li><strong>Read left → right:</strong> columns are frets 0–5. Fret <strong>0</strong> is open string.</li>
-            <li><strong>Play root notes first</strong> (●), then fill in scale tones (○).</li>
-            <li><strong>Practice sequence:</strong> ascend slowly, descend slowly, then improvise for 60 seconds.</li>
-            <li><strong>Tone idea:</strong> for blues/rock, pair minor pentatonic with a medium gain amp tone.</li>
-          </ul>
+        <div class="df-field">
+          <label class="df-label" for="scale-key">Key</label>
+          <select id="scale-key" class="df-input">${SCALE_KEYS.map((key) => `<option value="${key}">${key}</option>`).join('')}</select>
         </div>
 
-        <div style="margin-top:24px;background:var(--bg1);border:1px solid var(--line2);padding:16px;">
-          <div style="font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Legend</div>
-          <div style="display:flex;gap:20px;font-family:var(--f-mono);font-size:12px;">
-            <span><span style="color:var(--accent);">●</span> Root note</span>
-            <span><span style="color:var(--text2);">○</span> Scale tone</span>
-            <span><span style="color:var(--text3);">─</span> Open string / No note</span>
-          </div>
-        </div>
-
-        <div style="margin-top:18px;font-family:var(--f-mono);font-size:10px;color:var(--text3);letter-spacing:.06em;">
-          Further reading: JustinGuitar scale basics, Fender scale exercises, and Marty Music pentatonic practice routines.
-        </div>
+        <div id="scale-title" style="font-family:var(--f-mono);font-size:16px;"></div>
+        <div id="scale-svg" style="border:1px solid var(--line2);background:var(--bg1);padding:12px;"></div>
       </div>
     `;
 
-    const picker = app.querySelector('#scale-picker');
-    const showScale = (name) => {
-      const scale = SCALES[name];
-      if (!scale) return;
-      app.querySelector('#scale-fretboard').innerHTML = this._buildFretboard(scale);
-      app.querySelector('#scale-desc').textContent = scale.desc;
-    };
-
-    picker.addEventListener('change', () => showScale(picker.value));
-    showScale(picker.value);
+    this._bind(app);
   },
 
-  _buildFretboard(scale) {
-    const FRETS = 6; // frets 0-5
-    const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E']; // high e to low E
+  _bind(container) {
+    const typeEl = container.querySelector('#scale-type');
+    const keyEl = container.querySelector('#scale-key');
+    const titleEl = container.querySelector('#scale-title');
+    const svgEl = container.querySelector('#scale-svg');
 
-    // String indices in our data: 0=e(high), 1=B, 2=G, 3=D, 4=A, 5=E(low)
-    // Display top-to-bottom: e, B, G, D, A, E
+    const renderScale = () => {
+      const type = typeEl.value;
+      const key = keyEl.value;
+      titleEl.textContent = `${key} ${type === 'pentatonicMinor' ? 'Minor Pentatonic' : type === 'minor' ? 'Minor' : 'Major'}`;
+      svgEl.innerHTML = this._buildScaleSvg(key, SCALE_INTERVALS[type] || SCALE_INTERVALS.major);
+    };
 
-    let header = '     ';
-    for (let f = 0; f <= FRETS - 1; f++) {
-      header += f.toString().padEnd(5, ' ');
-    }
+    keyEl.addEventListener('change', renderScale);
+    typeEl.addEventListener('change', renderScale);
+    renderScale();
+  },
 
-    let rows = [header];
+  _buildScaleSvg(key, intervals) {
+    const width = 660;
+    const height = 230;
+    const margin = 24;
+    const stringGap = 34;
+    const fretGap = 50;
+    const maxFrets = 12;
 
-    for (let si = 0; si < 6; si++) {
-      const strName = STRING_NAMES[si].padEnd(2, ' ');
-      const notesOnString = scale.strings[si] || [];
-      const rootsOnString = (scale.roots[si] || []);
+    const rootIndex = NOTE_INDEX[key];
+    const scaleNotes = new Set(intervals.map((i) => (rootIndex + i) % 12));
 
-      let row = strName + ' ';
-      for (let f = 0; f < FRETS; f++) {
-        if (notesOnString.includes(f)) {
-          if (rootsOnString.includes(f)) {
-            row += '<span style="color:var(--accent);text-shadow:0 0 8px var(--glow);">●</span>    ';
-          } else {
-            row += '<span style="color:var(--text2);">○</span>    ';
-          }
-        } else {
-          row += '<span style="color:var(--text3);">─</span>    ';
-        }
+    const fretLines = Array.from({ length: maxFrets + 1 }, (_, fret) => {
+      const x = margin + fret * fretGap;
+      return `<line x1="${x}" y1="${margin}" x2="${x}" y2="${margin + stringGap * 5}" stroke="var(--line2)" stroke-width="${fret === 0 ? 4 : 1.5}" />`;
+    }).join('');
+
+    const stringLines = Array.from({ length: 6 }, (_, stringIdx) => {
+      const y = margin + stringIdx * stringGap;
+      return `<line x1="${margin}" y1="${y}" x2="${margin + fretGap * maxFrets}" y2="${y}" stroke="var(--line2)" stroke-width="1.5" />`;
+    }).join('');
+
+    const markers = [];
+    for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
+      const openIndex = NOTE_INDEX[STRING_OPEN_NOTES[stringIdx]];
+      const y = margin + stringIdx * stringGap;
+      for (let fret = 0; fret <= maxFrets; fret++) {
+        const noteIndex = (openIndex + fret) % 12;
+        if (!scaleNotes.has(noteIndex)) continue;
+        const x = margin + fret * fretGap;
+        const isRoot = noteIndex === rootIndex;
+        markers.push(`<circle cx="${x}" cy="${y}" r="${isRoot ? 9 : 6}" fill="${isRoot ? 'var(--accent)' : 'var(--text2)'}" />`);
       }
-
-      rows.push(row);
     }
 
-    // Fret number footer
-    let footer = '     ';
-    for (let f = 0; f < FRETS; f++) {
-      footer += f.toString().padEnd(5, ' ');
-    }
-    rows.push(footer);
+    const fretLabels = Array.from({ length: maxFrets + 1 }, (_, fret) => `<text x="${margin + fret * fretGap}" y="${height - 10}" text-anchor="middle" fill="var(--text3)" font-size="11">${fret}</text>`).join('');
 
-    return rows.join('\n');
+    return `
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="230" role="img" aria-label="Scale fretboard diagram">
+        ${stringLines}
+        ${fretLines}
+        ${markers.join('')}
+        ${fretLabels}
+      </svg>
+    `;
   },
 };

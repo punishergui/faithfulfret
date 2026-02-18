@@ -1,37 +1,39 @@
-// Daily Fret — Chord Reference
+// Daily Fret — Chords Tool
 
 window.Pages = window.Pages || {};
 
-const CHORDS = {
-  'Em':    { frets: '022000', fingers: 'x x 2 2 0 0', type: 'minor',    tip: 'First chord most players learn. Practice transitioning to Am.' },
-  'Am':    { frets: 'x02210', fingers: 'x 0 2 2 1 0', type: 'minor',    tip: 'The companion to Em. Em → Am is the most common progression.' },
-  'Dm':    { frets: 'xx0231', fingers: 'x x 0 2 3 1', type: 'minor',    tip: 'Triangle shape. Common in pop and folk.' },
-  'C':     { frets: 'x32010', fingers: 'x 3 2 0 1 0', type: 'major',    tip: 'Essential open chord. Keep your thumb behind the neck.' },
-  'G':     { frets: '320003', fingers: '3 2 0 0 0 3', type: 'major',    tip: 'Use pinky on 1st string for cleaner G→C transitions.' },
-  'D':     { frets: 'xx0232', fingers: 'x x 0 2 3 2', type: 'major',    tip: 'Diamond shape. Watch that 1st string clearance.' },
-  'A':     { frets: 'x02220', fingers: 'x 0 2 2 2 0', type: 'major',    tip: 'Barre all 3 middle strings with one finger.' },
-  'E':     { frets: '022100', fingers: '0 2 2 1 0 0', type: 'major',    tip: 'Same shape as Em — just add 2 more fingers.' },
-  'F':     { frets: '133211', fingers: '1 3 3 2 1 1', type: 'major',    tip: 'The barre chord wall. Keep index finger right behind the fret.' },
-  'B7':    { frets: 'x21202', fingers: 'x 2 1 2 0 2', type: 'dominant', tip: 'Great stepping stone toward full barre chords.' },
-  'G7':    { frets: '320001', fingers: '3 2 0 0 0 1', type: 'dominant', tip: 'G but with index on high E. Common in blues.' },
-  'D7':    { frets: 'xx0212', fingers: 'x x 0 2 1 2', type: 'dominant', tip: 'D → D7 is a great exercise for chord transitions.' },
-  'Cmaj7': { frets: 'x32000', fingers: 'x 3 2 0 0 0', type: 'maj7',     tip: 'Easier than C and sounds gorgeous. Essential in pop.' },
-  'Fmaj7': { frets: 'xx3210', fingers: 'x x 3 2 1 0', type: 'maj7',     tip: 'The easy alternative to full F barre. Use it constantly.' },
-  'Bm':    { frets: 'x24432', fingers: 'x 2 4 4 3 2', type: 'minor',    tip: 'Partial barre at 2nd fret. Master this one early.' },
+const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const CHORD_SHAPES = {
+  C: {
+    major: { name: 'C', frets: ['x', 3, 2, 0, 1, 0], fingers: ['x', 3, 2, 0, 1, 0] },
+    minor: { name: 'Cm', frets: ['x', 3, 5, 5, 4, 3], fingers: ['x', 1, 3, 4, 2, 1] },
+    7: { name: 'C7', frets: ['x', 3, 2, 3, 1, 0], fingers: ['x', 3, 2, 4, 1, 0] },
+  },
+  D: {
+    major: { name: 'D', frets: ['x', 'x', 0, 2, 3, 2], fingers: ['x', 'x', 0, 1, 3, 2] },
+    minor: { name: 'Dm', frets: ['x', 'x', 0, 2, 3, 1], fingers: ['x', 'x', 0, 2, 3, 1] },
+    7: { name: 'D7', frets: ['x', 'x', 0, 2, 1, 2], fingers: ['x', 'x', 0, 2, 1, 3] },
+  },
+  E: {
+    major: { name: 'E', frets: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0] },
+    minor: { name: 'Em', frets: [0, 2, 2, 0, 0, 0], fingers: [0, 2, 3, 0, 0, 0] },
+    7: { name: 'E7', frets: [0, 2, 0, 1, 0, 0], fingers: [0, 2, 0, 1, 0, 0] },
+  },
+  G: {
+    major: { name: 'G', frets: [3, 2, 0, 0, 0, 3], fingers: [2, 1, 0, 0, 0, 3] },
+    minor: { name: 'Gm', frets: [3, 5, 5, 3, 3, 3], fingers: [1, 3, 4, 1, 1, 1] },
+    7: { name: 'G7', frets: [3, 2, 0, 0, 0, 1], fingers: [3, 2, 0, 0, 0, 1] },
+  },
+  A: {
+    major: { name: 'A', frets: ['x', 0, 2, 2, 2, 0], fingers: ['x', 0, 1, 2, 3, 0] },
+    minor: { name: 'Am', frets: ['x', 0, 2, 2, 1, 0], fingers: ['x', 0, 2, 3, 1, 0] },
+    7: { name: 'A7', frets: ['x', 0, 2, 0, 2, 0], fingers: ['x', 0, 2, 0, 3, 0] },
+  },
 };
 
 Pages.Chords = {
-  currentChord: null,
-
   render() {
     const app = document.getElementById('app');
-
-    const typeColor = {
-      major:    'var(--accent)',
-      minor:    '#5599ff',
-      dominant: 'var(--yellow)',
-      maj7:     'var(--green)',
-    };
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516924962500-2b4b3b99ea02?w=1200&q=80');">
@@ -42,97 +44,98 @@ Pages.Chords = {
         <div class="fret-line"></div>
       </div>
 
-      <div class="chords-wrap">
-        <div class="chord-grid">
-          ${Object.entries(CHORDS).map(([name, chord]) => `
-            <button class="chord-btn chord-btn--${chord.type}" data-chord="${name}"
-              style="border-top-color:${typeColor[chord.type] || 'var(--accent)'};">
-              ${name}
-            </button>
-          `).join('')}
+      <div class="chords-wrap" style="display:grid;gap:14px;">
+        <div class="df-field">
+          <label class="df-label" for="chord-root">Root</label>
+          <select id="chord-root" class="df-input">${ROOTS.map((root) => `<option value="${root}">${root}</option>`).join('')}</select>
         </div>
 
-        <!-- Type legend -->
-        <div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-          ${Object.entries({ Major: 'var(--accent)', Minor: '#5599ff', Dominant: 'var(--yellow)', Maj7: 'var(--green)' }).map(([label, color]) => `
-            <div style="display:flex;align-items:center;gap:6px;">
-              <div style="width:12px;height:12px;background:${color};"></div>
-              <span style="font-family:var(--f-mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;">${label}</span>
-            </div>
-          `).join('')}
+        <div class="df-field">
+          <label class="df-label" for="chord-type">Chord Type</label>
+          <select id="chord-type" class="df-input">
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+            <option value="7">Dominant 7</option>
+          </select>
         </div>
 
-        <div id="chord-display" style="display:none;" class="chord-display">
-          <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
-            <div class="chord-display__name" id="chord-name"></div>
-            <pre id="chord-diagram" class="chord-diagram-board"></pre>
-            <div class="chord-display__fingers" id="chord-fingers"></div>
-          </div>
-          <div>
-            <div class="chord-display__tip" id="chord-tip"></div>
-          </div>
-        </div>
+        <div id="chord-name" style="font-family:var(--f-mono);font-size:18px;"></div>
+        <div id="chord-svg" style="border:1px solid var(--line2);background:var(--bg1);padding:12px;"></div>
+        <div id="chord-fingers" style="color:var(--text2);"></div>
       </div>
     `;
 
-    // Select first chord by default
-    const firstChord = Object.keys(CHORDS)[0];
-    this._showChord(app, firstChord);
-
-    // Bind chord buttons
-    app.querySelectorAll('.chord-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        app.querySelectorAll('.chord-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this._showChord(app, btn.dataset.chord);
-      });
-    });
-
-    // Auto-select first button
-    app.querySelector(`[data-chord="${firstChord}"]`)?.classList.add('active');
+    this._bind(app);
   },
 
-  _showChord(container, name) {
-    const chord = CHORDS[name];
-    if (!chord) return;
+  _bind(container) {
+    const rootEl = container.querySelector('#chord-root');
+    const typeEl = container.querySelector('#chord-type');
+    const nameEl = container.querySelector('#chord-name');
+    const svgEl = container.querySelector('#chord-svg');
+    const fingersEl = container.querySelector('#chord-fingers');
 
-    const display = container.querySelector('#chord-display');
-    display.style.display = 'grid';
+    const renderChord = () => {
+      const root = rootEl.value;
+      const type = typeEl.value;
+      const leftHanded = window.Utils?.isLeftHanded?.() || false;
+      const shape = CHORD_SHAPES[root]?.[type];
 
-    container.querySelector('#chord-name').textContent = name;
-    container.querySelector('#chord-diagram').innerHTML = this._buildTextFretboard(chord.frets);
-    container.querySelector('#chord-fingers').textContent = 'Finger positions: ' + chord.fingers;
-    container.querySelector('#chord-tip').textContent = chord.tip;
-  },
-
-  // Build a fretboard-style chord chart with the same orientation as scales
-  // (high e string at top, low E at bottom).
-  _buildTextFretboard(frets) {
-    const markersByString = frets.split('');
-    const stringNames = ['e', 'B', 'G', 'D', 'A', 'E'];
-    const mapping = [5, 4, 3, 2, 1, 0];
-    const visibleFrets = 6;
-
-    let header = '     ';
-    for (let f = 0; f < visibleFrets; f++) header += `${f}`.padEnd(5, ' ');
-    const rows = [header];
-
-    for (let rowIndex = 0; rowIndex < stringNames.length; rowIndex++) {
-      const stringName = stringNames[rowIndex].padEnd(2, ' ');
-      const marker = markersByString[mapping[rowIndex]];
-      let row = `${stringName} `;
-
-      for (let fret = 0; fret < visibleFrets; fret++) {
-        if (marker === 'x' && fret === 0) row += '<span style="color:var(--red);">✕</span>    ';
-        else if (marker === '0' && fret === 0) row += '<span style="color:var(--green);">○</span>    ';
-        else if (parseInt(marker, 10) === fret) row += '<span style="color:var(--accent);text-shadow:0 0 8px var(--glow);">●</span>    ';
-        else row += '<span style="color:var(--text3);">─</span>    ';
+      if (!shape) {
+        nameEl.textContent = `${root} ${type}`;
+        svgEl.innerHTML = '<div style="color:var(--text2);">No static shape in this phase for that selection.</div>';
+        fingersEl.textContent = '';
+        return;
       }
 
-      rows.push(row);
-    }
+      nameEl.textContent = `${shape.name}${leftHanded ? ' (left-handed)' : ''}`;
+      fingersEl.textContent = `Finger hints: ${shape.fingers.join(' ')}`;
+      svgEl.innerHTML = this._buildChordSvg(shape, leftHanded);
+    };
 
-    rows.push(header);
-    return rows.join('\n');
+    rootEl.addEventListener('change', renderChord);
+    typeEl.addEventListener('change', renderChord);
+    renderChord();
+  },
+
+  _buildChordSvg(shape, leftHanded) {
+    const width = 260;
+    const height = 220;
+    const left = 30;
+    const top = 30;
+    const stringGap = 40;
+    const fretGap = 36;
+    const strings = ['E', 'A', 'D', 'G', 'B', 'e'];
+
+    const indexToX = (i) => left + (leftHanded ? (5 - i) : i) * stringGap;
+
+    const stringLines = strings.map((_, i) => {
+      const x = indexToX(i);
+      return `<line x1="${x}" y1="${top}" x2="${x}" y2="${top + fretGap * 4}" stroke="var(--line2)" stroke-width="2" />`;
+    }).join('');
+
+    const fretLines = Array.from({ length: 5 }, (_, i) => {
+      const y = top + i * fretGap;
+      return `<line x1="${left}" y1="${y}" x2="${left + stringGap * 5}" y2="${y}" stroke="var(--line2)" stroke-width="${i === 0 ? 4 : 2}" />`;
+    }).join('');
+
+    const markers = shape.frets.map((fret, i) => {
+      const x = indexToX(i);
+      if (fret === 'x') return `<text x="${x}" y="18" text-anchor="middle" fill="var(--text2)" font-size="14">x</text>`;
+      if (fret === 0) return `<text x="${x}" y="18" text-anchor="middle" fill="var(--text2)" font-size="14">o</text>`;
+      const y = top + (fret - 0.5) * fretGap;
+      return `<circle cx="${x}" cy="${y}" r="10" fill="var(--accent)" />`;
+    }).join('');
+
+    const labels = strings.map((name, i) => `<text x="${indexToX(i)}" y="${height - 8}" text-anchor="middle" fill="var(--text2)" font-size="12">${name}</text>`).join('');
+
+    return `
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="220" role="img" aria-label="Chord diagram">
+        ${stringLines}
+        ${fretLines}
+        ${markers}
+        ${labels}
+      </svg>
+    `;
   },
 };

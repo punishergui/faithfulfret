@@ -1,59 +1,105 @@
-// Daily Fret — Tuning Guide
+// Daily Fret — Tunings Tool
 
 window.Pages = window.Pages || {};
+
+const TUNINGS = [
+  { name: 'Standard (E A D G B E)', notes: ['E', 'A', 'D', 'G', 'B', 'E'] },
+  { name: 'Drop D (D A D G B E)', notes: ['D', 'A', 'D', 'G', 'B', 'E'] },
+  { name: 'Half Step Down (Eb Ab Db Gb Bb Eb)', notes: ['Eb', 'Ab', 'Db', 'Gb', 'Bb', 'Eb'] },
+  { name: 'Open G (D G D G B D)', notes: ['D', 'G', 'D', 'G', 'B', 'D'] },
+];
+
+const NOTE_TO_SEMITONE = {
+  C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5,
+  'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11,
+};
 
 Pages.Tuning = {
   render() {
     const app = document.getElementById('app');
 
-    const standard = [
-      { string: '6 (Low E)', note: 'E2', hz: '82.41 Hz' },
-      { string: '5 (A)', note: 'A2', hz: '110.00 Hz' },
-      { string: '4 (D)', note: 'D3', hz: '146.83 Hz' },
-      { string: '3 (G)', note: 'G3', hz: '196.00 Hz' },
-      { string: '2 (B)', note: 'B3', hz: '246.94 Hz' },
-      { string: '1 (High e)', note: 'E4', hz: '329.63 Hz' },
-    ];
-
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');">
         <div class="page-hero__inner">
-          <div class="page-title">Tuning Guide</div>
+          <div class="page-title">Tunings</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>
         </div>
         <div class="fret-line"></div>
       </div>
 
       <div class="scales-wrap">
-        <div class="df-card" style="padding:20px;border:1px solid var(--line2);background:var(--bg1);margin-bottom:16px;">
-          <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;margin-bottom:10px;">Standard tuning reference</div>
-          <div style="display:grid;grid-template-columns:1.2fr .7fr .8fr;gap:10px;font-family:var(--f-mono);font-size:12px;">
-            ${standard.map(item => `
-              <div>${item.string}</div><div>${item.note}</div><div style="color:var(--text2);">${item.hz}</div>
-            `).join('')}
-          </div>
+        <div class="df-field" style="margin-bottom:14px;">
+          <label class="df-label" for="tuning-select">Tuning</label>
+          <select id="tuning-select" class="df-input">
+            ${TUNINGS.map((t, i) => `<option value="${i}">${t.name}</option>`).join('')}
+          </select>
         </div>
 
-        <div class="scale-help">
-          <div class="scale-help__title">Quick tuning workflow (by ear + tuner)</div>
-          <ul>
-            <li>Mute all strings, set amp volume low, and switch to clean channel.</li>
-            <li>Tune low E first, then 5th fret method: E→A→D→G, then 4th fret G→B, then 5th fret B→e.</li>
-            <li>After each pass, strum open chord and re-check all strings (tension changes pitch).</li>
-            <li>Use harmonics (5th/7th fret) for finer checks after rough tuning.</li>
-          </ul>
-        </div>
+        <div id="tuning-strings" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:16px;"></div>
 
-        <div class="scale-help" style="margin-top:14px;">
-          <div class="scale-help__title">Peavey Vypyr X2 setup for easier tuning</div>
-          <ul>
-            <li>Pick a clean amp model and reduce gain/noise gate while tuning.</li>
-            <li>Use bridge pickup for strongest attack, then pick lightly for accurate pitch reading.</li>
-            <li>If pitch drifts, stretch new strings gently and retune 2–3 times.</li>
-            <li>Keep tuner source first in your signal path (before heavy effects/distortion).</li>
-          </ul>
-        </div>
+        <button id="play-tuning" class="df-btn df-btn--primary">Play Tuning</button>
       </div>
     `;
+
+    this._bind(app);
+  },
+
+  _bind(container) {
+    const select = container.querySelector('#tuning-select');
+    const stringsEl = container.querySelector('#tuning-strings');
+    const playBtn = container.querySelector('#play-tuning');
+
+    let audioCtx = null;
+
+    const renderStrings = () => {
+      const tuning = TUNINGS[parseInt(select.value, 10)] || TUNINGS[0];
+      stringsEl.innerHTML = tuning.notes
+        .map((note, i) => `<div style="border:1px solid var(--line2);background:var(--bg1);padding:10px 8px;text-align:center;"><div style="font-size:10px;color:var(--text3);font-family:var(--f-mono);">String ${6 - i}</div><div style="font-size:20px;font-family:var(--f-mono);margin-top:4px;">${note}</div></div>`)
+        .join('');
+    };
+
+    const noteToFrequency = (note, octave) => {
+      const semitone = NOTE_TO_SEMITONE[note];
+      if (semitone == null) return 0;
+      const midi = (octave + 1) * 12 + semitone;
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    };
+
+    const playTuning = async () => {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+      const tuning = TUNINGS[parseInt(select.value, 10)] || TUNINGS[0];
+      const octaves = [2, 2, 3, 3, 3, 4];
+      const startAt = audioCtx.currentTime + 0.05;
+
+      tuning.notes.forEach((note, i) => {
+        const when = startAt + (i * 0.8);
+        const freq = noteToFrequency(note, octaves[i]);
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, when);
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(0.25, when + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.7);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(when);
+        osc.stop(when + 0.72);
+      });
+    };
+
+    select.addEventListener('change', renderStrings);
+    playBtn.addEventListener('click', playTuning);
+    renderStrings();
+
+    const observer = new MutationObserver(() => {
+      if (!container.contains(playBtn)) {
+        if (audioCtx) audioCtx.close().catch(() => {});
+        observer.disconnect();
+      }
+    });
+    observer.observe(container, { childList: true });
   },
 };
