@@ -824,8 +824,19 @@ const listTrainingVideos = (filters = {}) => {
         ELSE substr(trim(p.notes), 1, 80) || '…'
       END AS notes_preview`
     : '';
+  const selectAttachmentCounts = `,
+      (
+        SELECT COUNT(*)
+        FROM video_attachments va
+        WHERE va.video_id = training_videos.id
+      ) AS attachment_count,
+      (
+        SELECT COUNT(*)
+        FROM video_attachments va
+        WHERE va.video_id = training_videos.id AND va.kind = 'pdf'
+      ) AS pdf_attachment_count`;
   const joinProgress = includeProgress ? ' LEFT JOIN training_video_progress p ON p.video_id = training_videos.id' : '';
-  const sql = `SELECT training_videos.*${selectProgress} FROM training_videos${joinProgress} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY training_videos.updatedAt DESC, training_videos.id DESC`;
+  const sql = `SELECT training_videos.*${selectProgress}${selectAttachmentCounts} FROM training_videos${joinProgress} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY training_videos.updatedAt DESC, training_videos.id DESC`;
   return db.prepare(sql).all(...values);
 };
 
