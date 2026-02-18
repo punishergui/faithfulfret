@@ -39,7 +39,6 @@ Pages.Dashboard = {
 
     app.innerHTML = `
       ${this._renderHero(stats)}
-      ${this._renderStatBar(stats)}
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
         <div class="dashboard-grid" style="align-items:start;">
           <div class="dashboard-main-col">
@@ -55,7 +54,7 @@ Pages.Dashboard = {
             ${this._renderRecentActivity(recentActivity)}
           </div>
           <aside class="dashboard-side-col">
-            ${this._renderProgressMemory(progressSummary)}
+            ${this._renderProgressMemory(progressSummary, stats)}
             ${this._renderQuickLog(today)}
             ${this._renderCompactHeatmap(heatmapDays, today)}
             ${this._renderCalendar(stats.allDates)}
@@ -144,31 +143,39 @@ Pages.Dashboard = {
     return Number.isNaN(parsed) ? 0 : parsed;
   },
 
-  _renderProgressMemory(summary) {
+  _renderProgressMemory(summary, stats) {
     const hasData = summary && (summary.weekMinutes > 0 || summary.totalMinutes > 0 || summary.streak.current > 0);
-    const topKey = summary?.topKeyWeek ? `${summary.topKeyWeek.name} (${summary.topKeyWeek.minutes} min)` : '—';
-    const topProg = summary?.topProgWeek ? `${this._formatProgId(summary.topProgWeek.name)} (${summary.topProgWeek.minutes} min)` : '—';
+    const topKey = summary?.topKeyWeek?.name || '—';
+    const topProg = summary?.topProgWeek?.name ? this._formatProgId(summary.topProgWeek.name) : '—';
+    const practiceSummaryRows = [
+      { label: 'Sessions/week', value: stats?.sessionsPerWeek || 0 },
+      { label: 'Total sessions', value: stats?.count || 0 },
+      { label: 'Total hours', value: stats?.totalHours || 0 },
+    ];
     return `
       <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
         <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Progress Memory</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
-          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
-            <div style="font-size:12px;color:var(--text3);">Streak</div>
-            <div style="font-size:16px;font-family:var(--f-mono);">Streak: ${summary?.streak?.current || 0} days</div>
-            <div style="font-size:12px;color:var(--text2);">Best: ${summary?.streak?.best || 0}</div>
-          </div>
-          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
-            <div style="font-size:12px;color:var(--text3);">Minutes</div>
-            <div style="font-size:16px;font-family:var(--f-mono);">This week: ${summary?.weekMinutes || 0} min</div>
-            <div style="font-size:12px;color:var(--text2);">Total: ${summary?.totalMinutes || 0} min</div>
-          </div>
-          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
-            <div style="font-size:12px;color:var(--text3);">Most Practiced (This Week)</div>
-            <div style="font-size:13px;">Top key: ${topKey}</div>
-            <div style="font-size:13px;color:var(--text2);">Top progression: ${topProg}</div>
-          </div>
+        <div style="display:grid;gap:8px;">
+          ${this._renderMetricRow('Streak', `${summary?.streak?.current || 0} day${(summary?.streak?.current || 0) === 1 ? '' : 's'} (Best: ${summary?.streak?.best || 0})`)}
+          ${this._renderMetricRow('Minutes this week', `${summary?.weekMinutes || 0}`)}
+          ${this._renderMetricRow('Top key', topKey)}
+          ${this._renderMetricRow('Top progression', topProg)}
+        </div>
+        <div style="height:1px;background:var(--line2);margin:12px 0;"></div>
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Practice Summary</div>
+        <div style="display:grid;gap:8px;">
+          ${practiceSummaryRows.map((row) => this._renderMetricRow(row.label, row.value)).join('')}
         </div>
         ${hasData ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">Start Practice Mode to build stats.</div>'}
+      </div>
+    `;
+  },
+
+  _renderMetricRow(label, value) {
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;background:var(--bg2);font-size:12px;">
+        <span style="color:var(--text2);">${label}</span>
+        <strong style="font-family:var(--f-mono);font-size:12px;color:var(--text);text-align:right;">${value}</strong>
       </div>
     `;
   },
@@ -462,29 +469,6 @@ Pages.Dashboard = {
       subtitle: awayText,
       image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80',
     });
-  },
-
-  _renderStatBar(stats) {
-    const items = [
-      { key: 'Sessions', val: stats.count },
-      { key: 'Total Hours', val: stats.totalHours },
-      { key: 'Peak BPM', val: stats.maxBPM || '—' },
-      { key: 'Avg BPM', val: stats.avgBPM || '—' },
-      { key: 'Streak', val: stats.currentStreak ? `${stats.currentStreak}d` : '0d' },
-      { key: 'Best Streak', val: stats.longestStreak ? `${stats.longestStreak}d` : '0d' },
-      { key: 'Sessions/Week', val: stats.sessionsPerWeek || 0 },
-      { key: 'Last Session', val: stats.daysSinceLastSession == null ? '—' : `${stats.daysSinceLastSession}d ago` },
-    ];
-    return `
-      <div class="df-statbar">
-        ${items.map(item => `
-          <div class="df-statbar__item">
-            <div class="df-statbar__key">${item.key}</div>
-            <div class="df-statbar__val">${item.val}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
   },
 
   _renderRecentSessions(sessions, today) {
