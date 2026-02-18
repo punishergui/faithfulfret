@@ -42,6 +42,7 @@ Pages.ResourceVideosList = {
       ${Utils.renderPageHero({
         title: 'Training Video Library',
         subtitle: 'Videos + playlists + difficulty + attachments',
+        leftExtra: Utils.renderBreadcrumbs([{ label: 'Training', href: '#/training' }, { label: 'Videos' }]),
         actions: '<a href="#/training/playlists" class="df-btn df-btn--outline" style="margin-right:8px;">Playlists</a><a href="#/training/videos/new" class="df-btn df-btn--primary">+ New Video</a>',
       })}
       <div class="page-wrap" style="padding:24px 24px 60px;">

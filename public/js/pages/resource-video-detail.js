@@ -1,5 +1,21 @@
 window.Pages = window.Pages || {};
 
+
+function escHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function toLegacyDescriptionHtml(video) {
+  if (String(video.description_html || '').trim()) return String(video.description_html);
+  const fallback = String(video.description_text || video.notes || '').trim();
+  if (!fallback) return '';
+  return `<p>${escHtml(fallback).replace(/\n/g, '<br>')}</p>`;
+}
+
 Pages.ResourceVideoDetail = {
   _readJson(key, fallback) {
     try {
@@ -53,16 +69,22 @@ Pages.ResourceVideoDetail = {
   async render(id) {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
-    const [video, attachments, progress] = await Promise.all([
+    const fromPlaylist = Number(new URLSearchParams((window.location.hash.split('?')[1] || '')).get('fromPlaylist') || 0);
+    const [video, attachments, progress, fromPlaylistData] = await Promise.all([
       DB.getTrainingVideo(id),
       DB.getVideoAttachments(id),
       DB.getTrainingVideoProgress(id),
+      fromPlaylist ? DB.getVideoPlaylist(fromPlaylist).catch(() => null) : Promise.resolve(null),
     ]);
     if (!video) {
       app.innerHTML = '<div class="page-wrap" style="padding:24px;color:var(--text2);">Video not found.</div>';
       return;
     }
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
+    const descriptionHtml = toLegacyDescriptionHtml(video);
+    const breadcrumbItems = fromPlaylistData
+      ? [{ label: 'Training', href: '#/training' }, { label: 'Playlists', href: '#/training/playlists' }, { label: fromPlaylistData.name || 'Playlist', href: `#/training/playlists/${fromPlaylistData.id}` }, { label: video.title || 'Video' }]
+      : [{ label: 'Training', href: '#/training' }, { label: 'Videos', href: '#/training/videos' }, { label: video.title || 'Video' }];
     const embedBase = `https://www.youtube-nocookie.com/embed/${video.videoId || video.video_id || ''}`;
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
@@ -94,7 +116,7 @@ Pages.ResourceVideoDetail = {
     ].filter(Boolean).join('');
 
     app.innerHTML = `
-      ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '' })}
+      ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '', leftExtra: Utils.renderBreadcrumbs(breadcrumbItems) })}
       <div class="page-wrap training-video-detail-layout" style="padding:24px 24px 60px;display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;">
         <div class="df-panel" style="padding:12px;">
           <iframe title="${video.title || ''}" src="${embedBase}" style="width:100%;height:420px;border:0;border-radius:12px;background:var(--bg2);" allowfullscreen loading="lazy"></iframe>
@@ -103,7 +125,10 @@ Pages.ResourceVideoDetail = {
           <div style="margin-top:6px;color:var(--text2);font-size:13px;">Difficulty: ${video.difficulty || '—'}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${badgeRow || '<span style="color:var(--text3);font-size:12px;">No progress yet.</span>'}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
-          <div style="margin-top:12px;white-space:pre-wrap;color:var(--text2);">${video.notes || ''}</div>
+          <div style="margin-top:12px;">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Description</div>
+            ${descriptionHtml ? `<div style="color:var(--text2);display:grid;gap:6px;">${descriptionHtml}</div>` : '<div style="color:var(--text3);font-size:13px;">No description yet.</div>'}
+          </div>
         </div>
 
         <div style="display:grid;gap:12px;align-content:start;">

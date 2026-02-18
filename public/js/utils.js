@@ -317,6 +317,26 @@ window.Utils = {
       </div>
     `;
   },
+
+  renderBreadcrumbs: (items = []) => {
+    const crumbs = Array.isArray(items) ? items : [];
+    const safe = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    if (!crumbs.length) return '';
+    const body = crumbs.map((item, index) => {
+      const label = safe(item?.label || '');
+      const isLast = index === crumbs.length - 1;
+      const href = item?.href;
+      if (!isLast && href) {
+        return `<a class="training-breadcrumb__link" href="${safe(href)}">${label}</a>`;
+      }
+      return `<span class="training-breadcrumb__current" aria-current="${isLast ? 'page' : 'false'}">${label}</span>`;
+    }).join('<span class="training-breadcrumb__sep" aria-hidden="true">›</span>');
+    return `<nav class="training-breadcrumbs" aria-label="Breadcrumb">${body}</nav>`;
+  },
 };
 
 // __FF_TOAST__

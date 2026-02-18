@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS training_videos (
   tags TEXT,
   difficulty TEXT,
   notes TEXT,
+  description_html TEXT,
+  description_text TEXT,
   createdAt INTEGER,
   updatedAt INTEGER
 );
@@ -294,6 +296,8 @@ ensureColumn('training_videos', 'thumbUrl', 'TEXT');
 ensureColumn('training_videos', 'tags', 'TEXT');
 ensureColumn('training_videos', 'difficulty', 'TEXT');
 ensureColumn('training_videos', 'notes', 'TEXT');
+ensureColumn('training_videos', 'description_html', 'TEXT');
+ensureColumn('training_videos', 'description_text', 'TEXT');
 ensureColumn('training_videos', 'createdAt', 'INTEGER');
 ensureColumn('training_videos', 'updatedAt', 'INTEGER');
 ensureColumn('training_videos', 'category', "TEXT DEFAULT 'general' CHECK(category IN ('general','skill','song'))");
@@ -570,6 +574,38 @@ function coerceResource(input = {}) {
   };
 }
 
+function stripHtmlToText(value = '') {
+  return String(value || '')
+    .replace(/<br\s*\/?\>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function sanitizeTrainingDescriptionHtml(input = '') {
+  let html = String(input || '');
+  if (!html.trim()) return '';
+  html = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\/?(?:script|style|iframe|object|embed|svg|math)[^>]*>/gi, '')
+    .replace(/<(\/?)([a-z0-9]+)([^>]*)>/gi, (full, slash, tag, attrs) => {
+      const t = String(tag || '').toLowerCase();
+      const allowed = new Set(['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a']);
+      if (!allowed.has(t)) return '';
+      if (slash) return `</${t}>`;
+      if (t === 'br') return '<br>';
+      if (t !== 'a') return `<${t}>`;
+      const hrefMatch = String(attrs || '').match(/href\s*=\s*(["'])(.*?)\1/i) || String(attrs || '').match(/href\s*=\s*([^\s>]+)/i);
+      const href = hrefMatch ? String(hrefMatch[2] || hrefMatch[1] || '').trim() : '';
+      if (!/^https?:\/\//i.test(href)) return '<a>';
+      const safeHref = href.replace(/"/g, '&quot;');
+      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`;
+    });
+  return html.trim();
+}
+
 function coerceTrainingVideo(input = {}) {
   const now = Date.now();
   const track = input.difficulty_track || input.difficultyTrack || input.difficulty || '';
@@ -588,7 +624,9 @@ function coerceTrainingVideo(input = {}) {
     difficulty_track: track || null,
     difficulty_level: Number.isFinite(levelNum) ? levelNum : null,
     category: input.category || 'general',
-    notes: input.notes || '',
+    notes: input.notes || input.description_text || '',
+    description_html: sanitizeTrainingDescriptionHtml(input.description_html || ''),
+    description_text: input.description_text || stripHtmlToText(input.description_html || '') || input.notes || '',
     createdAt: Number(input.createdAt) || now,
     updatedAt: Number(input.updatedAt) || now,
   };
@@ -788,9 +826,9 @@ const listTrainingVideos = (filters = {}) => {
   const where = [];
   const values = [];
   if (filters.q) {
-    where.push('(title LIKE ? OR author LIKE ? OR notes LIKE ? OR tags LIKE ?)');
+    where.push('(title LIKE ? OR author LIKE ? OR notes LIKE ? OR description_text LIKE ? OR tags LIKE ?)');
     const like = `%${String(filters.q).trim()}%`;
-    values.push(like, like, like, like);
+    values.push(like, like, like, like, like);
   }
   if (filters.tags) {
     const tags = String(filters.tags).split(',').map((tag) => tag.trim()).filter(Boolean);
@@ -846,12 +884,12 @@ const saveTrainingVideo = (data) => {
   const existing = row.id ? getTrainingVideo(row.id) : null;
   const createdAt = existing?.createdAt || row.createdAt;
   if (existing) {
-    db.prepare(`UPDATE training_videos SET url=@url, provider=@provider, videoId=@videoId, video_id=@videoId, title=@title, author=@author, thumbUrl=@thumbUrl, thumb_url=@thumbUrl, tags=@tags, difficulty=@difficulty, difficulty_track=@difficulty_track, difficulty_level=@difficulty_level, category=@category, notes=@notes, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id`)
+    db.prepare(`UPDATE training_videos SET url=@url, provider=@provider, videoId=@videoId, video_id=@videoId, title=@title, author=@author, thumbUrl=@thumbUrl, thumb_url=@thumbUrl, tags=@tags, difficulty=@difficulty, difficulty_track=@difficulty_track, difficulty_level=@difficulty_level, category=@category, notes=@notes, description_html=@description_html, description_text=@description_text, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id`)
       .run({ ...row, createdAt, updatedAt: Date.now() });
     return getTrainingVideo(row.id);
   }
-  const result = db.prepare(`INSERT INTO training_videos (url,provider,videoId,video_id,title,author,thumbUrl,thumb_url,tags,difficulty,difficulty_track,difficulty_level,category,notes,createdAt,updatedAt)
-    VALUES (@url,@provider,@videoId,@videoId,@title,@author,@thumbUrl,@thumbUrl,@tags,@difficulty,@difficulty_track,@difficulty_level,@category,@notes,@createdAt,@updatedAt)`)
+  const result = db.prepare(`INSERT INTO training_videos (url,provider,videoId,video_id,title,author,thumbUrl,thumb_url,tags,difficulty,difficulty_track,difficulty_level,category,notes,description_html,description_text,createdAt,updatedAt)
+    VALUES (@url,@provider,@videoId,@videoId,@title,@author,@thumbUrl,@thumbUrl,@tags,@difficulty,@difficulty_track,@difficulty_level,@category,@notes,@description_html,@description_text,@createdAt,@updatedAt)`)
     .run({ ...row, createdAt, updatedAt: Date.now() });
   return getTrainingVideo(result.lastInsertRowid);
 };
@@ -1045,7 +1083,7 @@ const listLessons = (filters = {}) => {
   if (filters.q) {
     where.push('(l.title LIKE ? OR l.summary LIKE ? OR l.notes LIKE ? OR l.practice_plan LIKE ?)');
     const like = `%${String(filters.q).trim()}%`;
-    values.push(like, like, like, like);
+    values.push(like, like, like, like, like);
   }
   if (filters.skill) {
     where.push('l.id IN (SELECT lesson_id FROM lesson_skills WHERE skill = ?)');
