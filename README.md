@@ -62,6 +62,7 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
+After deploy, verify Dashboard → Start Practice works: Continue Last Video, Continue Last Playlist, and Quick Start Playlist should enable only after opening training content, and should show helper text when empty.
 After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
