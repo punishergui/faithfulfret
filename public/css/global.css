@@ -1570,6 +1570,59 @@ select.df-input option {
   gap: 24px;
 }
 
+
+.dashboard-layout-wrap {
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
+  gap: 28px;
+}
+
+.dashboard-main-col,
+.dashboard-side-col {
+  min-width: 0;
+}
+
+.dashboard-section-header {
+  margin-bottom: 10px;
+}
+
+.dashboard-section-gap {
+  margin-top: 26px;
+}
+
+.dashboard-panel {
+  margin-bottom: 22px;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.dashboard-panel .section-header {
+  margin-bottom: 8px;
+}
+
+.dashboard-panel--resources {
+  padding: 12px 14px;
+}
+
+.dashboard-panel--resources .resource-row,
+.dashboard-panel--resources > div[style*="border-bottom"] {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.dashboard-panel--heatmap .ff-heatmap {
+  gap: 4px;
+}
+
+.dashboard-panel--calendar {
+  margin-bottom: 20px !important;
+}
+
 /* ============================================================
    RECENT SESSION ROW
    ============================================================ */
@@ -2494,6 +2547,13 @@ select.df-input option {
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}
+
 @media (max-width: 768px) {
   .nav__links {
     display: none;
@@ -2574,6 +2634,15 @@ select.df-input option {
 
   .page-wrap {
     padding: 0 16px;
+  }
+
+  .dashboard-layout-wrap {
+    padding-top: 22px;
+    padding-bottom: 22px;
+  }
+
+  .dashboard-panel {
+    margin-bottom: 16px;
   }
 
   .session-row {

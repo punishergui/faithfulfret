@@ -32,41 +32,42 @@ Pages.Dashboard = {
       return;
     }
 
-    const recent = sessions.slice(0, 6);
+    const recent = sessions.slice(0, 8);
     const today = Utils.today();
     const topResources = resources.slice(0, 5);
     const quickStart = this._readQuickStart();
     const lastPractice = Utils.getLastPractice();
     const progressSummary = window.progressMem?.getSummary?.() || null;
+    const recentActivity = this._buildRecentActivityItems(quickStart, lastPractice);
 
     app.innerHTML = `
       ${this._renderHero(stats)}
       ${this._renderStatBar(stats)}
-      <div class="page-wrap" style="padding:32px 24px;">
-        ${this._renderStartPractice(quickStart)}
-        ${this._renderProgressMemory(progressSummary)}
-        ${this._renderLastPracticeSnapshot(lastPractice)}
-        ${this._renderNextUp(lastPractice)}
-        <div class="two-col" style="align-items:start;">
-          <div>
-            <div class="section-header">
+      <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
+        <div class="dashboard-grid" style="align-items:start;">
+          <div class="dashboard-main-col">
+            <div class="section-header dashboard-section-header">
               <span class="section-header__label">Recent Sessions</span>
               <a href="#/sessions" class="section-header__link">View All &rarr;</a>
             </div>
             ${this._renderRecentSessions(recent, today)}
 
-            <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+            <div class="section-header dashboard-section-header dashboard-section-gap">
+              <span class="section-header__label">Recent Activity</span>
+            </div>
+            ${this._renderRecentActivity(recentActivity)}
+          </div>
+          <aside class="dashboard-side-col">
+            ${this._renderProgressMemory(progressSummary)}
+            ${this._renderCompactHeatmap(heatmapDays, today)}
+            ${this._renderQuickLog(today)}
+            ${this._renderCalendar(stats.allDates)}
+            ${topResources.length ? this._renderTopResources(topResources) : ''}
+            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
               <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
               <a href="#/sessions" class="df-btn df-btn--outline">Browse Sessions</a>
             </div>
-          </div>
-          <div>
-            ${this._renderRecentActivity(quickStart)}
-            ${this._renderQuickLog(today)}
-            ${this._renderCompactHeatmap(heatmapDays, today)}
-            ${this._renderCalendar(stats.allDates)}
-            ${topResources.length ? this._renderTopResources(topResources) : ''}
-          </div>
+          </aside>
         </div>
       </div>
     `;
@@ -75,8 +76,6 @@ Pages.Dashboard = {
     this._initCalendarNav(app, stats.allDates);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
-    this._initStartPractice(app, quickStart);
-    this._initLastPractice(app, lastPractice);
 
     // Stagger reveal
     setTimeout(() => Utils.staggerReveal(app, '.session-row', 0), 50);
@@ -106,6 +105,51 @@ Pages.Dashboard = {
   _formatProgId(progId) {
     if (!progId) return null;
     return String(progId).split('-').filter(Boolean).join('–');
+  },
+
+  _buildRecentActivityItems(data, lastPractice) {
+    const items = [];
+    (data.recentVideos || []).forEach((item) => {
+      items.push({
+        id: `video-${Number(item.id)}`,
+        title: item.title || `Video ${item.id}`,
+        type: 'Video',
+        when: item.lastPracticedAt || item.watchedAt,
+        href: `#/training/videos/${Number(item.id)}`,
+      });
+    });
+
+    (data.recentPlaylists || []).forEach((item) => {
+      items.push({
+        id: `playlist-${Number(item.id)}`,
+        title: item.name || `Playlist ${item.id}`,
+        type: 'Playlist',
+        when: item.at || item.usedAt,
+        href: `#/training/playlists/${Number(item.id)}`,
+      });
+    });
+
+    if (lastPractice?.tool) {
+      items.push({
+        id: 'practice-last',
+        title: `${this._toolLabel(lastPractice.tool)} Practice`,
+        type: 'Training',
+        when: Number(lastPractice.updated_at || lastPractice.started_at || 0),
+        href: '#/tools/progressions?resume=1',
+      });
+    }
+
+    return items
+      .filter((item) => item.href)
+      .sort((a, b) => this._activityTime(b.when) - this._activityTime(a.when))
+      .slice(0, 8);
+  },
+
+  _activityTime(value) {
+    if (!value) return 0;
+    if (typeof value === 'number') return value;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
   },
 
   _renderProgressMemory(summary) {
@@ -325,24 +369,37 @@ Pages.Dashboard = {
     });
   },
 
-  _renderRecentActivity(data) {
+  _renderRecentActivity(items = []) {
     const fmt = (iso) => {
       if (!iso) return '—';
-      const d = new Date(iso);
+      const d = new Date(typeof iso === 'number' ? Number(iso) : iso);
       if (Number.isNaN(d.getTime())) return '—';
       return d.toLocaleString();
     };
+
+    if (!items.length) {
+      return `<div class="empty-state"><div class="empty-state__title">No recent activity</div><div class="empty-state__text">Watch a video, open a playlist, or resume training to populate this feed.</div></div>`;
+    }
+
     return `
-      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
-        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Recent Activity</div>
-        <div style="margin-bottom:10px;">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Videos</div>
-          ${(data.recentVideos || []).length ? data.recentVideos.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/videos/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.title || `Video ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.lastPracticedAt || item.watchedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent videos yet.</div>'}
-        </div>
-        <div>
-          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Playlists</div>
-          ${(data.recentPlaylists || []).length ? data.recentPlaylists.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/playlists/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.name || `Playlist ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.at || item.usedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent playlists yet.</div>'}
-        </div>
+      <div>
+        ${items.map((item) => `
+          <div class="session-row card-reveal" onclick="go('${item.href}')">
+            <div class="session-row__date">
+              <div class="session-row__dow">${item.type}</div>
+              <div class="session-row__date-val">${fmt(item.when)}</div>
+            </div>
+            <div class="session-row__middle">
+              <div style="min-width:0;">
+                <div class="session-row__focus">${item.title}</div>
+                <div class="session-row__win">Resume where you left off.</div>
+              </div>
+            </div>
+            <div class="session-row__chips">
+              <span class="df-badge df-badge--muted">${item.type}</span>
+            </div>
+          </div>
+        `).join('')}
       </div>
     `;
   },
@@ -490,10 +547,10 @@ Pages.Dashboard = {
     const focuses = ['Chords','Scales','Strumming','Picking','Worship Set','Metronome','Song Practice','Technique','Ear Training'];
 
     return `
-      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide dashboard-panel dashboard-panel--stats">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Quick Log</div>
-          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">defaults to ${lastMinutes}m</div>
+          <div style="font-family:var(--f-mono);font-size:10px;color:var(--text3);">${today}</div>
         </div>
 
         <div class="df-field" style="margin-bottom:12px;">
@@ -512,22 +569,28 @@ Pages.Dashboard = {
         </div>
 
         <div class="df-field" style="margin-bottom:12px;">
-          <label class="df-label">Focus</label>
+          <label class="df-label">Tool</label>
           <select id="ql-focus" class="df-input">
-            <option value="">— Optional —</option>
+            <option value="">Choose tool</option>
             ${focuses.map(f => `<option value="${f}" ${f===lastFocus?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="df-field" style="margin-bottom:10px;">
+          <label class="df-label">Key</label>
+          <select id="ql-key" class="df-input">
+            <option value="">Select key</option>
+            ${['C','G','D','A','E','B','F#','C#','F','Bb','Eb','Ab','Db','Gb'].map((key) => `<option value="${key}">${key}</option>`).join('')}
           </select>
         </div>
 
         <div class="df-field" style="margin-bottom:12px;">
           <label class="df-label">YouTube URL (optional)</label>
           <input id="ql-yt" class="df-input" placeholder="Paste YouTube URL or ID">
-          <div style="margin-top:8px;color:var(--text3);font-size:12px;">Saves a minimal session now — you can edit details later.</div>
         </div>
 
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button type="button" id="ql-save" class="df-btn df-btn--primary" style="flex:1;">Save Quick Session</button>
-          <a href="#/log" class="df-btn df-btn--outline">Full Form</a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          <button type="button" id="ql-save" class="df-btn df-btn--primary">Start Practice</button>
         </div>
 
         <div id="ql-msg" style="display:none;margin-top:10px;color:var(--text3);font-size:12px;font-family:var(--f-mono);"></div>
@@ -541,6 +604,7 @@ Pages.Dashboard = {
     const minutesEl = root.querySelector('#ql-minutes');
     const focusEl = root.querySelector('#ql-focus');
     const ytEl = root.querySelector('#ql-yt');
+    const keyEl = root.querySelector('#ql-key');
 
     const updatePillState = (value) => {
       root.querySelectorAll('[data-ql-min]').forEach((btn) => {
@@ -571,6 +635,11 @@ Pages.Dashboard = {
       const focus = (focusEl?.value || '').trim();
       if (focus) data.focus = focus;
 
+      const selectedKey = (keyEl?.value || '').trim();
+      if (selectedKey) {
+        data.focus = data.focus ? `${data.focus} · ${selectedKey}` : `${selectedKey} practice`;
+      }
+
       const yt = (ytEl?.value || '').trim();
       if (yt) {
         const extracted = Utils.extractYouTubeId?.(yt);
@@ -596,7 +665,7 @@ Pages.Dashboard = {
   _renderCompactHeatmap(rows = [], today, initialMetric = 'minutes') {
     const safeRows = Array.isArray(rows) ? rows : [];
     return `
-      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+        <div class="df-panel df-panel--wide dashboard-panel dashboard-panel--heatmap">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
           <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">Practice Pulse · 90 Days</div>
           <div class="heatmap-toggle" data-heatmap-toggle>
@@ -710,7 +779,7 @@ Pages.Dashboard = {
     }
 
     return `
-      <div class="calendar" data-cal-year="${y}" data-cal-month="${m}" style="margin-bottom:24px;">
+      <div class="calendar dashboard-panel dashboard-panel--calendar" data-cal-year="${y}" data-cal-month="${m}" style="margin-bottom:24px;">
         <div class="calendar__header">
           <button class="calendar__nav" id="cal-prev">&lsaquo;</button>
           <span class="calendar__month">${monthName}</span>
@@ -723,9 +792,9 @@ Pages.Dashboard = {
 
   _renderTopResources(resources) {
     return `
-      <div>
+      <div class="dashboard-panel dashboard-panel--resources">
         <div class="section-header" style="margin-bottom:10px;">
-          <span class="section-header__label">Top Resources</span>
+          <span class="section-header__label">Selected Recordings</span>
           <a href="#/resources" class="section-header__link">All &rarr;</a>
         </div>
         ${resources.map(r => `
