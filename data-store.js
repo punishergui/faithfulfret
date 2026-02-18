@@ -312,11 +312,11 @@ ensureColumn('training_videos', 'upload_mime', 'TEXT');
 ensureColumn('training_videos', 'upload_size', 'INTEGER');
 ensureColumn('training_videos', 'upload_original_name', 'TEXT');
 ensureColumn('training_videos', 'thumbnail_url', 'TEXT');
-run(`UPDATE training_videos
+db.prepare(`UPDATE training_videos
   SET source_type = COALESCE(NULLIF(source_type, ''), 'youtube'),
       youtube_url = COALESCE(NULLIF(youtube_url, ''), NULLIF(url, '')),
       thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), NULLIF(thumb_url, ''), NULLIF(thumbUrl, ''))
-  WHERE 1=1`);
+  WHERE 1=1`).run();
 ensureColumn('video_playlists', 'name', 'TEXT');
 ensureColumn('video_playlists', 'description', 'TEXT');
 ensureColumn('video_playlists', 'createdAt', 'INTEGER');
