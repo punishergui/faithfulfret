@@ -3245,6 +3245,7 @@ body.print-view .chord-chart-row {
 .training-description-content code {
   font-family: var(--f-mono);
   font-size: 0.95em;
+  white-space: pre;
 }
 
 .training-rich-editor__surface pre code,
@@ -3265,7 +3266,64 @@ body.print-view .chord-chart-row {
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+.training-video-detail-layout > * {
+  min-width: 0;
+}
+
+.training-description-content,
+.training-description-content *,
+.rt-display,
+.rt-display * {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.training-description-content p,
+.training-description-content li,
+.training-description-content blockquote,
+.rt-display p,
+.rt-display li,
+.rt-display blockquote {
+  white-space: normal;
+}
+
+.training-description-content pre,
+.rt-display pre {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.training-description-content pre code,
+.rt-display pre code {
+  white-space: pre;
+}
+
+.training-description-content a,
+.rt-display a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.training-rich-editor__surface h2,
+.training-description-content h2,
+.rt-display h2 {
+  margin: 0.75em 0 0.45em;
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.training-rich-editor__surface h3,
+.training-description-content h3,
+.rt-display h3 {
+  margin: 0.6em 0 0.35em;
+  font-size: 1.1em;
+  font-weight: 650;
 }
 
 .training-emoji-popover {
@@ -3273,8 +3331,8 @@ body.print-view .chord-chart-row {
   z-index: 20;
   margin-top: 6px;
   width: min(360px, calc(100vw - 32px));
-  max-height: 280px;
-  overflow: auto;
+  max-height: min(480px, calc(100vh - 32px));
+  overflow: hidden;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line) 70%);
   border-radius: 10px;
@@ -3293,10 +3351,29 @@ body.print-view .chord-chart-row {
   margin-bottom: 8px;
 }
 
+.training-emoji-popover__tab {
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--text2);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.training-emoji-popover__tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--card) 78%, var(--accent) 22%);
+  color: var(--text);
+}
+
 .training-emoji-popover__panel {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
+  max-height: min(320px, calc(100vh - 180px));
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .training-emoji-popover__item {
@@ -3312,6 +3389,14 @@ body.print-view .chord-chart-row {
 .training-emoji-popover__item:hover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--card) 70%, var(--accent) 30%);
+}
+
+.training-emoji-popover__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text3);
+  font-size: 12px;
+  padding: 8px 0;
 }
 
 .training-rich-editor__surface:focus-visible {
