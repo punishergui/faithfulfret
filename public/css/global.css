@@ -3619,6 +3619,47 @@ body.print-view .chord-chart-row {
   justify-self: end;
 }
 
+.training-video-library-card {
+  text-decoration: none;
+  color: inherit;
+  padding: 10px;
+  display: block;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.training-video-library-card.is-list {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.training-video-library-card:hover,
+.training-video-library-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow:
+    0 6px 18px color-mix(in srgb, var(--bg) 60%, var(--text) 40%),
+    0 0 8px color-mix(in srgb, var(--accent) 36%, transparent 64%);
+}
+
+.training-video-library-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--bg2);
+  display: block;
+}
+
+.training-video-library-thumb-fallback {
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
 .training-playlists-layout {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr);

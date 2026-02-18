@@ -66,6 +66,7 @@ After deploy, verify Training video progress works (Watched/Mastered toggles + n
 After deploy, verify Training videos remain URL-based: create/edit videos with YouTube URLs, metadata fetch works, and thumbnails render from oEmbed/URL values.
 After deploy, verify Training Playlists list uses 70/30 layout (cards left, create/sort sidebar right), cards open on click, and each card thumbnail matches the first playlist video by position (or placeholder when empty).
 After deploy, verify Playlist detail thumbnails keep a fixed 16:9 size with object-fit cover and do not squish when reorder/remove controls are visible.
+After deploy, verify `#/training/videos` cards are fully clickable with keyboard Enter support, show subtle lift/glow hover states, and keep 16:9 thumbnails stable across theme switching.
 After deploy, verify Dashboard → Start Practice works: Continue Last Video, Continue Last Playlist, and Quick Start Playlist should enable only after opening training content, and should show helper text when empty.
 After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 After deploy, verify Tools routes load: `#/tools`, `#/tools/tunings`, `#/tools/metronome`, `#/tools/chords`, `#/tools/scales`, `#/tools/progressions`, and `#/tools/chord-chart`; then set BPM once in Metronome and confirm `localStorage.df_last_bpm` updates.

@@ -97,6 +97,21 @@ Pages.ResourceVideosList = {
       this.viewMode = this.viewMode === 'grid' ? 'list' : 'grid';
       await this.render();
     });
+
+    const results = app.querySelector('#video-results');
+    results?.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-video-link]');
+      if (!card) return;
+      if (event.target.closest('button,a,input,select,textarea,[data-card-action]')) return;
+      go(`#/training/videos/${card.dataset.videoLink}`);
+    });
+    results?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      const card = event.target.closest('[data-video-link]');
+      if (!card) return;
+      event.preventDefault();
+      go(`#/training/videos/${card.dataset.videoLink}`);
+    });
   },
 
   applyProgressFilterAndSort(videos = [], progressFilter = 'all', sort = 'recentlyAdded') {
@@ -137,25 +152,25 @@ Pages.ResourceVideosList = {
       !pdfCount && attachmentCount > 0 ? '<span class="training-status-badge">ATTACHMENTS</span>' : '',
     ].filter(Boolean).join('');
     const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${statusTags}`;
-    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '120px' : '170px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : '<div class="training-thumb-fallback">🎬</div>';
+    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" class="training-video-library-thumb">` : '<div class="training-thumb-fallback training-video-library-thumb-fallback">🎬</div>';
 
     if (viewMode === 'list') {
-      return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">${thumbHtml}
+      return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
         <div style="min-width:0;">
           <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
         </div>
-      </a>`;
+      </div>`;
     }
 
-    return `<a href="#/training/videos/${video.id}" class="df-panel" style="text-decoration:none;color:inherit;padding:10px;display:block;">${thumbHtml}
+    return `<div class="df-panel training-video-library-card" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
       <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
-    </a>`;
+    </div>`;
   },
 
   updateFilters(next) {
