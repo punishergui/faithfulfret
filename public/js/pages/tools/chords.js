@@ -21,8 +21,10 @@ Pages.Chords = {
   render() {
     const app = document.getElementById('app');
     const params = new URLSearchParams(location.hash.split('?')[1] || '');
-    const queryRoot = params.get('root');
-    const queryType = params.get('type');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+    const queryRoot = params.get('root') || (lastPractice?.tool === 'chords' ? (lastPractice.chord_id || '').split(':')[0] : '');
+    const queryType = params.get('type') || (lastPractice?.tool === 'chords' ? (lastPractice.chord_id || '').split(':')[1] : '');
     const savedBpm = parseInt(localStorage.getItem('df_last_bpm') || '', 10);
 
     app.innerHTML = `
@@ -88,11 +90,35 @@ Pages.Chords = {
 
     let running = false;
 
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+
+    const writeLastPractice = (extra = {}) => {
+      Utils.setLastPractice({
+        tool: 'chords',
+        key_root: rootEl.value || null,
+        key_mode: null,
+        progression_id: null,
+        scale_id: null,
+        chord_id: `${rootEl.value}:${typeEl.value}`,
+        bpm: Math.max(30, Math.min(240, parseInt(bpmEl.value, 10) || 80)),
+        beats_per_chord: null,
+        countin_enabled: null,
+        countin_bars: null,
+        ...extra,
+      });
+    };
+
     const setRunning = (next) => {
       running = next;
       startBtn.disabled = running;
       stopBtn.disabled = !running;
     };
+
+    if (lastPractice?.tool === 'chords' && Number.isFinite(Number(lastPractice.bpm))) {
+      bpmEl.value = String(Number(lastPractice.bpm));
+    }
 
     const renderChord = () => {
       const root = rootEl.value;
@@ -114,18 +140,20 @@ Pages.Chords = {
       svgEl.innerHTML = window.renderChordSvg(shape, { leftHanded, showStringLabels: true, height: 230 });
     };
 
-    rootEl.addEventListener('change', renderChord);
-    typeEl.addEventListener('change', renderChord);
+    rootEl.addEventListener('change', () => { renderChord(); writeLastPractice(); });
+    typeEl.addEventListener('change', () => { renderChord(); writeLastPractice(); });
 
     startBtn.addEventListener('click', () => {
       const bpm = Math.max(30, Math.min(240, parseInt(bpmEl.value, 10) || 80));
       localStorage.setItem('df_last_bpm', String(bpm));
+      writeLastPractice({ bpm });
       window.FFMetronome.startMetronome({ bpm, subdivision: 4, accent: true });
       setRunning(true);
     });
 
     stopBtn.addEventListener('click', () => {
       window.FFMetronome.stopMetronome();
+      writeLastPractice();
       setRunning(false);
     });
 
@@ -138,5 +166,9 @@ Pages.Chords = {
     observer.observe(container, { childList: true });
 
     renderChord();
+    writeLastPractice();
+    if (resumeRequested && lastPractice?.tool === 'chords') {
+      setTimeout(() => startBtn.click(), 0);
+    }
   },
 };

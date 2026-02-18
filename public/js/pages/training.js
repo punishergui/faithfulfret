@@ -18,6 +18,24 @@ function writeLocalJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
 }
 
+
+function setLastPracticeTraining({ playlistId = null, videoId = null } = {}) {
+  Utils.setLastPractice({
+    tool: 'training',
+    key_root: null,
+    key_mode: null,
+    progression_id: null,
+    scale_id: null,
+    chord_id: null,
+    bpm: null,
+    beats_per_chord: null,
+    countin_enabled: null,
+    countin_bars: null,
+    playlist_id: Number.isFinite(Number(playlistId)) ? Number(playlistId) : null,
+    video_id: Number.isFinite(Number(videoId)) ? Number(videoId) : null,
+  });
+}
+
 function pushRecentPlaylist(playlist) {
   const list = readLocalJson('df_recent_playlists', []);
   const safe = Array.isArray(list) ? list : [];
@@ -26,6 +44,7 @@ function pushRecentPlaylist(playlist) {
 }
 
 function savePlaylistProgress(playlistId, lastVideoId) {
+  setLastPracticeTraining({ playlistId, videoId: lastVideoId });
   writeLocalJson('df_playlist_progress', {
     playlistId: Number(playlistId),
     lastVideoId: Number(lastVideoId),

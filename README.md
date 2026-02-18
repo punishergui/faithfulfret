@@ -569,6 +569,7 @@ Training quick-start now uses browser localStorage keys:
 - `df_recent_videos`
 - `df_playlist_progress`
 - `df_recent_playlists`
+- `df_last_practice` (source of truth for Last Practice snapshot + Continue Last Practice + Next Up)
 
 Existing app keys still apply (for example: `theme`, `handedness`).
 
@@ -598,17 +599,18 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 1) open #/training/videos/<id>, verify timer Start/Pause/Reset appears and df_last_video_id updates
 # 2) open #/training/playlists/<id>, click a video title, verify df_playlist_progress updates
 # 3) open #/dashboard, verify Start Practice + Recent Activity cards show recent localStorage data
+# 4) verify Last Practice card reads from df_last_practice, Continue Last Practice routes with ?resume=1, and Next Up suggests BPM step + alternate progression when applicable
 # Phase A tools checks
-# 4) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
-# 5) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.
-# 6) open #/tools/chords and verify diagram labels plus playing-view orientation (Low E bottom, High e top).
-# 7) open #/tools/scales and verify expanded scale list, string labels, and collapsible scale help card.
-# 8) open each tool page and collapse Help once, refresh page, and verify collapsed state persists from localStorage.
+# 5) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
+# 6) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.
+# 7) open #/tools/chords and verify diagram labels plus playing-view orientation (Low E bottom, High e top).
+# 8) open #/tools/scales and verify expanded scale list, string labels, and collapsible scale help card.
+# 9) open each tool page and collapse Help once, refresh page, and verify collapsed state persists from localStorage.
 # Phase E practice checks
-# 9) open #/tools/progressions, enable Practice Mode, pick a progression, and verify count-in + chord highlight advance every configured beats/chord.
-# 10) verify Progressions Pause resumes from current chord and Stop resets to chord 1.
-# 11) open #/tools/scales, toggle "Show matching diatonic chords", and verify chips open #/tools/chords with matching root/type.
-# 12) on #/tools/chords, start metronome from the Practice helper and verify df_last_bpm updates in localStorage.
+# 10) open #/tools/progressions, enable Practice Mode, pick a progression, and verify count-in + chord highlight advance every configured beats/chord.
+# 11) verify Progressions Pause resumes from current chord and Stop resets to chord 1.
+# 12) open #/tools/scales, toggle "Show matching diatonic chords", and verify chips open #/tools/chords with matching root/type.
+# 13) on #/tools/chords, start metronome from the Practice helper and verify df_last_bpm updates in localStorage.
 ```
 
 Practice-mode localStorage keys: `df_last_bpm`, `df_practice_beats_per_chord`, `df_practice_countin_enabled`, `df_practice_countin_bars`, `df_practice_loop_enabled`, `df_last_key_root`, `df_last_key_mode`.

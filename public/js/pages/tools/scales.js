@@ -18,7 +18,11 @@ Pages.Scales = {
   render() {
     const app = document.getElementById('app');
     const scales = window.FF_SCALES || [];
-    const savedKey = localStorage.getItem('df_last_key_root') || 'C';
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+    const savedKey = (lastPractice?.tool === 'scales' && lastPractice.key_root) || localStorage.getItem('df_last_key_root') || 'C';
+    const savedScale = (lastPractice?.tool === 'scales' && lastPractice.scale_id) || '';
     const savedBpm = parseInt(localStorage.getItem('df_last_bpm') || '', 10);
 
     app.innerHTML = `
@@ -43,7 +47,7 @@ Pages.Scales = {
         <div class="df-field">
           <label class="df-label" for="scale-type">Scale Type</label>
           <select id="scale-type" class="df-input">
-            ${scales.map((scale) => `<option value="${scale.id}">${scale.name}</option>`).join('')}
+            ${scales.map((scale) => `<option value="${scale.id}" ${scale.id === savedScale ? 'selected' : ''}>${scale.name}</option>`).join('')}
           </select>
         </div>
 
@@ -77,12 +81,40 @@ Pages.Scales = {
     const diatonicRowEl = container.querySelector('#scale-diatonic-row');
     const practicePanelEl = container.querySelector('#scale-practice-panel');
 
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+
     let bpm = initialBpm;
     let countInEnabled = localStorage.getItem('df_practice_countin_enabled') !== '0';
     let running = false;
     let beatCount = 0;
 
+    if (lastPractice?.tool === 'scales') {
+      if (Number.isFinite(Number(lastPractice.bpm))) bpm = Number(lastPractice.bpm);
+      if (typeof lastPractice.countin_enabled === 'boolean') countInEnabled = lastPractice.countin_enabled;
+      if (lastPractice.scale_id) typeEl.value = lastPractice.scale_id;
+      if (lastPractice.key_root) keyEl.value = lastPractice.key_root;
+    }
+
+    const writeLastPractice = (extra = {}) => {
+      Utils.setLastPractice({
+        tool: 'scales',
+        key_root: keyEl.value || null,
+        key_mode: 'major',
+        progression_id: null,
+        scale_id: typeEl.value || null,
+        chord_id: null,
+        bpm,
+        beats_per_chord: null,
+        countin_enabled: countInEnabled,
+        countin_bars: null,
+        ...extra,
+      });
+    };
+
     const stopMetro = () => {
+      writeLastPractice();
       running = false;
       window.FFMetronome.stopMetronome();
       renderPracticePanel();
@@ -90,6 +122,7 @@ Pages.Scales = {
 
     const startMetro = () => {
       beatCount = 0;
+      writeLastPractice();
       const countInBeats = countInEnabled ? 4 : 0;
       running = true;
       window.FFMetronome.startMetronome({
@@ -123,11 +156,13 @@ Pages.Scales = {
       practicePanelEl.querySelector('#scale-practice-bpm').addEventListener('change', (e) => {
         bpm = Math.max(30, Math.min(240, parseInt(e.target.value, 10) || 80));
         localStorage.setItem('df_last_bpm', String(bpm));
+        writeLastPractice();
         if (running) startMetro();
       });
       practicePanelEl.querySelector('#scale-practice-countin').addEventListener('change', (e) => {
         countInEnabled = e.target.checked;
         localStorage.setItem('df_practice_countin_enabled', countInEnabled ? '1' : '0');
+        writeLastPractice();
       });
       practicePanelEl.querySelector('#scale-practice-start').addEventListener('click', startMetro);
       practicePanelEl.querySelector('#scale-practice-stop').addEventListener('click', stopMetro);
@@ -174,6 +209,7 @@ Pages.Scales = {
       });
       window.bindHelpCards(helpEl);
       renderDiatonicChords();
+      writeLastPractice();
     };
 
     keyEl.addEventListener('change', renderScale);
@@ -190,6 +226,9 @@ Pages.Scales = {
 
     renderPracticePanel();
     renderScale();
+    if (resumeRequested && lastPractice?.tool === 'scales') {
+      setTimeout(() => startMetro(), 0);
+    }
   },
 
   _buildScaleSvg(key, intervals) {

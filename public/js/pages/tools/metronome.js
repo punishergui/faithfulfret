@@ -120,6 +120,7 @@ Pages.Metronome = {
       slider.value = bpm;
       updateTempoName();
       localStorage.setItem('df_last_bpm', String(bpm));
+      if (isPlaying) Utils.setLastPractice({ tool: 'metronome', bpm });
       if (isPlaying) {
         window.FFMetronome.startMetronome({ bpm, subdivision: sig, accent: true, onTick });
       }
@@ -136,6 +137,18 @@ Pages.Metronome = {
 
     const start = () => {
       isPlaying = true;
+      Utils.setLastPractice({
+        tool: 'metronome',
+        key_root: null,
+        key_mode: null,
+        progression_id: null,
+        scale_id: null,
+        chord_id: null,
+        bpm,
+        beats_per_chord: null,
+        countin_enabled: null,
+        countin_bars: null,
+      });
       window.FFMetronome.startMetronome({ bpm, subdivision: sig, accent: true, onTick });
       playBtn.textContent = '■ STOP';
       playBtn.classList.add('metro-play--playing');

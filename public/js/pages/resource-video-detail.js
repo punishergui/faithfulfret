@@ -64,6 +64,21 @@ Pages.ResourceVideoDetail = {
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
     try { localStorage.setItem('df_last_video_id', String(video.id)); } catch (e) {}
+    const playlistProgress = this._readJson('df_playlist_progress', null);
+    Utils.setLastPractice({
+      tool: 'training',
+      key_root: null,
+      key_mode: null,
+      progression_id: null,
+      scale_id: null,
+      chord_id: null,
+      bpm: null,
+      beats_per_chord: null,
+      countin_enabled: null,
+      countin_bars: null,
+      playlist_id: Number(playlistProgress?.playlistId) || null,
+      video_id: Number(video.id) || null,
+    });
     this._upsertRecentVideo(video);
 
     app.innerHTML = `
