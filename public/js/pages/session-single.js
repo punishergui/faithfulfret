@@ -31,20 +31,22 @@ Pages.SessionSingle = {
 
     app.innerHTML = `
       ${this._renderHero(session)}
-      ${this._renderVideo(session, prevSession, nextSession, todaySession, today)}
       <div class="session-body">
         <div class="session-main">
+          ${this._renderVideo(session, prevSession, nextSession, todaySession, today)}
           ${session.gear?.length ? this._renderGear(session.gear) : ''}
           ${session.win ? this._renderWin(session.win) : ''}
           ${session.notes ? this._renderNotes(session.notes) : ''}
           ${session.links ? this._renderLinks(session.links) : ''}
         </div>
-        <div class="session-sidebar df-panel df-panel--tight">
-          ${this._renderStats(session)}
-          ${session.checklist ? this._renderChecklist(session) : ''}
-          <div style="margin-top:20px;">
-            <a href="#/sessions" class="df-btn df-btn--outline" style="margin-bottom:10px;display:block;text-align:center;">&#8592; All Sessions</a>
-            <a href="#/log/${session.id}" class="df-btn df-btn--outline" style="display:block;text-align:center;">Edit Session</a>
+        <div class="session-sidebar">
+          <div class="session-sidebar__card df-panel df-panel--tight">
+            ${this._renderStats(session)}
+            ${session.checklist ? this._renderChecklist(session) : ''}
+            <div style="margin-top:20px;">
+              <a href="#/sessions" class="df-btn df-btn--outline" style="margin-bottom:10px;display:block;text-align:center;">&#8592; All Sessions</a>
+              <a href="#/log/${session.id}" class="df-btn df-btn--outline" style="display:block;text-align:center;">Edit Session</a>
+            </div>
           </div>
         </div>
       </div>
@@ -127,7 +129,7 @@ Pages.SessionSingle = {
       `;
     }
     return `
-      <div style="max-width:700px;margin:24px auto;padding:0 24px;">
+      <div class="session-video">
         ${nav}
         <div class="session-video__placeholder">// NO VIDEO LOGGED</div>
       </div>

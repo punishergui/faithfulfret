@@ -71,6 +71,8 @@ After deploy, verify Tools routes load: `#/tools`, `#/tools/tunings`, `#/tools/m
 After deploy, in Progressions confirm key changes refresh diatonic chords + progression diagrams, and in Chord Chart confirm Print View toggles a clean white export layout for poster-style references.
 After deploy, verify Dashboard → Progress Memory updates only after Practice Mode Start/Stop in Progressions/Scales (streak, week/total minutes, top key, and top progression).
 After deploy, verify Dashboard has no top stats strip; Progress Memory is the single stats area and includes Practice Summary rows for sessions/week, total sessions, and total hours without duplicate metrics.
+After deploy, verify Session Detail uses two columns on desktop (video + content left, stats/actions sidebar right aligned to top), and stacks to one column on mobile without changing top navigation.
+After deploy, verify Training Video Description editor supports inline code + code blocks (with preserved newlines), emoji picker insertions at caret, and theme-driven text colors (`data-color` spans) that adapt when switching themes.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints

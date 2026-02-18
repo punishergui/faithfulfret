@@ -1,16 +1,15 @@
 window.Pages = window.Pages || {};
 
 const TRAINING_TEXT_COLORS = Object.freeze([
-  { key: 'accent', label: 'Accent', value: 'var(--accent)' },
   { key: 'text', label: 'Text', value: 'var(--text)' },
   { key: 'muted', label: 'Muted', value: 'var(--text2)' },
-  { key: 'teal', label: 'Teal', value: '#14b8a6' },
-  { key: 'blue', label: 'Blue', value: '#60a5fa' },
-  { key: 'purple', label: 'Purple', value: '#a78bfa' },
-  { key: 'pink', label: 'Pink', value: '#f472b6' },
-  { key: 'orange', label: 'Orange', value: '#fb923c' },
-  { key: 'yellow', label: 'Yellow', value: '#facc15' },
-  { key: 'green', label: 'Green', value: '#4ade80' },
+  { key: 'accent', label: 'Accent', value: 'var(--accent)' },
+  { key: 'accent2', label: 'Accent 2', value: 'var(--accent2, var(--accent))' },
+  { key: 'success', label: 'Success', value: 'var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%)))' },
+  { key: 'warn', label: 'Warn', value: 'var(--warn, color-mix(in srgb, var(--accent) 45%, #f59e0b 55%))' },
+  { key: 'danger', label: 'Danger', value: 'var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%)))' },
+  { key: 'soft', label: 'Soft', value: 'var(--text3)' },
+  { key: 'neutral', label: 'Neutral', value: 'color-mix(in srgb, var(--text) 70%, var(--bg) 30%)' },
 ]);
 
 const TRAINING_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
@@ -263,8 +262,88 @@ Pages.ResourceVideosEdit = {
     const restoreSelection = () => {
       if (!savedRange) return;
       const selection = window.getSelection();
+      if (!selection) return;
       selection.removeAllRanges();
       selection.addRange(savedRange);
+    };
+
+    const getRangeInEditor = () => {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount || !editor) return null;
+      const range = selection.getRangeAt(0);
+      return editor.contains(range.commonAncestorContainer) ? range : null;
+    };
+
+    const selectNodeContents = (node, collapseToEnd = false) => {
+      const selection = window.getSelection();
+      if (!selection || !node) return;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      range.collapse(collapseToEnd);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      savedRange = range.cloneRange();
+    };
+
+    const insertTextAtRange = (text) => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      const range = getRangeInEditor();
+      if (!range) return;
+      range.deleteContents();
+      const node = document.createTextNode(text);
+      range.insertNode(node);
+      range.setStartAfter(node);
+      range.collapse(true);
+      const selection = window.getSelection();
+      if (!selection) return;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      savedRange = range.cloneRange();
+    };
+
+    const wrapInlineTag = (tagName, fallbackText = tagName) => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      const range = getRangeInEditor();
+      if (!range) return;
+      const text = range.toString();
+      const wrapper = document.createElement(tagName);
+      wrapper.textContent = text || fallbackText;
+      range.deleteContents();
+      range.insertNode(wrapper);
+      selectNodeContents(wrapper, true);
+    };
+
+    const wrapCodeBlock = () => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      const range = getRangeInEditor();
+      if (!range) return;
+      const selectedText = range.toString();
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      const blockText = selectedText || '\n\n';
+      code.textContent = blockText;
+      pre.appendChild(code);
+      range.deleteContents();
+      range.insertNode(pre);
+
+      if (selectedText) {
+        selectNodeContents(code, true);
+      } else {
+        const selection = window.getSelection();
+        const caret = document.createRange();
+        caret.setStart(code.firstChild || code, 1);
+        caret.collapse(true);
+        if (!selection) return;
+        selection.removeAllRanges();
+        selection.addRange(caret);
+        savedRange = caret.cloneRange();
+      }
     };
 
     const applyCmd = (cmd, value = null) => {
@@ -317,15 +396,11 @@ Pages.ResourceVideosEdit = {
     app.querySelector('[data-rich-hr]')?.addEventListener('click', () => applyCmd('insertHorizontalRule'));
 
     app.querySelector('[data-rich-inline-code]')?.addEventListener('click', () => {
-      const raw = selectionText();
-      const text = raw || 'code';
-      wrapSelectionWithHtml(`<code>${escHtml(text)}</code>`);
+      wrapInlineTag('code', 'code');
     });
 
     app.querySelector('[data-rich-code-block]')?.addEventListener('click', () => {
-      const raw = selectionText();
-      const text = raw || 'code block';
-      wrapSelectionWithHtml(`<pre><code>${escHtml(text)}</code></pre>`);
+      wrapCodeBlock();
     });
 
     app.querySelector('[data-rich-link]')?.addEventListener('click', () => {
@@ -378,8 +453,9 @@ Pages.ResourceVideosEdit = {
     });
 
     app.querySelectorAll('[data-emoji]').forEach((button) => {
+      button.addEventListener('mousedown', (event) => event.preventDefault());
       button.addEventListener('click', () => {
-        wrapSelectionWithHtml(escHtml(button.dataset.emoji || ''));
+        insertTextAtRange(button.dataset.emoji || '');
         togglePopover(false);
       });
     });
