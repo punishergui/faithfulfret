@@ -604,6 +604,13 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 6) open #/tools/chords and verify diagram labels plus playing-view orientation (Low E bottom, High e top).
 # 7) open #/tools/scales and verify expanded scale list, string labels, and collapsible scale help card.
 # 8) open each tool page and collapse Help once, refresh page, and verify collapsed state persists from localStorage.
+# Phase E practice checks
+# 9) open #/tools/progressions, enable Practice Mode, pick a progression, and verify count-in + chord highlight advance every configured beats/chord.
+# 10) verify Progressions Pause resumes from current chord and Stop resets to chord 1.
+# 11) open #/tools/scales, toggle "Show matching diatonic chords", and verify chips open #/tools/chords with matching root/type.
+# 12) on #/tools/chords, start metronome from the Practice helper and verify df_last_bpm updates in localStorage.
 ```
+
+Practice-mode localStorage keys: `df_last_bpm`, `df_practice_beats_per_chord`, `df_practice_countin_enabled`, `df_practice_countin_bars`, `df_practice_loop_enabled`, `df_last_key_root`, `df_last_key_mode`.
 
 Keep rollback path unchanged: publish immutable tags (`vX.Y.Z`) and pin `docker-compose.prod.yml` image to the selected tag when rolling back.

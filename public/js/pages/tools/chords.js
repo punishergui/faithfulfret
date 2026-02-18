@@ -20,6 +20,10 @@ const CHORD_ROOT_OPTIONS = [
 Pages.Chords = {
   render() {
     const app = document.getElementById('app');
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const queryRoot = params.get('root');
+    const queryType = params.get('type');
+    const savedBpm = parseInt(localStorage.getItem('df_last_bpm') || '', 10);
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516924962500-2b4b3b99ea02?w=1200&q=80');">
@@ -32,21 +36,32 @@ Pages.Chords = {
 
       <div class="chords-wrap" style="display:grid;gap:14px;">
         ${window.renderHelpCard({
-          title: 'How to read chord diagrams',
-          description: 'These diagrams are shown in playing view: low E string at the bottom, high e string at the top.',
-          bullets: ['Dots are fretted notes.', '“X” means do not play that string.', '“O” means play open string.', 'A barre means one finger presses multiple strings.'],
+          title: 'Chords Practice guide',
+          description: 'Use the chord diagram for shape reference and run a metronome to keep strumming or picking in time.',
+          bullets: ['Count-in (on other tools) gives setup beats before loop start.', 'Beats per chord in Progressions changes how fast the highlight moves.', 'Use this page for focused reps on one chord shape.'],
           storageKey: 'df_help_tool_chords',
         })}
 
+        <div class="df-card prog-practice-panel">
+          <div style="font-family:var(--f-mono);font-size:15px;">Practice helper</div>
+          <div class="prog-practice-grid">
+            <label>BPM <input id="chord-practice-bpm" class="df-input" type="number" min="30" max="240" value="${Number.isFinite(savedBpm) ? savedBpm : 80}" /></label>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="df-btn df-btn--primary" id="chord-metro-start">Start metronome</button>
+            <button class="df-btn df-btn--outline" id="chord-metro-stop" disabled>Stop</button>
+          </div>
+        </div>
+
         <div class="df-field">
           <label class="df-label" for="chord-root">Root</label>
-          <select id="chord-root" class="df-input">${CHORD_ROOT_OPTIONS.map((root) => `<option value="${root.value}">${root.label}</option>`).join('')}</select>
+          <select id="chord-root" class="df-input">${CHORD_ROOT_OPTIONS.map((root) => `<option value="${root.value}" ${root.value === queryRoot ? 'selected' : ''}>${root.label}</option>`).join('')}</select>
         </div>
 
         <div class="df-field">
           <label class="df-label" for="chord-type">Chord Type</label>
           <select id="chord-type" class="df-input">
-            ${window.FF_CHORD_TYPES.map((type) => `<option value="${type.id}">${type.label}</option>`).join('')}
+            ${window.FF_CHORD_TYPES.map((type) => `<option value="${type.id}" ${type.id === queryType ? 'selected' : ''}>${type.label}</option>`).join('')}
           </select>
         </div>
 
@@ -67,6 +82,17 @@ Pages.Chords = {
     const nameEl = container.querySelector('#chord-name');
     const svgEl = container.querySelector('#chord-svg');
     const fingersEl = container.querySelector('#chord-fingers');
+    const bpmEl = container.querySelector('#chord-practice-bpm');
+    const startBtn = container.querySelector('#chord-metro-start');
+    const stopBtn = container.querySelector('#chord-metro-stop');
+
+    let running = false;
+
+    const setRunning = (next) => {
+      running = next;
+      startBtn.disabled = running;
+      stopBtn.disabled = !running;
+    };
 
     const renderChord = () => {
       const root = rootEl.value;
@@ -90,6 +116,27 @@ Pages.Chords = {
 
     rootEl.addEventListener('change', renderChord);
     typeEl.addEventListener('change', renderChord);
+
+    startBtn.addEventListener('click', () => {
+      const bpm = Math.max(30, Math.min(240, parseInt(bpmEl.value, 10) || 80));
+      localStorage.setItem('df_last_bpm', String(bpm));
+      window.FFMetronome.startMetronome({ bpm, subdivision: 4, accent: true });
+      setRunning(true);
+    });
+
+    stopBtn.addEventListener('click', () => {
+      window.FFMetronome.stopMetronome();
+      setRunning(false);
+    });
+
+    const observer = new MutationObserver(() => {
+      if (!container.contains(rootEl)) {
+        window.FFMetronome.stopMetronome();
+        observer.disconnect();
+      }
+    });
+    observer.observe(container, { childList: true });
+
     renderChord();
   },
 };

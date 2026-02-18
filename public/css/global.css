@@ -2920,3 +2920,47 @@ body.print-view .chord-chart-row {
   color: #111111 !important;
   border-color: #d0d0d0 !important;
 }
+
+.prog-practice-panel {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.prog-practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.prog-practice-grid label {
+  font-size: 13px;
+  color: var(--text2);
+  display: grid;
+  gap: 6px;
+}
+
+.prog-chord-card--active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 16px var(--glow);
+}
+
+.prog-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prog-chip {
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.prog-chip:hover {
+  border-color: var(--accent);
+}
