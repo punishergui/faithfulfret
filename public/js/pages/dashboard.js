@@ -9,14 +9,12 @@ Pages.Dashboard = {
 
     let stats;
     let sessions;
-    let resources;
     let heatmapDays;
 
     try {
-      [stats, sessions, resources, heatmapDays] = await Promise.all([
+      [stats, sessions, heatmapDays] = await Promise.all([
         DB.getStats(),
         DB.getAllSess(),
-        DB.getAllResources(),
         DB.getSessionHeatmap(),
       ]);
     } catch (error) {
@@ -34,7 +32,6 @@ Pages.Dashboard = {
 
     const recent = sessions.slice(0, 8);
     const today = Utils.today();
-    const topResources = resources.slice(0, 5);
     const quickStart = this._readQuickStart();
     const lastPractice = Utils.getLastPractice();
     const progressSummary = window.progressMem?.getSummary?.() || null;
@@ -59,14 +56,9 @@ Pages.Dashboard = {
           </div>
           <aside class="dashboard-side-col">
             ${this._renderProgressMemory(progressSummary)}
-            ${this._renderCompactHeatmap(heatmapDays, today)}
             ${this._renderQuickLog(today)}
+            ${this._renderCompactHeatmap(heatmapDays, today)}
             ${this._renderCalendar(stats.allDates)}
-            ${topResources.length ? this._renderTopResources(topResources) : ''}
-            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
-              <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
-              <a href="#/sessions" class="df-btn df-btn--outline">Browse Sessions</a>
-            </div>
           </aside>
         </div>
       </div>
@@ -469,10 +461,6 @@ Pages.Dashboard = {
       title: greeting,
       subtitle: awayText,
       image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80',
-      actions: `
-        <a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>
-        <a href="#/sessions" class="df-btn df-btn--outline">View Sessions</a>
-      `,
     });
   },
 
@@ -576,14 +564,6 @@ Pages.Dashboard = {
           </select>
         </div>
 
-        <div class="df-field" style="margin-bottom:10px;">
-          <label class="df-label">Key</label>
-          <select id="ql-key" class="df-input">
-            <option value="">Select key</option>
-            ${['C','G','D','A','E','B','F#','C#','F','Bb','Eb','Ab','Db','Gb'].map((key) => `<option value="${key}">${key}</option>`).join('')}
-          </select>
-        </div>
-
         <div class="df-field" style="margin-bottom:12px;">
           <label class="df-label">YouTube URL (optional)</label>
           <input id="ql-yt" class="df-input" placeholder="Paste YouTube URL or ID">
@@ -604,7 +584,6 @@ Pages.Dashboard = {
     const minutesEl = root.querySelector('#ql-minutes');
     const focusEl = root.querySelector('#ql-focus');
     const ytEl = root.querySelector('#ql-yt');
-    const keyEl = root.querySelector('#ql-key');
 
     const updatePillState = (value) => {
       root.querySelectorAll('[data-ql-min]').forEach((btn) => {
@@ -634,11 +613,6 @@ Pages.Dashboard = {
 
       const focus = (focusEl?.value || '').trim();
       if (focus) data.focus = focus;
-
-      const selectedKey = (keyEl?.value || '').trim();
-      if (selectedKey) {
-        data.focus = data.focus ? `${data.focus} · ${selectedKey}` : `${selectedKey} practice`;
-      }
 
       const yt = (ytEl?.value || '').trim();
       if (yt) {
@@ -786,24 +760,6 @@ Pages.Dashboard = {
           <button class="calendar__nav" id="cal-next">&rsaquo;</button>
         </div>
         <div class="calendar__grid">${cells}</div>
-      </div>
-    `;
-  },
-
-  _renderTopResources(resources) {
-    return `
-      <div class="dashboard-panel dashboard-panel--resources">
-        <div class="section-header" style="margin-bottom:10px;">
-          <span class="section-header__label">Selected Recordings</span>
-          <a href="#/resources" class="section-header__link">All &rarr;</a>
-        </div>
-        ${resources.map(r => `
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);">
-            <span style="color:var(--text3);font-family:var(--f-mono);font-size:11px;">&#8599;</span>
-            <a href="${r.url ? Utils.normalizeUrl(r.url) : '#/resources'}" target="_blank" rel="noopener" style="flex:1;font-size:14px;color:var(--text);text-decoration:none;font-weight:500;">${r.title}</a>
-            <span class="df-badge df-badge--muted">${r.category || ''}</span>
-          </div>
-        `).join('')}
       </div>
     `;
   },
