@@ -5,23 +5,15 @@ const TRAINING_TEXT_COLORS = Object.freeze([
   { key: 'muted', label: 'Muted', value: 'var(--text2)' },
   { key: 'accent', label: 'Accent', value: 'var(--accent)' },
   { key: 'accent2', label: 'Accent 2', value: 'var(--accent2, var(--accent))' },
-  { key: 'success', label: 'Success', value: 'var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%)))' },
+  { key: 'good', label: 'Good', value: 'var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%)))' },
   { key: 'warn', label: 'Warn', value: 'var(--warn, color-mix(in srgb, var(--accent) 45%, #f59e0b 55%))' },
-  { key: 'danger', label: 'Danger', value: 'var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%)))' },
-  { key: 'soft', label: 'Soft', value: 'var(--text3)' },
-  { key: 'neutral', label: 'Neutral', value: 'color-mix(in srgb, var(--text) 70%, var(--bg) 30%)' },
+  { key: 'bad', label: 'Bad', value: 'var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%)))' },
 ]);
 
 const TRAINING_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
 const TRAINING_ALLOWED_COLORS = new Set(TRAINING_TEXT_COLORS.map((item) => item.key));
 
-const TRAINING_EMOJI_CATEGORIES = [
-  { key: 'smileys', label: 'Smileys', items: ['😀', '😄', '😁', '😎', '🤩', '🥳', '😌', '🤔', '🔥', '🎯'] },
-  { key: 'hands', label: 'Hands', items: ['👍', '👎', '👏', '🙌', '🤟', '✌️', '🤘', '🙏', '👊', '🤝'] },
-  { key: 'music', label: 'Music', items: ['🎸', '🎵', '🎶', '🎼', '🥁', '🎤', '🎧', '🎹', '🎺', '🎷'] },
-  { key: 'objects', label: 'Objects', items: ['📘', '📝', '📌', '📎', '🎬', '📷', '💡', '✅', '⏱️', '🧠'] },
-  { key: 'symbols', label: 'Symbols', items: ['⭐', '✅', '❌', '⚡', '💯', '➕', '➖', '➡️', '⬅️', '🔁'] },
-];
+const TRAINING_EMOJIS = ['🎸', '🎶', '⏱️', '✅', '⭐', '🔥', '🤘', '😅', '😤', '🙂', '🙌'];
 
 function escHtml(value) {
   return String(value ?? '')
@@ -168,12 +160,7 @@ function renderVideoForm(video, options = {}) {
             <span class="training-rich-editor__group">${colorButtons}<button type="button" class="training-rich-editor__btn" data-rich-color-reset="1">Reset color</button></span>
             <button type="button" class="training-rich-editor__btn" data-rich-emoji-toggle="1" aria-expanded="false">😀 Emoji</button>
           </div>
-          <div id="video-description-editor" class="training-rich-editor__surface" contenteditable="true" data-placeholder="Add a description...">${normalizeEditorSeed(data)}</div>
-          <div id="video-emoji-popover" class="training-emoji-popover" hidden>
-            <input type="search" class="df-input training-emoji-popover__search" placeholder="Search emoji" aria-label="Search emoji">
-            <div class="training-emoji-popover__tabs">${TRAINING_EMOJI_CATEGORIES.map((cat, idx) => `<button type="button" class="training-rich-editor__btn ${idx === 0 ? 'is-active' : ''}" data-emoji-tab="${cat.key}">${cat.label}</button>`).join('')}</div>
-            ${TRAINING_EMOJI_CATEGORIES.map((cat, idx) => `<div class="training-emoji-popover__panel" data-emoji-panel="${cat.key}" ${idx === 0 ? '' : 'hidden'}>${cat.items.map((emoji) => `<button type="button" class="training-emoji-popover__item" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join('')}</div>`).join('')}
-          </div>
+          <div id="video-description-editor" class="training-rich-editor__surface rt-editor" contenteditable="true" data-placeholder="Add a description...">${normalizeEditorSeed(data)}</div>
         </div>
         <input type="hidden" name="description_html" value="">
         <input type="hidden" name="description_text" value="">
@@ -207,6 +194,8 @@ function renderVideoForm(video, options = {}) {
 
 Pages.ResourceVideosEdit = {
   async render(id) {
+    this._cleanupEditorHooks?.();
+    this._cleanupEditorHooks = null;
     const app = document.getElementById('app');
     const isEdit = Boolean(id);
     const [video, attachments] = await Promise.all([
@@ -248,9 +237,8 @@ Pages.ResourceVideosEdit = {
 
     const editor = app.querySelector('#video-description-editor');
     const emojiToggleBtn = app.querySelector('[data-rich-emoji-toggle]');
-    const emojiPopover = app.querySelector('#video-emoji-popover');
-    const emojiSearch = app.querySelector('.training-emoji-popover__search');
     let savedRange = null;
+    let emojiPopover = null;
 
     const saveSelection = () => {
       const selection = window.getSelection();
@@ -354,6 +342,27 @@ Pages.ResourceVideosEdit = {
       saveSelection();
     };
 
+    const normalizeColorSpans = () => {
+      if (!editor) return;
+      editor.querySelectorAll('span[data-color]').forEach((span) => {
+        const color = String(span.getAttribute('data-color') || '').trim();
+        if (!TRAINING_ALLOWED_COLORS.has(color)) {
+          while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+          span.remove();
+          return;
+        }
+        if (!span.textContent || !span.textContent.trim()) {
+          span.remove();
+          return;
+        }
+        const parent = span.parentElement;
+        if (parent?.matches('span[data-color]') && parent.getAttribute('data-color') === color) {
+          while (span.firstChild) parent.insertBefore(span.firstChild, span);
+          span.remove();
+        }
+      });
+    };
+
     const wrapSelectionWithHtml = (html) => {
       if (!editor) return;
       editor.focus();
@@ -368,18 +377,6 @@ Pages.ResourceVideosEdit = {
       return String(selection.toString() || '');
     };
 
-    const togglePopover = (show) => {
-      if (!emojiPopover || !emojiToggleBtn) return;
-      const open = Boolean(show);
-      emojiPopover.hidden = !open;
-      emojiToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) {
-        const rect = emojiToggleBtn.getBoundingClientRect();
-        const parentRect = emojiToggleBtn.closest('.training-rich-editor').getBoundingClientRect();
-        emojiPopover.style.left = `${Math.max(8, rect.left - parentRect.left)}px`;
-      }
-    };
-
     editor?.addEventListener('keyup', saveSelection);
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('input', saveSelection);
@@ -389,7 +386,7 @@ Pages.ResourceVideosEdit = {
     });
 
     app.querySelectorAll('[data-rich-block]').forEach((button) => {
-      button.addEventListener('click', () => applyCmd('formatBlock', button.dataset.richBlock));
+      button.addEventListener('click', () => applyCmd('formatBlock', `<${button.dataset.richBlock}>`));
     });
 
     app.querySelector('[data-rich-quote]')?.addEventListener('click', () => applyCmd('formatBlock', 'blockquote'));
@@ -424,9 +421,20 @@ Pages.ResourceVideosEdit = {
       button.addEventListener('click', () => {
         const color = button.dataset.richColor;
         if (!TRAINING_ALLOWED_COLORS.has(color)) return;
-        const raw = selectionText();
-        const text = raw || 'text';
-        wrapSelectionWithHtml(`<span data-color="${color}">${escHtml(text)}</span>`);
+        editor?.focus();
+        restoreSelection();
+        const range = getRangeInEditor();
+        if (!range) return;
+        const span = document.createElement('span');
+        span.setAttribute('data-color', color);
+        if (range.collapsed) {
+          span.textContent = 'text';
+        } else {
+          span.appendChild(range.extractContents());
+        }
+        range.insertNode(span);
+        selectNodeContents(span, true);
+        normalizeColorSpans();
       });
     });
 
@@ -436,47 +444,87 @@ Pages.ResourceVideosEdit = {
       wrapSelectionWithHtml(escHtml(raw));
     });
 
-    emojiToggleBtn?.addEventListener('click', () => {
-      saveSelection();
-      togglePopover(emojiPopover.hidden);
-    });
+    const buildEmojiPopover = () => {
+      if (emojiPopover) return emojiPopover;
+      const pop = document.createElement('div');
+      pop.className = 'training-emoji-popover';
+      pop.hidden = true;
+      pop.innerHTML = `
+        <input type="search" class="df-input training-emoji-popover__search" placeholder="Search emoji" aria-label="Search emoji">
+        <div class="training-emoji-popover__panel">${TRAINING_EMOJIS.map((emoji) => `<button type="button" class="training-emoji-popover__item" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join('')}</div>
+      `;
+      document.body.appendChild(pop);
+      emojiPopover = pop;
+      return pop;
+    };
 
-    app.querySelectorAll('[data-emoji-tab]').forEach((button) => {
-      button.addEventListener('click', () => {
-        app.querySelectorAll('[data-emoji-tab]').forEach((tab) => tab.classList.remove('is-active'));
-        button.classList.add('is-active');
-        const key = button.dataset.emojiTab;
-        app.querySelectorAll('[data-emoji-panel]').forEach((panel) => {
-          panel.hidden = panel.dataset.emojiPanel !== key;
-        });
-      });
-    });
+    const positionEmojiPopover = () => {
+      if (!emojiPopover || !emojiToggleBtn) return;
+      const rect = emojiToggleBtn.getBoundingClientRect();
+      emojiPopover.hidden = false;
+      const popRect = emojiPopover.getBoundingClientRect();
+      const gap = 8;
+      const maxLeft = window.innerWidth - popRect.width - gap;
+      const left = Math.min(Math.max(gap, rect.left), Math.max(gap, maxLeft));
+      let top = rect.bottom + gap;
+      if (top + popRect.height > window.innerHeight - gap) {
+        top = Math.max(gap, rect.top - popRect.height - gap);
+      }
+      emojiPopover.style.left = `${left}px`;
+      emojiPopover.style.top = `${top}px`;
+    };
 
-    app.querySelectorAll('[data-emoji]').forEach((button) => {
-      button.addEventListener('mousedown', (event) => event.preventDefault());
-      button.addEventListener('click', () => {
-        insertTextAtRange(button.dataset.emoji || '');
-        togglePopover(false);
-      });
-    });
+    const onDocKeydown = (event) => {
+      if (event.key === 'Escape') togglePopover(false);
+    };
 
-    emojiSearch?.addEventListener('input', () => {
-      const q = String(emojiSearch.value || '').trim().toLowerCase();
-      app.querySelectorAll('[data-emoji]').forEach((button) => {
+    const onDocClick = (event) => {
+      if (!emojiPopover || emojiPopover.hidden) return;
+      if (emojiPopover.contains(event.target) || emojiToggleBtn?.contains(event.target)) return;
+      togglePopover(false);
+    };
+
+    const onEmojiSearch = (event) => {
+      const q = String(event.target.value || '').trim().toLowerCase();
+      emojiPopover?.querySelectorAll('[data-emoji]').forEach((button) => {
         const value = String(button.dataset.emoji || '').toLowerCase();
         button.hidden = q && !value.includes(q);
       });
+    };
+
+    emojiToggleBtn?.addEventListener('click', () => {
+      saveSelection();
+      const nextOpen = !emojiPopover || emojiPopover.hidden;
+      togglePopover(nextOpen);
     });
 
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') togglePopover(false);
-    });
+    const togglePopover = (show) => {
+      if (!emojiToggleBtn) return;
+      const open = Boolean(show);
+      const pop = buildEmojiPopover();
+      pop.hidden = !open;
+      emojiToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) return;
+      positionEmojiPopover();
+      pop.querySelector('.training-emoji-popover__search')?.focus();
+    };
 
-    document.addEventListener('click', (event) => {
-      if (emojiPopover.hidden) return;
-      if (emojiPopover.contains(event.target) || emojiToggleBtn.contains(event.target)) return;
+    const onPopoverClick = (event) => {
+      const button = event.target.closest('[data-emoji]');
+      if (!button) return;
+      insertTextAtRange(button.dataset.emoji || '');
       togglePopover(false);
+    };
+
+    const pop = buildEmojiPopover();
+    pop.querySelectorAll('[data-emoji]').forEach((button) => {
+      button.addEventListener('mousedown', (event) => event.preventDefault());
     });
+    pop.addEventListener('click', onPopoverClick);
+    pop.querySelector('.training-emoji-popover__search')?.addEventListener('input', onEmojiSearch);
+    document.addEventListener('keydown', onDocKeydown);
+    document.addEventListener('click', onDocClick);
+    window.addEventListener('resize', positionEmojiPopover);
 
     editor?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && event.shiftKey) {
@@ -563,5 +611,13 @@ Pages.ResourceVideosEdit = {
         this.render(video.id);
       });
     });
+
+    this._cleanupEditorHooks = () => {
+      document.removeEventListener('keydown', onDocKeydown);
+      document.removeEventListener('click', onDocClick);
+      window.removeEventListener('resize', positionEmojiPopover);
+      emojiPopover?.remove();
+      emojiPopover = null;
+    };
   },
 };

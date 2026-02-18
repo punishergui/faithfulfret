@@ -3186,26 +3186,41 @@ body.print-view .chord-chart-row {
   min-height: 140px;
   padding: 10px 12px;
   color: var(--text);
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .training-rich-editor__surface [data-color="text"],
-.training-description-content [data-color="text"] { color: var(--text); }
+.training-description-content [data-color="text"],
+.rt-display span[data-color="text"],
+.rt-editor span[data-color="text"] { color: var(--text); }
 .training-rich-editor__surface [data-color="muted"],
-.training-description-content [data-color="muted"] { color: var(--text2); }
+.training-description-content [data-color="muted"],
+.rt-display span[data-color="muted"],
+.rt-editor span[data-color="muted"] { color: var(--text2); }
 .training-rich-editor__surface [data-color="accent"],
-.training-description-content [data-color="accent"] { color: var(--accent); }
+.training-description-content [data-color="accent"],
+.rt-display span[data-color="accent"],
+.rt-editor span[data-color="accent"] { color: var(--accent); }
 .training-rich-editor__surface [data-color="accent2"],
-.training-description-content [data-color="accent2"] { color: var(--accent2, var(--accent)); }
-.training-rich-editor__surface [data-color="success"],
-.training-description-content [data-color="success"] { color: var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%))); }
+.training-description-content [data-color="accent2"],
+.rt-display span[data-color="accent2"],
+.rt-editor span[data-color="accent2"] { color: var(--accent2, var(--accent)); }
+.training-rich-editor__surface [data-color="good"],
+.training-description-content [data-color="good"],
+.rt-display span[data-color="good"],
+.rt-editor span[data-color="good"] { color: var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%))); }
 .training-rich-editor__surface [data-color="warn"],
-.training-description-content [data-color="warn"] { color: var(--warn, color-mix(in srgb, var(--accent) 45%, #f59e0b 55%)); }
-.training-rich-editor__surface [data-color="danger"],
-.training-description-content [data-color="danger"] { color: var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%))); }
-.training-rich-editor__surface [data-color="soft"],
-.training-description-content [data-color="soft"] { color: var(--text3); }
-.training-rich-editor__surface [data-color="neutral"],
-.training-description-content [data-color="neutral"] { color: color-mix(in srgb, var(--text) 70%, var(--bg) 30%); }
+.training-description-content [data-color="warn"],
+.rt-display span[data-color="warn"],
+.rt-editor span[data-color="warn"] { color: var(--warn, color-mix(in srgb, var(--accent) 45%, #f59e0b 55%)); }
+.training-rich-editor__surface [data-color="bad"],
+.training-description-content [data-color="bad"],
+.rt-display span[data-color="bad"],
+.rt-editor span[data-color="bad"] { color: var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%))); }
 
 .training-rich-editor__surface pre,
 .training-description-content pre {
@@ -3214,6 +3229,7 @@ body.print-view .chord-chart-row {
   border-radius: 8px;
   padding: 10px;
   overflow: auto;
+  max-width: 100%;
   white-space: pre;
 }
 
@@ -3234,16 +3250,26 @@ body.print-view .chord-chart-row {
 .training-rich-editor__surface pre code,
 .training-description-content pre code {
   display: block;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: pre;
 }
 
-.training-description-content {
+.training-description-content,
+.rt-display {
   color: var(--text2);
   display: grid;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .training-emoji-popover {
-  position: absolute;
+  position: fixed;
   z-index: 20;
   margin-top: 6px;
   width: min(360px, calc(100vw - 32px));
@@ -3518,6 +3544,21 @@ body.print-view .chord-chart-row {
   display: grid;
   gap: 12px;
   align-content: start;
+}
+
+.training-video-detail-layout {
+  overflow: hidden;
+}
+
+.training-video-detail-layout > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.training-rich-editor,
+.training-rich-editor__toolbar {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .training-video-detail-layout iframe {
