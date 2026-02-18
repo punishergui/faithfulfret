@@ -53,8 +53,11 @@ Pages.ResourceVideoDetail = {
   async render(id) {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
-    const video = await DB.getTrainingVideo(id);
-    const attachments = await DB.getVideoAttachments(id);
+    const [video, attachments, progress] = await Promise.all([
+      DB.getTrainingVideo(id),
+      DB.getVideoAttachments(id),
+      DB.getTrainingVideoProgress(id),
+    ]);
     if (!video) {
       app.innerHTML = '<div class="page-wrap" style="padding:24px;color:var(--text2);">Video not found.</div>';
       return;
@@ -90,6 +93,19 @@ Pages.ResourceVideoDetail = {
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
           <div style="margin-top:8px;color:var(--text2);">Difficulty: ${video.difficulty || '—'}</div>
           <div style="margin-top:12px;white-space:pre-wrap;color:var(--text2);">${video.notes || ''}</div>
+          <div class="df-panel" style="padding:10px;margin-top:12px;display:grid;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="video-progress-watched" type="button" class="df-btn df-btn--outline">${progress.watched_at ? 'Unwatch' : 'Mark Watched'}</button>
+              <button id="video-progress-mastered" type="button" class="df-btn df-btn--outline">${progress.mastered_at ? 'Unmaster' : 'Mark Mastered'}</button>
+            </div>
+            <div style="display:grid;gap:6px;">
+              <textarea id="video-progress-notes" class="df-input" rows="4" placeholder="Personal notes">${progress.notes || ''}</textarea>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <button id="video-progress-save" class="df-btn df-btn--primary" type="button">Save Notes</button>
+                <div style="color:var(--text3);font-size:12px;">${progress.watched_at ? `Watched ${new Date(progress.watched_at).toLocaleDateString()}` : 'Not watched yet'}${progress.mastered_at ? ` • Mastered ${new Date(progress.mastered_at).toLocaleDateString()}` : ''}</div>
+              </div>
+            </div>
+          </div>
           <div class="df-panel" style="padding:10px;margin-top:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
               <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);">Practice Timer</div>
@@ -150,6 +166,22 @@ Pages.ResourceVideoDetail = {
         await DB.deleteVideoTimestamp(button.dataset.deleteStamp);
         await this.render(video.id);
       });
+    });
+
+    app.querySelector('#video-progress-watched')?.addEventListener('click', async () => {
+      await DB.saveTrainingVideoProgress(video.id, { watched: !progress.watched_at });
+      await this.render(video.id);
+    });
+
+    app.querySelector('#video-progress-mastered')?.addEventListener('click', async () => {
+      await DB.saveTrainingVideoProgress(video.id, { mastered: !progress.mastered_at });
+      await this.render(video.id);
+    });
+
+    app.querySelector('#video-progress-save')?.addEventListener('click', async () => {
+      const notes = app.querySelector('#video-progress-notes')?.value || '';
+      await DB.saveTrainingVideoProgress(video.id, { notes });
+      await this.render(video.id);
     });
 
     const timerDisplay = app.querySelector('#video-timer-display');

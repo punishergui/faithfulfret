@@ -3033,3 +3033,121 @@ body.print-view .chord-chart-row {
 .prog-chip:hover {
   border-color: var(--accent);
 }
+
+.training-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.training-chip {
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--text2);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.training-chip.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--card);
+}
+
+.training-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.training-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  color: var(--text2);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.training-status-badge.is-mastered {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.training-card-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.training-row-title {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.training-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  border-radius: 10px;
+  border: 1px dashed var(--line2);
+  color: var(--text3);
+  background: var(--bg2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.training-playlist-card {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  display: grid;
+  gap: 8px;
+}
+
+.training-playlist-preview {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.training-playlist-preview img {
+  width: 52px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg2);
+}
+
+.training-playlist-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0,1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.training-playlist-thumb {
+  width: 64px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bg2);
+}
+
+@media (max-width: 720px) {
+  .training-playlist-row {
+    grid-template-columns: 64px minmax(0,1fr);
+  }
+}

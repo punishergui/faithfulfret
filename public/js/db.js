@@ -320,7 +320,8 @@
 
     async getAllTrainingVideos(filters = {}) {
       const params = new URLSearchParams();
-      Object.entries(filters || {}).forEach(([key, value]) => {
+      const merged = { includeProgress: 1, ...(filters || {}) };
+      Object.entries(merged).forEach(([key, value]) => {
         if (value == null || value === '') return;
         params.set(key, String(value));
       });
@@ -342,6 +343,14 @@
       return api(`/api/training-videos/${id}`, { method: 'DELETE' });
     },
 
+
+    async getTrainingVideoProgress(id) {
+      return api(`/api/training/videos/${id}/progress`);
+    },
+
+    async saveTrainingVideoProgress(id, data = {}) {
+      return api(`/api/training/videos/${id}/progress`, { method: 'PUT', body: JSON.stringify(data) });
+    },
     async addVideoTimestamp(videoId, data) {
       return api(`/api/training-videos/${videoId}/timestamps`, { method: 'POST', body: JSON.stringify(data) });
     },

@@ -165,9 +165,15 @@ Pages.TrainingAdmin = { async render() { await renderWithError(async () => {
 
 Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   const app = document.getElementById('app');
-  const playlists = await DB.getVideoPlaylists();
+  const [playlists, videos] = await Promise.all([DB.getVideoPlaylists(), DB.getAllTrainingVideos({ includeProgress: 1 })]);
   const status = sessionStorage.getItem('trainingPlaylistStatus') || '';
   sessionStorage.removeItem('trainingPlaylistStatus');
+  const videosById = new Map(videos.map((video) => [Number(video.id), video]));
+  const previewFor = (playlist) => {
+    const itemIds = (playlist.items || []).slice(0, 3).map((item) => Number(item.video_id || item.videoId)).filter(Boolean);
+    return itemIds.map((id) => videosById.get(id)).filter(Boolean);
+  };
+
   app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
       <div id="playlist-status" class="df-panel" style="padding:10px;${status ? '' : 'display:none;'}">${esc(status)}</div>
@@ -176,7 +182,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
         <input class="df-input" name="description" placeholder="Description">
         <button class="df-btn df-btn--primary">Create</button>
       </form>
-      <div class="df-panel" style="padding:12px;">${playlists.map((p, idx)=>`<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:10px 0;gap:10px;"><div style="display:flex;align-items:center;gap:8px;"><button class="df-btn df-btn--outline" type="button" data-playlist-up="${idx}" ${idx < 1 ? 'disabled' : ''}>↑</button><button class="df-btn df-btn--outline" type="button" data-playlist-down="${idx}" ${idx >= playlists.length - 1 ? 'disabled' : ''}>↓</button><div><strong>${esc(p.name || `Playlist ${p.id}`)}</strong><div style="color:var(--text2);">${esc(p.description || '')}</div></div></div><div style="display:flex;gap:8px;"><a class="df-btn df-btn--outline" href="#/training/playlists/${p.id}">Open</a><button class="df-btn df-btn--danger" type="button" data-playlist-delete="${p.id}">Delete</button></div></div>`).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}</div>
+      <div class="df-panel" style="padding:12px;display:grid;gap:10px;">${playlists.map((p, idx)=>{ const previews = previewFor(p); return `<div class="training-playlist-card"><div style="display:flex;align-items:flex-start;gap:10px;min-width:0;"><div style="display:flex;align-items:center;gap:8px;"><button class="df-btn df-btn--outline" type="button" data-playlist-up="${idx}" ${idx < 1 ? 'disabled' : ''}>↑</button><button class="df-btn df-btn--outline" type="button" data-playlist-down="${idx}" ${idx >= playlists.length - 1 ? 'disabled' : ''}>↓</button></div><div style="min-width:0;"><strong style="display:block;font-size:16px;">${esc(p.name || `Playlist ${p.id}`)}</strong><div style="color:var(--text2);margin-top:4px;">${esc(p.description || '')}</div><div style="color:var(--text3);font-size:12px;margin-top:4px;">${(p.items || []).length} videos</div></div></div><div class="training-playlist-preview">${previews.length ? previews.map((video) => video.thumbUrl || video.thumb_url ? `<img src="${video.thumbUrl || video.thumb_url}" alt="${esc(video.title || '')}">` : '<div class="training-thumb-fallback" style="width:52px;height:32px;font-size:13px;">🎬</div>').join('') : '<div style="color:var(--text3);font-size:12px;">No videos</div>'}</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><a class="df-btn df-btn--outline" href="#/training/playlists/${p.id}">Open</a><button class="df-btn df-btn--danger" type="button" data-playlist-delete="${p.id}">Delete</button></div></div>`; }).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}</div>
     </div>`;
 
   async function movePlaylist(index, delta) {
@@ -191,14 +197,14 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   }
 
   app.querySelector('#playlist-create')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries()); data.sort_order = playlists.length ? ((Number(playlists[playlists.length - 1].sort_order) || 0) + 10) : 10; await DB.saveVideoPlaylist(data); sessionStorage.setItem('trainingPlaylistStatus', 'Playlist created.'); go('#/training/playlists'); });
-  app.querySelectorAll('[data-playlist-delete]').forEach((button)=>button.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; const playlistId = Number(button.dataset.playlistDelete); await DB.deleteVideoPlaylist(playlistId); button.closest('div[style*="border-top"]')?.remove(); const statusEl = app.querySelector('#playlist-status'); statusEl.textContent = 'Playlist deleted.'; statusEl.style.display = 'block'; }));
+  app.querySelectorAll('[data-playlist-delete]').forEach((button)=>button.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; const playlistId = Number(button.dataset.playlistDelete); await DB.deleteVideoPlaylist(playlistId); button.closest('.training-playlist-card')?.remove(); const statusEl = app.querySelector('#playlist-status'); statusEl.textContent = 'Playlist deleted.'; statusEl.style.display = 'block'; }));
   app.querySelectorAll('[data-playlist-up]').forEach((button)=>button.addEventListener('click', async ()=>{ await movePlaylist(Number(button.dataset.playlistUp), -1); }));
   app.querySelectorAll('[data-playlist-down]').forEach((button)=>button.addEventListener('click', async ()=>{ await movePlaylist(Number(button.dataset.playlistDown), 1); }));
 }); }};
 
 Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async () => {
   const app = document.getElementById('app');
-  const [playlist, videos] = await Promise.all([DB.getVideoPlaylist(id), DB.getAllTrainingVideos()]);
+  const [playlist, videos] = await Promise.all([DB.getVideoPlaylist(id), DB.getAllTrainingVideos({ includeProgress: 1 })]);
   if (!playlist) { app.innerHTML = '<div class="page-wrap" style="padding:24px;">Playlist not found.</div>'; return; }
   const items = Array.isArray(playlist.items) ? playlist.items.slice().sort((a,b)=>(a.position||0)-(b.position||0)) : [];
   const map = new Map(videos.map((v)=>[Number(v.id), v]));
@@ -215,7 +221,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
         <div style="color:var(--text2);font-size:12px;">${canResume ? `Last saved video: #${Number(progress.lastVideoId)}` : 'No saved playlist progress yet.'}</div>
         <button id="resume-playlist" class="df-btn df-btn--outline" type="button" ${canResume ? '' : 'disabled'}>Resume Playlist</button>
       </div>
-      <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); const videoId = Number(item.videoId || item.video_id); return `<div id="playlist-video-${videoId}" style="display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><button class="df-btn df-btn--ghost" style="justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" data-open-video="${videoId}">${esc(video?.title || `Video ${videoId}`)}</button><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
+      <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); const videoId = Number(item.videoId || item.video_id); const watched = video?.watched_at; const mastered = video?.mastered_at; const thumb = video?.thumbUrl || video?.thumb_url || ''; return `<div id="playlist-video-${videoId}" class="training-playlist-row"><button class="df-btn df-btn--ghost" style="padding:0;" data-open-video="${videoId}">${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb">` : '<div class="training-thumb-fallback" style="width:64px;height:36px;font-size:13px;">🎬</div>'}</button><div style="min-width:0;"><button class="df-btn df-btn--ghost training-row-title" style="padding:0;display:block;text-align:left;" data-open-video="${videoId}">${esc(video?.title || `Video ${videoId}`)}</button><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${video?.duration_sec ? `<span style="color:var(--text3);font-size:12px;">${fmt(video.duration_sec)}</span>` : ''}${watched ? '<span class="training-status-badge">Watched</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">Mastered</span>' : ''}</div></div><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
       <form id="playlist-add" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;">
         <select class="df-input" name="videoId">${available.map((v)=>`<option value="${v.id}">${esc(v.title || `Video ${v.id}`)}</option>`).join('')}</select>
         <button class="df-btn df-btn--primary">Add Video</button>
