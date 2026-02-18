@@ -4,6 +4,36 @@ function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&
 function fmt(sec) { const n = Number(sec) || 0; return `${Math.floor(n / 60)}m`; }
 function qv(name) { return new URLSearchParams(location.hash.split('?')[1] || '').get(name) || ''; }
 
+function readLocalJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeLocalJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+function pushRecentPlaylist(playlist) {
+  const list = readLocalJson('df_recent_playlists', []);
+  const safe = Array.isArray(list) ? list : [];
+  const next = [{ id: Number(playlist.id), name: playlist.name || `Playlist ${playlist.id}`, usedAt: new Date().toISOString() }, ...safe.filter((item) => Number(item?.id) !== Number(playlist.id))].slice(0, 3);
+  writeLocalJson('df_recent_playlists', next);
+}
+
+function savePlaylistProgress(playlistId, lastVideoId) {
+  writeLocalJson('df_playlist_progress', {
+    playlistId: Number(playlistId),
+    lastVideoId: Number(lastVideoId),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+
 async function renderWithError(renderFn) {
   const app = document.getElementById('app');
   try { await renderFn(); } catch (e) {
@@ -154,9 +184,19 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   const items = Array.isArray(playlist.items) ? playlist.items.slice().sort((a,b)=>(a.position||0)-(b.position||0)) : [];
   const map = new Map(videos.map((v)=>[Number(v.id), v]));
   const available = videos.filter((v)=>!items.find((i)=>Number(i.videoId || i.video_id)===Number(v.id)));
+  const progress = readLocalJson('df_playlist_progress', null);
+  const resumeId = Number(qv('resumeVideoId') || 0) || Number(progress?.lastVideoId || 0);
+  const canResume = Number(progress?.playlistId) === Number(id) && Number(progress?.lastVideoId);
+
+  pushRecentPlaylist(playlist);
+
   app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a><button id="delete-playlist" class="df-btn df-btn--danger" style="margin-left:8px;" type="button">Delete Playlist</button>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
-      <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><span>${esc(video?.title || `Video ${item.videoId}`)}</span><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
+      <div class="df-panel" style="padding:12px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+        <div style="color:var(--text2);font-size:12px;">${canResume ? `Last saved video: #${Number(progress.lastVideoId)}` : 'No saved playlist progress yet.'}</div>
+        <button id="resume-playlist" class="df-btn df-btn--outline" type="button" ${canResume ? '' : 'disabled'}>Resume Playlist</button>
+      </div>
+      <div class="df-panel" style="padding:12px;display:grid;gap:8px;">${items.map((item,idx)=>{ const video=map.get(Number(item.videoId || item.video_id)); const videoId = Number(item.videoId || item.video_id); return `<div id="playlist-video-${videoId}" style="display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:6px;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><button class="df-btn df-btn--ghost" style="justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" data-open-video="${videoId}">${esc(video?.title || `Video ${videoId}`)}</button><button class="df-btn df-btn--outline" data-up="${idx}">↑</button><button class="df-btn df-btn--outline" data-down="${idx}">↓</button><button class="df-btn df-btn--danger" data-remove="${idx}">Remove</button></div>`; }).join('') || '<div style="color:var(--text3);">No videos yet.</div>'}</div>
       <form id="playlist-add" class="df-panel" style="padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;">
         <select class="df-input" name="videoId">${available.map((v)=>`<option value="${v.id}">${esc(v.title || `Video ${v.id}`)}</option>`).join('')}</select>
         <button class="df-btn df-btn--primary">Add Video</button>
@@ -167,9 +207,35 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     await DB.replaceVideoPlaylistItems(id, nextItems.map((it, index) => ({ videoId: Number(it.videoId || it.video_id), position: index + 1 })));
     go(`#/training/playlists/${id}`);
   }
+
+  const scrollToVideo = (videoId) => {
+    const target = app.querySelector(`#playlist-video-${Number(videoId)}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.style.boxShadow = '0 0 0 1px var(--accent) inset';
+    setTimeout(() => { target.style.boxShadow = ''; }, 1500);
+  };
+
+  app.querySelector('#resume-playlist')?.addEventListener('click', () => {
+    if (!canResume) return;
+    scrollToVideo(progress.lastVideoId);
+  });
+
+  app.querySelectorAll('[data-open-video]').forEach((b)=>b.addEventListener('click', ()=>{
+    const videoId = Number(b.dataset.openVideo);
+    if (!videoId) return;
+    savePlaylistProgress(id, videoId);
+    pushRecentPlaylist(playlist);
+    go(`#/training/videos/${videoId}`);
+  }));
+
   app.querySelector('#playlist-add')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const videoId=Number(new FormData(e.target).get('videoId')); if (!videoId) return; await save([...items, { videoId }]); });
   app.querySelectorAll('[data-remove]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.remove); const next=items.filter((_,i)=>i!==idx); await save(next); }));
   app.querySelectorAll('[data-up]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.up); if (idx<1) return; const next=items.slice(); [next[idx-1], next[idx]]=[next[idx], next[idx-1]]; await save(next); }));
   app.querySelectorAll('[data-down]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.down); if (idx>=items.length-1) return; const next=items.slice(); [next[idx+1], next[idx]]=[next[idx], next[idx+1]]; await save(next); }));
   app.querySelector('#delete-playlist')?.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; await DB.deleteVideoPlaylist(id); sessionStorage.setItem('trainingPlaylistStatus', 'Playlist deleted.'); go('#/training/playlists'); });
+
+  if (resumeId) {
+    setTimeout(() => scrollToVideo(resumeId), 120);
+  }
 }); }};
