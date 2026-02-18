@@ -89,9 +89,6 @@ Pages.ResourceVideoDetail = {
       ? [{ label: 'Training', href: '#/training' }, { label: 'Playlists', href: '#/training/playlists' }, { label: fromPlaylistData.name || 'Playlist', href: `#/training/playlists/${fromPlaylistData.id}` }, { label: video.title || 'Video' }]
       : [{ label: 'Training', href: '#/training' }, { label: 'Videos', href: '#/training/videos' }, { label: video.title || 'Video' }];
     const embedBase = `https://www.youtube-nocookie.com/embed/${video.videoId || video.video_id || ''}`;
-    const isUpload = video.source_type === 'upload';
-    const uploadThumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || ((video.videoId || video.video_id) ? Utils.ytThumb(video.videoId || video.video_id) : '');
-    const watchUrl = video.watch_url || (isUpload ? (video.upload_url || '') : (video.youtube_url || video.url || ''));
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
     try { localStorage.setItem('df_last_video_id', String(video.id)); } catch (e) {}
@@ -125,8 +122,7 @@ Pages.ResourceVideoDetail = {
       ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '', leftExtra: Utils.renderBreadcrumbs(breadcrumbItems) })}
       <div class="page-wrap training-video-detail-layout" style="padding:24px 24px 60px;display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;">
         <div class="df-panel" style="padding:12px;">
-          ${isUpload ? `<video controls src="${escHtml(watchUrl)}" style="width:100%;max-height:420px;border:0;border-radius:12px;background:var(--bg2);"></video>` : `<iframe title="${video.title || ''}" src="${embedBase}" style="width:100%;height:420px;border:0;border-radius:12px;background:var(--bg2);" allowfullscreen loading="lazy"></iframe>`}
-          ${isUpload ? `<div style="margin-top:8px;">${uploadThumb ? `<img src="${escHtml(uploadThumb)}" alt="Thumbnail" style="max-width:240px;border-radius:10px;border:1px solid var(--line);">` : '<div class="training-thumb-fallback" style="max-width:240px;">Thumbnail pending / ffmpeg not installed</div>'}</div>` : ''}
+          <iframe title="${video.title || ''}" src="${embedBase}" style="width:100%;height:420px;border:0;border-radius:12px;background:var(--bg2);" allowfullscreen loading="lazy"></iframe>
           <div class="training-row-title" style="margin-top:10px;">${video.title || '(Untitled)'}</div>
           <div style="margin-top:6px;color:var(--text2);">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:13px;">Difficulty: ${video.difficulty || '—'}</div>
