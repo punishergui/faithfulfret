@@ -35,11 +35,13 @@ Pages.Dashboard = {
     const recent = sessions.slice(0, 6);
     const today = Utils.today();
     const topResources = resources.slice(0, 5);
+    const quickStart = this._readQuickStart();
 
     app.innerHTML = `
       ${this._renderHero(stats)}
       ${this._renderStatBar(stats)}
       <div class="page-wrap" style="padding:32px 24px;">
+        ${this._renderStartPractice(quickStart)}
         <div class="two-col" style="align-items:start;">
           <div>
             <div class="section-header">
@@ -54,7 +56,7 @@ Pages.Dashboard = {
             </div>
           </div>
           <div>
-            
+            ${this._renderRecentActivity(quickStart)}
             ${this._renderQuickLog(today)}
             ${this._renderCompactHeatmap(heatmapDays, today)}
             ${this._renderCalendar(stats.allDates)}
@@ -68,9 +70,93 @@ Pages.Dashboard = {
     this._initCalendarNav(app, stats.allDates);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
+    this._initStartPractice(app, quickStart);
 
     // Stagger reveal
     setTimeout(() => Utils.staggerReveal(app, '.session-row', 0), 50);
+  },
+
+  _readJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (e) {
+      return fallback;
+    }
+  },
+
+  _readQuickStart() {
+    const lastVideoId = Number(localStorage.getItem('df_last_video_id') || 0);
+    const playlistProgress = this._readJson('df_playlist_progress', null);
+    const recentPlaylistsRaw = this._readJson('df_recent_playlists', []);
+    const recentVideosRaw = this._readJson('df_recent_videos', []);
+    const recentPlaylists = (Array.isArray(recentPlaylistsRaw) ? recentPlaylistsRaw : []).slice(0, 3);
+    const recentVideos = (Array.isArray(recentVideosRaw) ? recentVideosRaw : []).slice(0, 5);
+    return { lastVideoId, playlistProgress, recentPlaylists, recentVideos };
+  },
+
+  _renderStartPractice(data) {
+    const hasVideo = Number(data.lastVideoId) > 0;
+    const hasPlaylist = Number(data.playlistProgress?.playlistId) > 0;
+    const hasRecentPlaylists = data.recentPlaylists.length > 0;
+    return `
+      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Start Practice</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button type="button" id="sp-last-video" class="df-btn df-btn--primary" ${hasVideo ? '' : 'disabled'}>Continue Last Video</button>
+          <button type="button" id="sp-last-playlist" class="df-btn df-btn--outline" ${hasPlaylist ? '' : 'disabled'}>Continue Last Playlist</button>
+          <select id="sp-playlist-select" class="df-input" style="max-width:260px;" ${hasRecentPlaylists ? '' : 'disabled'}>
+            <option value="">Quick Start Playlist</option>
+            ${data.recentPlaylists.map((item) => `<option value="${Number(item.id)}">${item.name || `Playlist ${item.id}`}</option>`).join('')}
+          </select>
+          <a href="#/training/videos" class="df-btn df-btn--outline">Browse Training</a>
+        </div>
+        ${hasVideo || hasPlaylist || hasRecentPlaylists ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">No recent training activity yet. Open any training video or playlist to enable quick start.</div>'}
+      </div>
+    `;
+  },
+
+  _renderRecentActivity(data) {
+    const fmt = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '—';
+      return d.toLocaleString();
+    };
+    return `
+      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Recent Activity</div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Videos</div>
+          ${(data.recentVideos || []).length ? data.recentVideos.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/videos/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.title || `Video ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.lastPracticedAt || item.watchedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent videos yet.</div>'}
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Playlists</div>
+          ${(data.recentPlaylists || []).length ? data.recentPlaylists.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/playlists/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.name || `Playlist ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.usedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent playlists yet.</div>'}
+        </div>
+      </div>
+    `;
+  },
+
+  _initStartPractice(container, data) {
+    container.querySelector('#sp-last-video')?.addEventListener('click', () => {
+      if (!Number(data.lastVideoId)) return;
+      go(`#/training/videos/${Number(data.lastVideoId)}`);
+    });
+
+    container.querySelector('#sp-last-playlist')?.addEventListener('click', () => {
+      const progress = data.playlistProgress || {};
+      if (!Number(progress.playlistId)) return;
+      const query = Number(progress.lastVideoId) ? `?resumeVideoId=${Number(progress.lastVideoId)}` : '';
+      go(`#/training/playlists/${Number(progress.playlistId)}${query}`);
+    });
+
+    container.querySelector('#sp-playlist-select')?.addEventListener('change', (event) => {
+      const playlistId = Number(event.target.value || 0);
+      if (!playlistId) return;
+      go(`#/training/playlists/${playlistId}`);
+    });
   },
 
   _renderHero(stats) {

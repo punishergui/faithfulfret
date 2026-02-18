@@ -561,7 +561,12 @@ Indexes:
 
 ### localStorage keys used
 
-No new training-specific localStorage keys were added.
+Training quick-start now uses browser localStorage keys:
+- `df_last_video_id`
+- `df_recent_videos`
+- `df_playlist_progress`
+- `df_recent_playlists`
+
 Existing app keys still apply (for example: `theme`, `handedness`).
 
 ### Deploy verification additions
@@ -585,6 +590,11 @@ curl -s http://127.0.0.1:3000/api/modules | jq
 curl -s http://127.0.0.1:3000/api/lessons | jq
 curl -s http://127.0.0.1:3000/api/attachments?entity_type=lesson\&entity_id=1 | jq
 curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ' | jq
+
+# UI quick-start checks
+# 1) open #/training/videos/<id>, verify timer Start/Pause/Reset appears and df_last_video_id updates
+# 2) open #/training/playlists/<id>, click a video title, verify df_playlist_progress updates
+# 3) open #/dashboard, verify Start Practice + Recent Activity cards show recent localStorage data
 ```
 
 Keep rollback path unchanged: publish immutable tags (`vX.Y.Z`) and pin `docker-compose.prod.yml` image to the selected tag when rolling back.
