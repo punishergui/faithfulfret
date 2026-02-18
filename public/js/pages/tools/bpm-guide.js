@@ -30,6 +30,13 @@ Pages.BpmGuide = {
       </div>
 
       <div class="page-wrap" style="padding:32px 24px 60px;max-width:800px;">
+        ${window.renderHelpCard({
+          title: 'How to use BPM guide',
+          description: 'Pick a tempo family and jump straight into metronome practice.',
+          bullets: ['Each row opens metronome at midpoint BPM.', 'Use this when you need a quick target tempo.', 'Traditional labels can overlap slightly by style.'],
+          storageKey: 'df_help_tool_bpm_guide',
+        })}
+
         <p style="font-size:14px;color:var(--text2);margin-bottom:28px;font-weight:300;">
           Click any row to open the metronome at that tempo. Tempos overlap slightly between tradition and practice.
         </p>
@@ -52,5 +59,7 @@ Pages.BpmGuide = {
         </div>
       </div>
     `;
+
+    window.bindHelpCards(app);
   },
 };

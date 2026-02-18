@@ -2,19 +2,15 @@
 
 window.Pages = window.Pages || {};
 
-const SCALE_INTERVALS = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  pentatonicMinor: [0, 3, 5, 7, 10],
-};
-
 const SCALE_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const NOTE_INDEX = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
 const STRING_OPEN_NOTES = ['E', 'A', 'D', 'G', 'B', 'E'];
+const STRING_LABELS = ['6 (Low E)', '5 (A)', '4 (D)', '3 (G)', '2 (B)', '1 (High e)'];
 
 Pages.Scales = {
   render() {
     const app = document.getElementById('app');
+    const scales = window.FF_SCALES || [];
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?w=1200&q=80');">
@@ -29,9 +25,7 @@ Pages.Scales = {
         <div class="df-field">
           <label class="df-label" for="scale-type">Scale Type</label>
           <select id="scale-type" class="df-input">
-            <option value="major">Major</option>
-            <option value="minor">Natural Minor</option>
-            <option value="pentatonicMinor">Minor Pentatonic</option>
+            ${scales.map((scale) => `<option value="${scale.id}">${scale.name}</option>`).join('')}
           </select>
         </div>
 
@@ -42,6 +36,7 @@ Pages.Scales = {
 
         <div id="scale-title" style="font-family:var(--f-mono);font-size:16px;"></div>
         <div id="scale-svg" style="border:1px solid var(--line2);background:var(--bg1);padding:12px;"></div>
+        <div id="scale-help"></div>
       </div>
     `;
 
@@ -49,16 +44,30 @@ Pages.Scales = {
   },
 
   _bind(container) {
+    const scales = window.FF_SCALES || [];
     const typeEl = container.querySelector('#scale-type');
     const keyEl = container.querySelector('#scale-key');
     const titleEl = container.querySelector('#scale-title');
     const svgEl = container.querySelector('#scale-svg');
+    const helpEl = container.querySelector('#scale-help');
 
     const renderScale = () => {
-      const type = typeEl.value;
+      const scale = scales.find((item) => item.id === typeEl.value) || scales[0];
+      if (!scale) return;
       const key = keyEl.value;
-      titleEl.textContent = `${key} ${type === 'pentatonicMinor' ? 'Minor Pentatonic' : type === 'minor' ? 'Minor' : 'Major'}`;
-      svgEl.innerHTML = this._buildScaleSvg(key, SCALE_INTERVALS[type] || SCALE_INTERVALS.major);
+      titleEl.textContent = `${key} ${scale.name}`;
+      svgEl.innerHTML = this._buildScaleSvg(key, scale.intervals || []);
+      helpEl.innerHTML = window.renderHelpCard({
+        title: `${scale.name} quick help`,
+        description: scale.description,
+        bullets: [
+          `Mood: ${scale.mood}`,
+          `Genres: ${scale.genres.join(', ')}`,
+          `Fits over: ${scale.fits_over}`,
+        ],
+        storageKey: 'df_help_tool_scales',
+      });
+      window.bindHelpCards(helpEl);
     };
 
     keyEl.addEventListener('change', renderScale);
@@ -67,11 +76,11 @@ Pages.Scales = {
   },
 
   _buildScaleSvg(key, intervals) {
-    const width = 660;
-    const height = 230;
-    const margin = 24;
-    const stringGap = 34;
-    const fretGap = 50;
+    const width = 760;
+    const height = 280;
+    const margin = 54;
+    const stringGap = 32;
+    const fretGap = 48;
     const maxFrets = 12;
 
     const rootIndex = NOTE_INDEX[key];
@@ -87,6 +96,11 @@ Pages.Scales = {
       return `<line x1="${margin}" y1="${y}" x2="${margin + fretGap * maxFrets}" y2="${y}" stroke="var(--line2)" stroke-width="1.5" />`;
     }).join('');
 
+    const stringLabels = STRING_LABELS.map((label, stringIdx) => {
+      const y = margin + stringIdx * stringGap + 4;
+      return `<text x="12" y="${y}" fill="var(--text3)" font-size="10">${label}</text>`;
+    }).join('');
+
     const markers = [];
     for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
       const openIndex = NOTE_INDEX[STRING_OPEN_NOTES[stringIdx]];
@@ -96,16 +110,17 @@ Pages.Scales = {
         if (!scaleNotes.has(noteIndex)) continue;
         const x = margin + fret * fretGap;
         const isRoot = noteIndex === rootIndex;
-        markers.push(`<circle cx="${x}" cy="${y}" r="${isRoot ? 9 : 6}" fill="${isRoot ? 'var(--accent)' : 'var(--text2)'}" />`);
+        markers.push(`<circle cx="${x}" cy="${y}" r="${isRoot ? 8 : 5.5}" fill="${isRoot ? 'var(--accent)' : 'var(--text2)'}" />`);
       }
     }
 
     const fretLabels = Array.from({ length: maxFrets + 1 }, (_, fret) => `<text x="${margin + fret * fretGap}" y="${height - 10}" text-anchor="middle" fill="var(--text3)" font-size="11">${fret}</text>`).join('');
 
     return `
-      <svg viewBox="0 0 ${width} ${height}" width="100%" height="230" role="img" aria-label="Scale fretboard diagram">
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="250" role="img" aria-label="Scale fretboard diagram">
         ${stringLines}
         ${fretLines}
+        ${stringLabels}
         ${markers.join('')}
         ${fretLabels}
       </svg>
