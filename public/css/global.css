@@ -1596,9 +1596,9 @@ select.df-input option {
 }
 
 .dashboard-panel {
-  margin-bottom: 22px;
+  margin-bottom: 18px;
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .dashboard-panel .section-header {
@@ -1620,7 +1620,7 @@ select.df-input option {
 }
 
 .dashboard-panel--calendar {
-  margin-bottom: 20px !important;
+  margin-bottom: 18px !important;
 }
 
 /* ============================================================
@@ -2642,7 +2642,7 @@ select.df-input option {
   }
 
   .dashboard-panel {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
 
   .session-row {
@@ -2706,7 +2706,7 @@ select.df-input option {
   font-family: var(--f-mono);
   font-size: 11px;
   padding: 8px 12px;
-  border-radius: 999px !important;
+  border-radius: 8px !important;
   transition: transform 0.14s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, background 0.18s ease;
 }
 
