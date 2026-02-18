@@ -343,6 +343,29 @@
       return api(`/api/training-videos/${id}`, { method: 'DELETE' });
     },
 
+    async uploadTrainingVideoFile(id, file, onProgress) {
+      const form = new FormData();
+      form.append('file', file);
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/training/videos/${encodeURIComponent(id)}/upload`);
+        xhr.responseType = 'json';
+        xhr.onload = () => {
+          const body = xhr.response || {};
+          if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+          else reject(new Error(body.error || `upload failed (${xhr.status})`));
+        };
+        xhr.onerror = () => reject(new Error('upload failed'));
+        if (xhr.upload && typeof onProgress === 'function') {
+          xhr.upload.onprogress = (event) => {
+            if (!event.lengthComputable) return;
+            onProgress(Math.round((event.loaded / event.total) * 100));
+          };
+        }
+        xhr.send(form);
+      });
+    },
+
 
     async getTrainingVideoProgress(id) {
       return api(`/api/training/videos/${id}/progress`);

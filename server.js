@@ -2,7 +2,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execSync, exec } = require('child_process');
+const { execSync, exec, spawn } = require('child_process');
+const crypto = require('crypto');
 const https = require('https');
 const JSZip = require('jszip');
 const multer = require('multer');
@@ -14,15 +15,30 @@ const PORT = process.env.PORT || 9999;
 const presetMediaDir = '/data/presets';
 const gearMediaDir = '/data/gear';
 const uploadsDir = '/data/uploads';
+const trainingVideosDir = '/data/uploads/training-videos';
+const trainingThumbsDir = '/data/uploads/training-thumbs';
 const presetAudioDir = '/data/uploads/preset-audio';
+const trainingUploadMaxMb = Number(process.env.TRAINING_UPLOAD_MAX_MB ?? 2048);
+const trainingUploadMaxBytes = Number.isFinite(trainingUploadMaxMb) && trainingUploadMaxMb > 0 ? Math.floor(trainingUploadMaxMb * 1024 * 1024) : 0;
 if (!fs.existsSync(presetMediaDir)) fs.mkdirSync(presetMediaDir, { recursive: true });
 if (!fs.existsSync(gearMediaDir)) fs.mkdirSync(gearMediaDir, { recursive: true });
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fs.existsSync(trainingVideosDir)) fs.mkdirSync(trainingVideosDir, { recursive: true });
+if (!fs.existsSync(trainingThumbsDir)) fs.mkdirSync(trainingThumbsDir, { recursive: true });
 if (!fs.existsSync(presetAudioDir)) fs.mkdirSync(presetAudioDir, { recursive: true });
 const restoreBackupDir = '/data/_restore_backup';
 if (!fs.existsSync(restoreBackupDir)) fs.mkdirSync(restoreBackupDir, { recursive: true });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 * 1024 } });
+const trainingVideoUpload = multer({
+  storage: multer.memoryStorage(),
+  ...(trainingUploadMaxBytes > 0 ? { limits: { fileSize: trainingUploadMaxBytes } } : {}),
+  fileFilter: (req, file, cb) => {
+    const allowed = ['video/mp4', 'video/webm', 'video/ogg'];
+    if (!allowed.includes(file.mimetype)) return cb(new Error('unsupported file type'));
+    cb(null, true);
+  },
+});
 const attachmentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
@@ -186,6 +202,56 @@ function sanitizeUploadFileName(name = '') {
 
 function getVideoIdFromUrl(value) {
   return extractYouTubeId(value);
+}
+
+
+
+function resolveTrainingThumb(video = {}) {
+  return video.thumbnail_url || video.thumb_url || video.thumbUrl || '';
+}
+
+function resolveTrainingWatchUrl(video = {}) {
+  if (video.source_type === 'upload' && video.upload_url) return video.upload_url;
+  return video.youtube_url || video.url || '';
+}
+
+function filePathFromUploadUrl(url, expectedDir) {
+  if (!url || typeof url !== 'string' || !url.startsWith('/uploads/')) return null;
+  const relative = url.slice('/uploads/'.length);
+  const fullPath = path.join(uploadsDir, relative);
+  if (!fullPath.startsWith(expectedDir)) return null;
+  return fullPath;
+}
+
+function safeUnlink(fullPath) {
+  if (!fullPath) return;
+  try {
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  } catch (error) {
+    console.warn('[training] failed to delete file', fullPath, error.message || error);
+  }
+}
+
+function hasFfmpeg() {
+  return new Promise((resolve) => {
+    const child = spawn('ffmpeg', ['-version']);
+    child.on('error', () => resolve(false));
+    child.on('exit', (code) => resolve(code === 0));
+  });
+}
+
+function generateVideoThumbnail(videoFilePath, thumbFilePath) {
+  return new Promise((resolve, reject) => {
+    const args = ['-y', '-ss', '2', '-i', videoFilePath, '-frames:v', '1', '-q:v', '2', thumbFilePath];
+    const child = spawn('ffmpeg', args);
+    let err = '';
+    child.stderr.on('data', (chunk) => { err += String(chunk || ''); });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) return resolve(true);
+      reject(new Error(err || `ffmpeg exited ${code}`));
+    });
+  });
 }
 
 function extractYouTubeId(value) {
@@ -951,14 +1017,19 @@ apiRouter.get('/training-videos', (req, res) => {
     difficulty_level: Number.isFinite(level) ? level : undefined,
     includeProgress: req.query.includeProgress,
   });
-  res.json(rows);
+  res.json(rows.map((row) => ({ ...row, thumbUrl: resolveTrainingThumb(row), thumb_url: resolveTrainingThumb(row), thumbnail_url: resolveTrainingThumb(row), watch_url: resolveTrainingWatchUrl(row) })));
 });
 
 apiRouter.get('/training-videos/:id', (req, res) => {
   const row = Store.getTrainingVideo(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
+  const thumb = resolveTrainingThumb(row);
   return res.json({
     ...row,
+    thumbUrl: thumb,
+    thumb_url: thumb,
+    thumbnail_url: thumb,
+    watch_url: resolveTrainingWatchUrl(row),
     timestamps: Store.listVideoTimestamps(req.params.id),
     playlists: Store.listPlaylistsByVideo(req.params.id),
   });
@@ -981,19 +1052,69 @@ apiRouter.put('/training/videos/:id/progress', (req, res) => {
   return res.json(Store.saveTrainingVideoProgress(req.params.id, changes));
 });
 
+apiRouter.post('/training/videos/:id/upload', trainingVideoUpload.single('file'), async (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  if (!req.file?.buffer?.length) return res.status(400).json({ error: 'file is required' });
+
+  const ext = (path.extname(req.file.originalname || '').replace(/[^a-zA-Z0-9.]/g, '').toLowerCase() || '.mp4').slice(0, 10);
+  const safeExt = ext.startsWith('.') ? ext : `.${ext}`;
+  const unique = `${Number(req.params.id)}-${crypto.randomUUID()}`;
+  const fileName = `${unique}${safeExt}`;
+  const videoPath = path.join(trainingVideosDir, fileName);
+  fs.writeFileSync(videoPath, req.file.buffer);
+
+  let thumbnailUrl = null;
+  try {
+    const ffmpegReady = await hasFfmpeg();
+    if (ffmpegReady) {
+      const thumbName = `${unique}.jpg`;
+      const thumbPath = path.join(trainingThumbsDir, thumbName);
+      await generateVideoThumbnail(videoPath, thumbPath);
+      thumbnailUrl = `/uploads/training-thumbs/${thumbName}`;
+    }
+  } catch (error) {
+    console.warn('[training] thumbnail generation failed:', error.message || error);
+  }
+
+  const saved = Store.saveTrainingVideoUpload(req.params.id, {
+    upload_url: `/uploads/training-videos/${fileName}`,
+    upload_mime: req.file.mimetype || '',
+    upload_size: req.file.size || req.file.buffer.length || 0,
+    upload_original_name: req.file.originalname || fileName,
+    thumbnail_url: thumbnailUrl,
+  });
+
+  return res.json({ ...saved, thumbnail_url: saved.thumbnail_url || saved.thumb_url || saved.thumbUrl || null });
+});
+
 apiRouter.post('/training-videos', async (req, res) => {
   const payload = req.body || {};
-  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.url);
-  if (!payload.url) return res.status(400).json({ error: 'url is required' });
+  const sourceType = String(payload.source_type || payload.sourceType || 'youtube').toLowerCase() === 'upload' ? 'upload' : 'youtube';
+  if (sourceType === 'upload') {
+    const savedUpload = Store.saveTrainingVideo({
+      ...payload,
+      source_type: 'upload',
+      provider: payload.provider || 'upload',
+      youtube_url: payload.youtube_url || '',
+      url: payload.url || payload.youtube_url || '',
+      thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || '',
+    });
+    return res.status(201).json(savedUpload);
+  }
+
+  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.youtube_url || payload.url);
+  const youtubeUrl = payload.youtube_url || payload.url;
+  if (!youtubeUrl) return res.status(400).json({ error: 'url is required' });
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if (!payload.title || !payload.thumbUrl) {
+  if (!payload.title || !(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url)) {
     try {
       const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
       payload.title = payload.title || meta.title || '';
-      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || meta.thumbnail_url || '';
+      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || meta.thumbnail_url || '';
     } catch {}
   }
-  const saved = Store.saveTrainingVideo({ ...payload, provider: payload.provider || 'youtube', videoId });
+  const saved = Store.saveTrainingVideo({ ...payload, source_type: 'youtube', provider: payload.provider || 'youtube', videoId, youtube_url: youtubeUrl, url: youtubeUrl, thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || '' });
   return res.status(201).json(saved);
 });
 
@@ -1001,22 +1122,44 @@ apiRouter.put('/training-videos/:id', async (req, res) => {
   const existing = Store.getTrainingVideo(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const payload = req.body || {};
-  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.url || existing.url) || existing.videoId;
+  const sourceType = String(payload.source_type || payload.sourceType || existing.source_type || 'youtube').toLowerCase() === 'upload' ? 'upload' : 'youtube';
+
+  if (sourceType === 'upload') {
+    const savedUpload = Store.saveTrainingVideo({
+      ...existing,
+      ...payload,
+      id: Number(req.params.id),
+      source_type: 'upload',
+      provider: payload.provider || existing.provider || 'upload',
+      thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || existing.thumbnail_url || existing.thumb_url || existing.thumbUrl || '',
+    });
+    return res.json(savedUpload);
+  }
+
+  const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.youtube_url || payload.url || existing.youtube_url || existing.url) || existing.videoId;
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if ((!payload.title && !existing.title) || (!payload.thumbUrl && !payload.thumb_url && !existing.thumbUrl)) {
+  if ((!payload.title && !existing.title) || (!(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) && !(existing.thumbUrl || existing.thumb_url || existing.thumbnail_url))) {
     try {
       const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
       payload.title = payload.title || existing.title || meta.title || '';
-      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || existing.thumbUrl || meta.thumbnail_url || '';
+      payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || existing.thumbUrl || existing.thumb_url || existing.thumbnail_url || meta.thumbnail_url || '';
     } catch {}
   }
-  const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), videoId, provider: payload.provider || existing.provider || 'youtube' });
+  const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), source_type: 'youtube', youtube_url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', videoId, provider: payload.provider || existing.provider || 'youtube', thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || existing.thumbnail_url || '' });
   return res.json(saved);
 });
 
 apiRouter.delete('/training-videos/:id', (req, res) => {
   const existing = Store.getTrainingVideo(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
+
+  if (existing.source_type === 'upload' && existing.upload_url) {
+    safeUnlink(filePathFromUploadUrl(existing.upload_url, trainingVideosDir));
+    if (String(existing.thumbnail_url || '').startsWith('/uploads/training-thumbs/')) {
+      safeUnlink(filePathFromUploadUrl(existing.thumbnail_url, trainingThumbsDir));
+    }
+  }
+
   Store.deleteTrainingVideo(req.params.id);
   return res.json({ ok: true });
 });
@@ -1430,14 +1573,7 @@ app.use('/api', (req, res) => {
 
 app.use('/media/presets', express.static(presetMediaDir));
 app.use('/media/gear', express.static(gearMediaDir));
-app.get('/uploads/:file', (req, res) => {
-  const file = path.basename(String(req.params.file || ''));
-  if (!/^[a-zA-Z0-9._-]+$/.test(file)) return res.status(400).json({ error: 'invalid file path' });
-  const fullPath = path.join(uploadsDir, file);
-  if (!fullPath.startsWith(uploadsDir)) return res.status(400).json({ error: 'invalid file path' });
-  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'not found' });
-  return res.sendFile(fullPath);
-});
+app.use('/uploads', express.static('/data/uploads', { maxAge: 0 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SPA fallback — return index.html for any unmatched route

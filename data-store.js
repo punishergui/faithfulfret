@@ -305,6 +305,18 @@ ensureColumn('training_videos', 'difficulty_track', "TEXT CHECK(difficulty_track
 ensureColumn('training_videos', 'difficulty_level', 'INTEGER CHECK(difficulty_level IN (1,2,3))');
 ensureColumn('training_videos', 'thumb_url', 'TEXT');
 ensureColumn('training_videos', 'video_id', 'TEXT');
+ensureColumn('training_videos', 'source_type', "TEXT NOT NULL DEFAULT 'youtube'");
+ensureColumn('training_videos', 'youtube_url', 'TEXT');
+ensureColumn('training_videos', 'upload_url', 'TEXT');
+ensureColumn('training_videos', 'upload_mime', 'TEXT');
+ensureColumn('training_videos', 'upload_size', 'INTEGER');
+ensureColumn('training_videos', 'upload_original_name', 'TEXT');
+ensureColumn('training_videos', 'thumbnail_url', 'TEXT');
+db.prepare(`UPDATE training_videos
+  SET source_type = COALESCE(NULLIF(source_type, ''), 'youtube'),
+      youtube_url = COALESCE(NULLIF(youtube_url, ''), NULLIF(url, '')),
+      thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), NULLIF(thumb_url, ''), NULLIF(thumbUrl, ''))
+  WHERE 1=1`).run();
 ensureColumn('video_playlists', 'name', 'TEXT');
 ensureColumn('video_playlists', 'description', 'TEXT');
 ensureColumn('video_playlists', 'createdAt', 'INTEGER');
@@ -679,6 +691,11 @@ function coerceTrainingVideo(input = {}) {
   const track = input.difficulty_track || input.difficultyTrack || input.difficulty || '';
   const levelRaw = input.difficulty_level || input.difficultyLevel || null;
   const levelNum = levelRaw == null || levelRaw === '' ? null : Number(levelRaw);
+  const sourceTypeRaw = String(input.source_type || input.sourceType || '').trim().toLowerCase();
+  const source_type = sourceTypeRaw === 'upload' ? 'upload' : 'youtube';
+  const youtube_url = input.youtube_url || input.youtubeUrl || input.url || '';
+  const upload_url = input.upload_url || input.uploadUrl || '';
+  const thumbnail_url = input.thumbnail_url || input.thumbnailUrl || input.thumb_url || input.thumbUrl || '';
   return {
     id: input.id == null || input.id === '' ? null : Number(input.id),
     url: input.url || '',
@@ -686,7 +703,14 @@ function coerceTrainingVideo(input = {}) {
     videoId: input.videoId || input.video_id || '',
     title: input.title || '',
     author: input.author || '',
-    thumbUrl: input.thumbUrl || input.thumb_url || '',
+    thumbUrl: thumbnail_url,
+    source_type,
+    youtube_url,
+    upload_url,
+    upload_mime: input.upload_mime || input.uploadMime || '',
+    upload_size: n(input.upload_size ?? input.uploadSize),
+    upload_original_name: input.upload_original_name || input.uploadOriginalName || '',
+    thumbnail_url,
     tags: Array.isArray(input.tags) ? input.tags.join(',') : (input.tags || ''),
     difficulty: input.difficulty || track,
     difficulty_track: track || null,
@@ -952,14 +976,37 @@ const saveTrainingVideo = (data) => {
   const existing = row.id ? getTrainingVideo(row.id) : null;
   const createdAt = existing?.createdAt || row.createdAt;
   if (existing) {
-    db.prepare(`UPDATE training_videos SET url=@url, provider=@provider, videoId=@videoId, video_id=@videoId, title=@title, author=@author, thumbUrl=@thumbUrl, thumb_url=@thumbUrl, tags=@tags, difficulty=@difficulty, difficulty_track=@difficulty_track, difficulty_level=@difficulty_level, category=@category, notes=@notes, description_html=@description_html, description_text=@description_text, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id`)
+    db.prepare(`UPDATE training_videos SET url=@url, provider=@provider, source_type=@source_type, youtube_url=@youtube_url, upload_url=@upload_url, upload_mime=@upload_mime, upload_size=@upload_size, upload_original_name=@upload_original_name, thumbnail_url=@thumbnail_url, videoId=@videoId, video_id=@videoId, title=@title, author=@author, thumbUrl=@thumbUrl, thumb_url=@thumbUrl, tags=@tags, difficulty=@difficulty, difficulty_track=@difficulty_track, difficulty_level=@difficulty_level, category=@category, notes=@notes, description_html=@description_html, description_text=@description_text, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id`)
       .run({ ...row, createdAt, updatedAt: Date.now() });
     return getTrainingVideo(row.id);
   }
-  const result = db.prepare(`INSERT INTO training_videos (url,provider,videoId,video_id,title,author,thumbUrl,thumb_url,tags,difficulty,difficulty_track,difficulty_level,category,notes,description_html,description_text,createdAt,updatedAt)
-    VALUES (@url,@provider,@videoId,@videoId,@title,@author,@thumbUrl,@thumbUrl,@tags,@difficulty,@difficulty_track,@difficulty_level,@category,@notes,@description_html,@description_text,@createdAt,@updatedAt)`)
+  const result = db.prepare(`INSERT INTO training_videos (url,provider,source_type,youtube_url,upload_url,upload_mime,upload_size,upload_original_name,thumbnail_url,videoId,video_id,title,author,thumbUrl,thumb_url,tags,difficulty,difficulty_track,difficulty_level,category,notes,description_html,description_text,createdAt,updatedAt)
+    VALUES (@url,@provider,@source_type,@youtube_url,@upload_url,@upload_mime,@upload_size,@upload_original_name,@thumbnail_url,@videoId,@videoId,@title,@author,@thumbUrl,@thumbUrl,@tags,@difficulty,@difficulty_track,@difficulty_level,@category,@notes,@description_html,@description_text,@createdAt,@updatedAt)`)
     .run({ ...row, createdAt, updatedAt: Date.now() });
   return getTrainingVideo(result.lastInsertRowid);
+};
+
+const saveTrainingVideoUpload = (id, data = {}) => {
+  run(`UPDATE training_videos
+    SET source_type = 'upload',
+        upload_url = @upload_url,
+        upload_mime = @upload_mime,
+        upload_size = @upload_size,
+        upload_original_name = @upload_original_name,
+        thumbnail_url = COALESCE(@thumbnail_url, thumbnail_url),
+        thumbUrl = COALESCE(@thumbnail_url, thumbnail_url, thumbUrl),
+        thumb_url = COALESCE(@thumbnail_url, thumbnail_url, thumb_url),
+        updatedAt = @updatedAt
+    WHERE id = @id`, {
+    id: Number(id),
+    upload_url: data.upload_url || '',
+    upload_mime: data.upload_mime || '',
+    upload_size: n(data.upload_size),
+    upload_original_name: data.upload_original_name || '',
+    thumbnail_url: data.thumbnail_url || null,
+    updatedAt: Date.now(),
+  });
+  return getTrainingVideo(id);
 };
 const deleteTrainingVideo = (id) => {
   const tx = db.transaction((targetId) => {
@@ -1051,7 +1098,7 @@ const listVideoPlaylists = () => all(`
       WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
     ) AS video_count,
     (
-      SELECT COALESCE(v.thumb_url, v.thumbUrl, '')
+      SELECT COALESCE(v.thumbnail_url, v.thumb_url, v.thumbUrl, '')
       FROM video_playlist_items i
       JOIN training_videos v ON v.id = COALESCE(i.video_id, i.videoId)
       WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
@@ -1590,4 +1637,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
