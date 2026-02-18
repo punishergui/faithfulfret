@@ -63,6 +63,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
+After deploy, verify uploaded training videos: upload mp4/webm/ogg in Edit Video, playback works in Video Detail, and if ffmpeg is missing the UI shows "Thumbnail pending / ffmpeg not installed" instead of broken images.
 After deploy, verify Training Playlists list uses 70/30 layout (cards left, create/sort sidebar right), cards open on click, and each card thumbnail matches the first playlist video by position (or placeholder when empty).
 After deploy, verify Playlist detail thumbnails keep a fixed 16:9 size with object-fit cover and do not squish when reorder/remove controls are visible.
 After deploy, verify Dashboard → Start Practice works: Continue Last Video, Continue Last Playlist, and Quick Start Playlist should enable only after opening training content, and should show helper text when empty.
@@ -534,7 +535,8 @@ MIT — do whatever you want with it.
 - `POST /api/attachments` (multipart form-data)
 - `GET /api/attachments?entity_type=lesson&entity_id=123`
 - `DELETE /api/attachments/:id`
-- `GET /uploads/:file` (validated file serving from `/data/uploads`)
+- `POST /api/training/videos/:id/upload` (multipart upload field: `file`, stores self-hosted training videos)
+- `GET /uploads/...` (static serving from `/data/uploads`, including `training-videos/` + `training-thumbs/`)
 
 ### New DB schema (idempotent)
 
@@ -567,7 +569,8 @@ Indexes:
 ### Upload/storage behavior
 
 - Upload directory: `/data/uploads` (created automatically on startup)
-- Max file size: `25MB`
+- Training video upload max size: `TRAINING_UPLOAD_MAX_MB` (default `2048`, set `0` for unlimited app-level limit)
+- Generic attachment max file size: `25MB`
 - Allowed MIME: `application/pdf`, `image/png`, `image/jpeg`, `image/webp`
 
 ### localStorage keys used
@@ -603,6 +606,10 @@ curl -s http://127.0.0.1:3000/api/lessons | jq
 curl -s http://127.0.0.1:3000/api/attachments?entity_type=lesson\&entity_id=1 | jq
 curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ' | jq
 
+
+# Training upload env (self-hosted videos)
+# default 2048 MB, set 0 for unlimited app-level cap
+TRAINING_UPLOAD_MAX_MB=2048
 # UI quick-start checks
 # 1) open #/training/videos/<id>, verify timer Start/Pause/Reset appears and df_last_video_id updates
 # 2) open #/training/playlists/<id>, click a video title, verify df_playlist_progress updates
