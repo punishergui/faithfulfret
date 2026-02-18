@@ -187,6 +187,7 @@ Pages.Progressions = {
 
     const pausePractice = () => {
       if (modeState !== 'countin' && modeState !== 'playing') return;
+      window.progressMem?.practicePauseOrStop?.();
       stopMetronome();
       modeState = 'paused';
       renderPracticePanel();
@@ -195,6 +196,7 @@ Pages.Progressions = {
 
     const stopPractice = () => {
       writeLastPractice();
+      window.progressMem?.practicePauseOrStop?.();
       stopMetronome();
       modeState = 'stopped';
       activeChordIndex = 0;
@@ -220,6 +222,13 @@ Pages.Progressions = {
       practiceTickOffset = countInBeatsDone + progressionBeatsDone;
 
       writeLastPractice();
+      const [keyRoot, keyMode] = keyEl.value.split('|');
+      const keyLabel = keyRoot && keyMode ? `${keyRoot} ${keyMode.charAt(0).toUpperCase()}${keyMode.slice(1)}` : null;
+      window.progressMem?.practiceStart?.({
+        tool: 'progressions',
+        key: keyLabel,
+        progressionId: progressionToId(activeProgression),
+      });
 
       window.FFMetronome.startMetronome({
         bpm,

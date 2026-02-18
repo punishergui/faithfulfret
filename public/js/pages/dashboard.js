@@ -37,12 +37,14 @@ Pages.Dashboard = {
     const topResources = resources.slice(0, 5);
     const quickStart = this._readQuickStart();
     const lastPractice = Utils.getLastPractice();
+    const progressSummary = window.progressMem?.getSummary?.() || null;
 
     app.innerHTML = `
       ${this._renderHero(stats)}
       ${this._renderStatBar(stats)}
       <div class="page-wrap" style="padding:32px 24px;">
         ${this._renderStartPractice(quickStart)}
+        ${this._renderProgressMemory(progressSummary)}
         ${this._renderLastPracticeSnapshot(lastPractice)}
         ${this._renderNextUp(lastPractice)}
         <div class="two-col" style="align-items:start;">
@@ -98,6 +100,41 @@ Pages.Dashboard = {
     const recentPlaylists = (Array.isArray(recentPlaylistsRaw) ? recentPlaylistsRaw : []).slice(0, 3);
     const recentVideos = (Array.isArray(recentVideosRaw) ? recentVideosRaw : []).slice(0, 5);
     return { lastVideoId, playlistProgress, recentPlaylists, recentVideos };
+  },
+
+
+  _formatProgId(progId) {
+    if (!progId) return null;
+    return String(progId).split('-').filter(Boolean).join('–');
+  },
+
+  _renderProgressMemory(summary) {
+    const hasData = summary && (summary.weekMinutes > 0 || summary.totalMinutes > 0 || summary.streak.current > 0);
+    const topKey = summary?.topKeyWeek ? `${summary.topKeyWeek.name} (${summary.topKeyWeek.minutes} min)` : '—';
+    const topProg = summary?.topProgWeek ? `${this._formatProgId(summary.topProgWeek.name)} (${summary.topProgWeek.minutes} min)` : '—';
+    return `
+      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Progress Memory</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
+            <div style="font-size:12px;color:var(--text3);">Streak</div>
+            <div style="font-size:16px;font-family:var(--f-mono);">Streak: ${summary?.streak?.current || 0} days</div>
+            <div style="font-size:12px;color:var(--text2);">Best: ${summary?.streak?.best || 0}</div>
+          </div>
+          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
+            <div style="font-size:12px;color:var(--text3);">Minutes</div>
+            <div style="font-size:16px;font-family:var(--f-mono);">This week: ${summary?.weekMinutes || 0} min</div>
+            <div style="font-size:12px;color:var(--text2);">Total: ${summary?.totalMinutes || 0} min</div>
+          </div>
+          <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;background:var(--bg2);">
+            <div style="font-size:12px;color:var(--text3);">Most Practiced (This Week)</div>
+            <div style="font-size:13px;">Top key: ${topKey}</div>
+            <div style="font-size:13px;color:var(--text2);">Top progression: ${topProg}</div>
+          </div>
+        </div>
+        ${hasData ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">Start Practice Mode to build stats.</div>'}
+      </div>
+    `;
   },
 
   _renderStartPractice(data) {
