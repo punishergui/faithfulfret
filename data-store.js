@@ -585,25 +585,93 @@ function stripHtmlToText(value = '') {
 }
 
 function sanitizeTrainingDescriptionHtml(input = '') {
-  let html = String(input || '');
-  if (!html.trim()) return '';
-  html = html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<\/?(?:script|style|iframe|object|embed|svg|math)[^>]*>/gi, '')
-    .replace(/<(\/?)([a-z0-9]+)([^>]*)>/gi, (full, slash, tag, attrs) => {
-      const t = String(tag || '').toLowerCase();
-      const allowed = new Set(['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a']);
-      if (!allowed.has(t)) return '';
-      if (slash) return `</${t}>`;
-      if (t === 'br') return '<br>';
-      if (t !== 'a') return `<${t}>`;
-      const hrefMatch = String(attrs || '').match(/href\s*=\s*(["'])(.*?)\1/i) || String(attrs || '').match(/href\s*=\s*([^\s>]+)/i);
-      const href = hrefMatch ? String(hrefMatch[2] || hrefMatch[1] || '').trim() : '';
-      if (!/^https?:\/\//i.test(href)) return '<a>';
-      const safeHref = href.replace(/"/g, '&quot;');
-      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`;
-    });
-  return html.trim();
+  const raw = String(input || '');
+  if (!raw.trim()) return '';
+  const allowedTags = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
+  const allowedColors = new Set(['accent', 'text', 'muted', 'teal', 'blue', 'purple', 'pink', 'orange', 'yellow', 'green']);
+  const stack = [];
+  const output = [];
+  const tagRegex = /<[^>]*>/g;
+  let lastIdx = 0;
+
+  const decodeEntities = (value = '') => String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+
+  const esc = (value = '') => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const parseAttrs = (chunk = '') => {
+    const attrs = {};
+    const attrRegex = /(\w[\w:-]*)\s*=\s*(["'])(.*?)\2|(\w[\w:-]*)\s*=\s*([^\s"'>]+)/g;
+    let match;
+    while ((match = attrRegex.exec(chunk))) {
+      const name = String(match[1] || match[4] || '').toLowerCase();
+      const value = decodeEntities(match[3] || match[5] || '').trim();
+      attrs[name] = value;
+    }
+    return attrs;
+  };
+
+  let match;
+  while ((match = tagRegex.exec(raw))) {
+    const textChunk = raw.slice(lastIdx, match.index);
+    if (textChunk) output.push(esc(decodeEntities(textChunk)));
+    lastIdx = tagRegex.lastIndex;
+
+    const token = match[0];
+    if (/^<!--/.test(token)) continue;
+    const tagMatch = token.match(/^<\s*(\/)?\s*([a-z0-9]+)([\s\S]*?)\/?\s*>$/i);
+    if (!tagMatch) continue;
+    const closing = Boolean(tagMatch[1]);
+    const tag = String(tagMatch[2] || '').toLowerCase();
+    const attrsChunk = String(tagMatch[3] || '');
+    const selfClosing = /\/>$/.test(token) || tag === 'br' || tag === 'hr';
+    if (!allowedTags.has(tag)) continue;
+
+    if (closing) {
+      const idx = stack.lastIndexOf(tag);
+      if (idx === -1) continue;
+      while (stack.length > idx) {
+        const closeTag = stack.pop();
+        output.push(`</${closeTag}>`);
+      }
+      continue;
+    }
+
+    if (tag === 'a') {
+      const attrs = parseAttrs(attrsChunk);
+      const href = String(attrs.href || '').trim();
+      if (!/^https?:\/\//i.test(href)) continue;
+      output.push(`<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">`);
+      stack.push('a');
+      continue;
+    }
+
+    if (tag === 'span') {
+      const attrs = parseAttrs(attrsChunk);
+      const color = String(attrs['data-color'] || '').trim();
+      if (!allowedColors.has(color)) continue;
+      output.push(`<span data-color="${esc(color)}">`);
+      stack.push('span');
+      continue;
+    }
+
+    output.push(`<${tag}>`);
+    if (!selfClosing) stack.push(tag);
+  }
+
+  const tail = raw.slice(lastIdx);
+  if (tail) output.push(esc(decodeEntities(tail)));
+  while (stack.length) output.push(`</${stack.pop()}>`);
+  return output.join('').trim();
 }
 
 function coerceTrainingVideo(input = {}) {

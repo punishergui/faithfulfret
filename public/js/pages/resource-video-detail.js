@@ -10,7 +10,10 @@ function escHtml(value) {
 }
 
 function toLegacyDescriptionHtml(video) {
-  if (String(video.description_html || '').trim()) return String(video.description_html);
+  const sanitize = window.TrainingDescription?.sanitizeHtml;
+  if (String(video.description_html || '').trim()) {
+    return typeof sanitize === 'function' ? sanitize(String(video.description_html)) : String(video.description_html);
+  }
   const fallback = String(video.description_text || video.notes || '').trim();
   if (!fallback) return '';
   return `<p>${escHtml(fallback).replace(/\n/g, '<br>')}</p>`;
@@ -127,7 +130,7 @@ Pages.ResourceVideoDetail = {
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
           <div style="margin-top:12px;">
             <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Description</div>
-            ${descriptionHtml ? `<div style="color:var(--text2);display:grid;gap:6px;">${descriptionHtml}</div>` : '<div style="color:var(--text3);font-size:13px;">No description yet.</div>'}
+            ${descriptionHtml ? `<div class="training-description-content">${descriptionHtml}</div>` : '<div style="color:var(--text3);font-size:13px;">No description yet.</div>'}
           </div>
         </div>
 

@@ -1,5 +1,29 @@
 window.Pages = window.Pages || {};
 
+const TRAINING_TEXT_COLORS = Object.freeze([
+  { key: 'accent', label: 'Accent', value: 'var(--accent)' },
+  { key: 'text', label: 'Text', value: 'var(--text)' },
+  { key: 'muted', label: 'Muted', value: 'var(--text2)' },
+  { key: 'teal', label: 'Teal', value: '#14b8a6' },
+  { key: 'blue', label: 'Blue', value: '#60a5fa' },
+  { key: 'purple', label: 'Purple', value: '#a78bfa' },
+  { key: 'pink', label: 'Pink', value: '#f472b6' },
+  { key: 'orange', label: 'Orange', value: '#fb923c' },
+  { key: 'yellow', label: 'Yellow', value: '#facc15' },
+  { key: 'green', label: 'Green', value: '#4ade80' },
+]);
+
+const TRAINING_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
+const TRAINING_ALLOWED_COLORS = new Set(TRAINING_TEXT_COLORS.map((item) => item.key));
+
+const TRAINING_EMOJI_CATEGORIES = [
+  { key: 'smileys', label: 'Smileys', items: ['😀', '😄', '😁', '😎', '🤩', '🥳', '😌', '🤔', '🔥', '🎯'] },
+  { key: 'hands', label: 'Hands', items: ['👍', '👎', '👏', '🙌', '🤟', '✌️', '🤘', '🙏', '👊', '🤝'] },
+  { key: 'music', label: 'Music', items: ['🎸', '🎵', '🎶', '🎼', '🥁', '🎤', '🎧', '🎹', '🎺', '🎷'] },
+  { key: 'objects', label: 'Objects', items: ['📘', '📝', '📌', '📎', '🎬', '📷', '💡', '✅', '⏱️', '🧠'] },
+  { key: 'symbols', label: 'Symbols', items: ['⭐', '✅', '❌', '⚡', '💯', '➕', '➖', '➡️', '⬅️', '🔁'] },
+];
+
 function escHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -24,16 +48,85 @@ function stripHtmlToText(html = '') {
   return String(html || '')
     .replace(/<br\s*\/?\>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
+    .replace(/<\/h[23]>/gi, '\n')
+    .replace(/<\/blockquote>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<hr\s*\/?\>/gi, '\n---\n')
     .replace(/<[^>]*>/g, '')
     .replace(/\u00a0/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
+function sanitizeTrainingDescriptionHtml(input = '') {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = String(input || '');
+
+  const sanitizeLink = (node) => {
+    const href = String(node.getAttribute('href') || '').trim();
+    if (!/^https?:\/\//i.test(href)) {
+      node.replaceWith(document.createTextNode(node.textContent || ''));
+      return;
+    }
+    node.setAttribute('href', href);
+    node.setAttribute('target', '_blank');
+    node.setAttribute('rel', 'noopener noreferrer');
+  };
+
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return;
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      node.remove();
+      return;
+    }
+    const tag = node.tagName.toLowerCase();
+    if (!TRAINING_ALLOWED_TAGS.has(tag)) {
+      const parent = node.parentNode;
+      while (node.firstChild) parent.insertBefore(node.firstChild, node);
+      parent.removeChild(node);
+      return;
+    }
+
+    [...node.attributes].forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on')) {
+        node.removeAttribute(attr.name);
+        return;
+      }
+      if (tag === 'a' && ['href', 'target', 'rel'].includes(name)) return;
+      if (tag === 'span' && name === 'data-color') return;
+      node.removeAttribute(attr.name);
+    });
+
+    if (tag === 'a') sanitizeLink(node);
+    if (tag === 'span') {
+      const color = String(node.getAttribute('data-color') || '').trim();
+      if (!TRAINING_ALLOWED_COLORS.has(color)) {
+        const parent = node.parentNode;
+        while (node.firstChild) parent.insertBefore(node.firstChild, node);
+        parent.removeChild(node);
+        return;
+      }
+    }
+
+    [...node.childNodes].forEach(walk);
+  };
+
+  [...wrap.childNodes].forEach(walk);
+  return wrap.innerHTML.trim();
+}
+
+window.TrainingDescription = window.TrainingDescription || {
+  sanitizeHtml: sanitizeTrainingDescriptionHtml,
+  stripHtmlToText,
+  colors: TRAINING_TEXT_COLORS,
+};
+
 function renderVideoForm(video, options = {}) {
   const isEdit = !!options.isEdit;
   const attachments = Array.isArray(options.attachments) ? options.attachments : [];
   const data = video || { url: '', title: '', author: '', thumbUrl: '', tags: '', category: 'general', difficulty_track: '', difficulty_level: '', notes: '' };
+  const colorButtons = TRAINING_TEXT_COLORS.map((item) => `<button type="button" class="training-rich-editor__btn training-rich-editor__color" data-rich-color="${item.key}" title="${item.label}"><span style="background:${item.value};"></span></button>`).join('');
 
   return `
     <form id="video-form" class="df-panel df-panel--wide" style="padding:16px;">
@@ -60,12 +153,28 @@ function renderVideoForm(video, options = {}) {
             <button type="button" class="training-rich-editor__btn" data-rich-cmd="bold">Bold</button>
             <button type="button" class="training-rich-editor__btn" data-rich-cmd="italic">Italic</button>
             <button type="button" class="training-rich-editor__btn" data-rich-cmd="underline">Underline</button>
-            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertUnorderedList">Bullet List</button>
-            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertOrderedList">Numbered List</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="strikeThrough">Strike</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-block="h2">H2</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-block="h3">H3</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertUnorderedList">Bullets</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertOrderedList">Numbered</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-quote="1">Quote</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-inline-code="1">Inline code</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-code-block="1">Code block</button>
             <button type="button" class="training-rich-editor__btn" data-rich-link="1">Link</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-hr="1">HR</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="undo">Undo</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="redo">Redo</button>
             <button type="button" class="training-rich-editor__btn" data-rich-clear="1">Clear</button>
+            <span class="training-rich-editor__group">${colorButtons}<button type="button" class="training-rich-editor__btn" data-rich-color-reset="1">Reset color</button></span>
+            <button type="button" class="training-rich-editor__btn" data-rich-emoji-toggle="1" aria-expanded="false">😀 Emoji</button>
           </div>
           <div id="video-description-editor" class="training-rich-editor__surface" contenteditable="true" data-placeholder="Add a description...">${normalizeEditorSeed(data)}</div>
+          <div id="video-emoji-popover" class="training-emoji-popover" hidden>
+            <input type="search" class="df-input training-emoji-popover__search" placeholder="Search emoji" aria-label="Search emoji">
+            <div class="training-emoji-popover__tabs">${TRAINING_EMOJI_CATEGORIES.map((cat, idx) => `<button type="button" class="training-rich-editor__btn ${idx === 0 ? 'is-active' : ''}" data-emoji-tab="${cat.key}">${cat.label}</button>`).join('')}</div>
+            ${TRAINING_EMOJI_CATEGORIES.map((cat, idx) => `<div class="training-emoji-popover__panel" data-emoji-panel="${cat.key}" ${idx === 0 ? '' : 'hidden'}>${cat.items.map((emoji) => `<button type="button" class="training-emoji-popover__item" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join('')}</div>`).join('')}
+          </div>
         </div>
         <input type="hidden" name="description_html" value="">
         <input type="hidden" name="description_text" value="">
@@ -83,28 +192,32 @@ function renderVideoForm(video, options = {}) {
       <form id="attachment-link-form" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:10px;">
         <input name="title" class="df-input" placeholder="Link title">
         <input name="url" class="df-input" placeholder="https://..." required>
-        <button class="df-btn df-btn--outline">Add Link</button>
+        <button type="submit" class="df-btn df-btn--outline">Add Link</button>
       </form>
       <form id="attachment-file-form" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px;">
-        <input type="file" name="file" class="df-input" accept="application/pdf,image/png,image/jpeg,image/webp" required>
-        <button class="df-btn df-btn--outline">Upload PDF/Image</button>
+        <input name="file" type="file" class="df-input" accept="application/pdf,image/*" required>
+        <button type="submit" class="df-btn df-btn--outline">Upload</button>
       </form>
-      <div id="attachment-list">${attachments.map((row) => `<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:8px 0;"><a href="${escHtml(row.url)}" target="_blank" rel="noopener">${escHtml(row.title || row.filename || row.url)}</a><button class="df-btn df-btn--danger" style="padding:4px 8px;" data-del-attachment="${row.id}">Delete</button></div>`).join('') || '<div style="color:var(--text3);">No attachments yet.</div>'}</div>` : '<div style="color:var(--text3);">Save the video first to add attachments.</div>'}
+      ` : '<p style="color:var(--text3);">Save the video first to add attachments.</p>'}
+      <div style="display:grid;gap:8px;">
+        ${attachments.length ? attachments.map((item) => `<div class="df-panel" style="padding:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;"><a href="${escHtml(item.url || '')}" target="_blank" rel="noopener">${escHtml(item.title || item.kind || 'Attachment')}</a>${isEdit ? `<button type="button" class="df-btn df-btn--outline" data-del-attachment="${item.id}">Delete</button>` : ''}</div>`).join('') : '<p style="color:var(--text3);margin:0;">No attachments yet.</p>'}
+      </div>
     </div>
   `;
 }
 
 Pages.ResourceVideosEdit = {
   async render(id) {
-    const isEdit = !!id;
     const app = document.getElementById('app');
-    app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
-    const video = isEdit ? await DB.getTrainingVideo(id) : null;
+    const isEdit = Boolean(id);
+    const [video, attachments] = await Promise.all([
+      isEdit ? DB.getTrainingVideo(id) : Promise.resolve(null),
+      isEdit ? DB.getVideoAttachments(id) : Promise.resolve([]),
+    ]);
     if (isEdit && !video) {
       app.innerHTML = '<div class="page-wrap" style="padding:24px;color:var(--text2);">Video not found.</div>';
       return;
     }
-    const attachments = isEdit ? await DB.getVideoAttachments(id) : [];
 
     app.innerHTML = `
       ${Utils.renderPageHero({ title: isEdit ? 'Edit Video' : 'New Video', leftExtra: Utils.renderBreadcrumbs([{ label: 'Training', href: '#/training' }, { label: 'Videos', href: '#/training/videos' }, { label: isEdit ? (video?.title || 'Video') : 'New Video' }]) })}
@@ -132,54 +245,89 @@ Pages.ResourceVideosEdit = {
       wrap.style.display = 'block';
       wrap.querySelector('img').src = url;
     };
-
     app.querySelector('[name="thumbUrl"]')?.addEventListener('input', updateThumbPreview);
 
     const editor = app.querySelector('#video-description-editor');
-    const applyCmd = (cmd) => {
-      if (!editor) return;
-      editor.focus();
-      document.execCommand(cmd, false, null);
+    const emojiToggleBtn = app.querySelector('[data-rich-emoji-toggle]');
+    const emojiPopover = app.querySelector('#video-emoji-popover');
+    const emojiSearch = app.querySelector('.training-emoji-popover__search');
+    let savedRange = null;
+
+    const saveSelection = () => {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      if (editor?.contains(range.commonAncestorContainer)) savedRange = range.cloneRange();
     };
 
-    const sanitizeDescriptionHtml = (html = '') => {
-      const allowed = new Set(['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a']);
-      const wrap = document.createElement('div');
-      wrap.innerHTML = String(html || '');
-      const walk = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) return;
-        if (node.nodeType !== Node.ELEMENT_NODE) {
-          node.remove();
-          return;
-        }
-        const tag = node.tagName.toLowerCase();
-        if (!allowed.has(tag)) {
-          const parent = node.parentNode;
-          while (node.firstChild) parent.insertBefore(node.firstChild, node);
-          parent.removeChild(node);
-          return;
-        }
-        [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
-        if (tag === 'a') {
-          const href = String(node.getAttribute('href') || '').trim();
-          if (!/^https?:\/\//i.test(href)) {
-            const textNode = document.createTextNode(node.textContent || '');
-            node.replaceWith(textNode);
-            return;
-          }
-          node.setAttribute('href', href);
-          node.setAttribute('target', '_blank');
-          node.setAttribute('rel', 'noopener noreferrer');
-        }
-        [...node.childNodes].forEach(walk);
-      };
-      [...wrap.childNodes].forEach(walk);
-      return wrap.innerHTML.trim();
+    const restoreSelection = () => {
+      if (!savedRange) return;
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
     };
+
+    const applyCmd = (cmd, value = null) => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      document.execCommand(cmd, false, value);
+      saveSelection();
+    };
+
+    const wrapSelectionWithHtml = (html) => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      document.execCommand('insertHTML', false, html);
+      saveSelection();
+    };
+
+    const selectionText = () => {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return '';
+      return String(selection.toString() || '');
+    };
+
+    const togglePopover = (show) => {
+      if (!emojiPopover || !emojiToggleBtn) return;
+      const open = Boolean(show);
+      emojiPopover.hidden = !open;
+      emojiToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        const rect = emojiToggleBtn.getBoundingClientRect();
+        const parentRect = emojiToggleBtn.closest('.training-rich-editor').getBoundingClientRect();
+        emojiPopover.style.left = `${Math.max(8, rect.left - parentRect.left)}px`;
+      }
+    };
+
+    editor?.addEventListener('keyup', saveSelection);
+    editor?.addEventListener('mouseup', saveSelection);
+    editor?.addEventListener('input', saveSelection);
 
     app.querySelectorAll('[data-rich-cmd]').forEach((button) => {
       button.addEventListener('click', () => applyCmd(button.dataset.richCmd));
     });
+
+    app.querySelectorAll('[data-rich-block]').forEach((button) => {
+      button.addEventListener('click', () => applyCmd('formatBlock', button.dataset.richBlock));
+    });
+
+    app.querySelector('[data-rich-quote]')?.addEventListener('click', () => applyCmd('formatBlock', 'blockquote'));
+    app.querySelector('[data-rich-hr]')?.addEventListener('click', () => applyCmd('insertHorizontalRule'));
+
+    app.querySelector('[data-rich-inline-code]')?.addEventListener('click', () => {
+      const raw = selectionText();
+      const text = raw || 'code';
+      wrapSelectionWithHtml(`<code>${escHtml(text)}</code>`);
+    });
+
+    app.querySelector('[data-rich-code-block]')?.addEventListener('click', () => {
+      const raw = selectionText();
+      const text = raw || 'code block';
+      wrapSelectionWithHtml(`<pre><code>${escHtml(text)}</code></pre>`);
+    });
+
     app.querySelector('[data-rich-link]')?.addEventListener('click', () => {
       if (!editor) return;
       const raw = prompt('Enter URL (https://...)');
@@ -189,10 +337,82 @@ Pages.ResourceVideosEdit = {
         showStatus('Links must start with http:// or https://');
         return;
       }
-      editor.focus();
-      document.execCommand('createLink', false, url);
+      applyCmd('createLink', url);
     });
-    app.querySelector('[data-rich-clear]')?.addEventListener('click', () => applyCmd('removeFormat'));
+
+    app.querySelector('[data-rich-clear]')?.addEventListener('click', () => {
+      applyCmd('removeFormat');
+      applyCmd('unlink');
+    });
+
+    app.querySelectorAll('[data-rich-color]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const color = button.dataset.richColor;
+        if (!TRAINING_ALLOWED_COLORS.has(color)) return;
+        const raw = selectionText();
+        const text = raw || 'text';
+        wrapSelectionWithHtml(`<span data-color="${color}">${escHtml(text)}</span>`);
+      });
+    });
+
+    app.querySelector('[data-rich-color-reset]')?.addEventListener('click', () => {
+      const raw = selectionText();
+      if (!raw) return;
+      wrapSelectionWithHtml(escHtml(raw));
+    });
+
+    emojiToggleBtn?.addEventListener('click', () => {
+      saveSelection();
+      togglePopover(emojiPopover.hidden);
+    });
+
+    app.querySelectorAll('[data-emoji-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        app.querySelectorAll('[data-emoji-tab]').forEach((tab) => tab.classList.remove('is-active'));
+        button.classList.add('is-active');
+        const key = button.dataset.emojiTab;
+        app.querySelectorAll('[data-emoji-panel]').forEach((panel) => {
+          panel.hidden = panel.dataset.emojiPanel !== key;
+        });
+      });
+    });
+
+    app.querySelectorAll('[data-emoji]').forEach((button) => {
+      button.addEventListener('click', () => {
+        wrapSelectionWithHtml(escHtml(button.dataset.emoji || ''));
+        togglePopover(false);
+      });
+    });
+
+    emojiSearch?.addEventListener('input', () => {
+      const q = String(emojiSearch.value || '').trim().toLowerCase();
+      app.querySelectorAll('[data-emoji]').forEach((button) => {
+        const value = String(button.dataset.emoji || '').toLowerCase();
+        button.hidden = q && !value.includes(q);
+      });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') togglePopover(false);
+    });
+
+    document.addEventListener('click', (event) => {
+      if (emojiPopover.hidden) return;
+      if (emojiPopover.contains(event.target) || emojiToggleBtn.contains(event.target)) return;
+      togglePopover(false);
+    });
+
+    editor?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && event.shiftKey) {
+        event.preventDefault();
+        applyCmd('insertLineBreak');
+      }
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        applyCmd('insertParagraph');
+      }
+    });
+
     editor?.addEventListener('paste', (event) => {
       event.preventDefault();
       const text = event.clipboardData?.getData('text/plain') || '';
@@ -223,7 +443,7 @@ Pages.ResourceVideosEdit = {
       const formData = new FormData(event.target);
       const payload = Object.fromEntries(formData.entries());
       payload.tags = String(payload.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).join(',');
-      const html = sanitizeDescriptionHtml(editor?.innerHTML || '');
+      const html = sanitizeTrainingDescriptionHtml(editor?.innerHTML || '');
       payload.description_html = html;
       payload.description_text = stripHtmlToText(html);
       payload.notes = payload.description_text;
