@@ -67,6 +67,7 @@ After deploy, create an export from **Stats → Data Management** and confirm th
 After deploy, verify Tools routes load: `#/tools`, `#/tools/tunings`, `#/tools/metronome`, `#/tools/chords`, `#/tools/scales`, `#/tools/progressions`, and `#/tools/chord-chart`; then set BPM once in Metronome and confirm `localStorage.df_last_bpm` updates.
 After deploy, in Progressions confirm key changes refresh diatonic chords + progression diagrams, and in Chord Chart confirm Print View toggles a clean white export layout for poster-style references.
 After deploy, verify Dashboard → Progress Memory updates only after Practice Mode Start/Stop in Progressions/Scales (streak, week/total minutes, top key, and top progression).
+After deploy, verify Dashboard has no top stats strip; Progress Memory is the single stats area and includes Practice Summary rows for sessions/week, total sessions, and total hours without duplicate metrics.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
