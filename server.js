@@ -1037,7 +1037,14 @@ apiRouter.delete('/video-timestamps/:id', (req, res) => {
 });
 
 apiRouter.get('/video-playlists', (req, res) => {
-  const playlists = Store.listVideoPlaylists();
+  const playlists = Store.listVideoPlaylists().map((playlist) => {
+    const items = Store.listPlaylistItems(playlist.id);
+    return {
+      ...playlist,
+      items,
+      video_count: Number(playlist.video_count) || items.length,
+    };
+  });
   return res.json(playlists);
 });
 

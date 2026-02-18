@@ -96,24 +96,6 @@ Pages.ResourceVideosList = {
       this.viewMode = this.viewMode === 'grid' ? 'list' : 'grid';
       await this.render();
     });
-
-    app.querySelectorAll('[data-toggle-watched]').forEach((button) => {
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        await DB.saveTrainingVideoProgress(button.dataset.toggleWatched, { watched: button.dataset.next === '1' });
-        await this.render();
-      });
-    });
-
-    app.querySelectorAll('[data-toggle-mastered]').forEach((button) => {
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        await DB.saveTrainingVideoProgress(button.dataset.toggleMastered, { mastered: button.dataset.next === '1' });
-        await this.render();
-      });
-    });
   },
 
   applyProgressFilterAndSort(videos = [], progressFilter = 'all', sort = 'recentlyAdded') {
@@ -143,20 +125,21 @@ Pages.ResourceVideosList = {
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
     const difficulty = video.difficulty_track && video.difficulty_level ? `${video.difficulty_track} ${video.difficulty_level}` : (video.difficulty || '');
     const thumb = video.thumbUrl || video.thumb_url || '';
-    const statusBadges = `${video.watched_at ? '<span class="training-status-badge">Watched</span>' : ''}${video.mastered_at ? '<span class="training-status-badge is-mastered">Mastered</span>' : ''}`;
-    const actionBar = `<div class="training-card-actions"><button class="df-btn df-btn--outline" data-toggle-watched="${video.id}" data-next="${video.watched_at ? '0' : '1'}">${video.watched_at ? 'Unwatch' : 'Watched'}</button><button class="df-btn df-btn--outline" data-toggle-mastered="${video.id}" data-next="${video.mastered_at ? '0' : '1'}">${video.mastered_at ? 'Unmaster' : 'Mastered'}</button><a href="#/training/videos/${video.id}" class="df-btn df-btn--ghost">Notes</a></div>`;
-    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '100px' : '150px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : '<div class="training-thumb-fallback">🎬</div>';
+    const progressTags = [
+      video.watched_at ? '<span class="training-status-badge">WATCHED</span>' : '',
+      video.mastered_at ? '<span class="training-status-badge is-mastered">MASTERED</span>' : '',
+      video.notes_preview ? '<span class="training-status-badge">📝 NOTES</span>' : '',
+    ].filter(Boolean).join('');
+    const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${progressTags}`;
+    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '120px' : '170px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : '<div class="training-thumb-fallback">🎬</div>';
 
     if (viewMode === 'list') {
-      return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">${thumbHtml}
+      return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">${thumbHtml}
         <div style="min-width:0;">
           <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
-          <div class="training-status-row">${statusBadges || '<span style="color:var(--text3);font-size:12px;">Unwatched</span>'}</div>
-          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"><span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
-          ${video.notes_preview ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;">${video.notes_preview}</div>` : ''}
-          ${actionBar}
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
         </div>
       </a>`;
     }
@@ -165,10 +148,7 @@ Pages.ResourceVideosList = {
       <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
-      <div class="training-status-row">${statusBadges || '<span style="color:var(--text3);font-size:12px;">Unwatched</span>'}</div>
-      ${video.notes_preview ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;">${video.notes_preview}</div>` : ''}
-      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"><span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
-      ${actionBar}
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
     </a>`;
   },
 

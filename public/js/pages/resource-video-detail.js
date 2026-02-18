@@ -86,63 +86,64 @@ Pages.ResourceVideoDetail = {
 
     app.innerHTML = `
       ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '' })}
-      <div class="page-wrap" style="padding:24px 24px 60px;display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;">
+      <div class="page-wrap training-video-detail-layout" style="padding:24px 24px 60px;display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;">
         <div class="df-panel" style="padding:12px;">
           <iframe title="${video.title || ''}" src="${embedBase}" style="width:100%;height:420px;border:0;border-radius:12px;background:var(--bg2);" allowfullscreen loading="lazy"></iframe>
           <div style="margin-top:10px;color:var(--text2);">${video.author || ''}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
           <div style="margin-top:8px;color:var(--text2);">Difficulty: ${video.difficulty || '—'}</div>
           <div style="margin-top:12px;white-space:pre-wrap;color:var(--text2);">${video.notes || ''}</div>
-          <div class="df-panel" style="padding:10px;margin-top:12px;display:grid;gap:8px;">
+          <div class="df-panel" style="padding:12px;margin-top:12px;">
+            <div style="font-weight:700;margin-bottom:10px;">Attachments</div>
+            ${(attachments || []).map((item) => `<div style="border-top:1px solid var(--line);padding:8px 0;"><a href="${item.url}" target="_blank" rel="noopener">${item.title || item.filename || item.url}</a></div>`).join('') || '<div style="color:var(--text3);">No attachments.</div>'}
+          </div>
+        </div>
+
+        <div style="display:grid;gap:12px;align-content:start;">
+          <div class="df-panel" style="padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+              <div style="font-weight:700;">Timestamps</div>
+              <button id="add-timestamp-toggle" class="df-btn df-btn--outline" type="button">Add Timestamp</button>
+            </div>
+            <form id="timestamp-form" style="display:none;margin-bottom:12px;">
+              <input class="df-input" name="label" placeholder="Label" required style="margin-bottom:8px;">
+              <input class="df-input" name="seconds" placeholder="mm:ss or seconds" required style="margin-bottom:8px;">
+              <textarea class="df-input" name="notes" rows="2" placeholder="Notes"></textarea>
+              <button class="df-btn df-btn--primary" type="submit" style="margin-top:8px;">Save Timestamp</button>
+            </form>
+            <div id="timestamp-list">${(video.timestamps || []).map((stamp) => this.renderTimestamp(stamp, embedBase)).join('') || '<div style="color:var(--text3);">No timestamps yet.</div>'}</div>
+          </div>
+
+          <div class="df-panel" style="padding:12px;display:grid;gap:10px;">
+            <div style="font-weight:700;">Practice & Notes</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button id="video-progress-watched" type="button" class="df-btn df-btn--outline">${progress.watched_at ? 'Unwatch' : 'Mark Watched'}</button>
-              <button id="video-progress-mastered" type="button" class="df-btn df-btn--outline">${progress.mastered_at ? 'Unmaster' : 'Mark Mastered'}</button>
+              <button id="video-progress-watched" type="button" class="df-btn df-btn--outline training-compact-btn">${progress.watched_at ? 'Watched' : 'Mark Watched'}</button>
+              <button id="video-progress-mastered" type="button" class="df-btn df-btn--outline training-compact-btn">${progress.mastered_at ? 'Mastered' : 'Mark Mastered'}</button>
             </div>
             <div style="display:grid;gap:6px;">
               <textarea id="video-progress-notes" class="df-input" rows="4" placeholder="Personal notes">${progress.notes || ''}</textarea>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <button id="video-progress-save" class="df-btn df-btn--primary" type="button">Save Notes</button>
-                <div style="color:var(--text3);font-size:12px;">${progress.watched_at ? `Watched ${new Date(progress.watched_at).toLocaleDateString()}` : 'Not watched yet'}${progress.mastered_at ? ` • Mastered ${new Date(progress.mastered_at).toLocaleDateString()}` : ''}</div>
+              <button id="video-progress-save" class="df-btn df-btn--outline" type="button" style="display:none;justify-self:flex-start;">Save Notes</button>
+              <div style="color:var(--text3);font-size:12px;">${progress.watched_at ? `Watched ${new Date(progress.watched_at).toLocaleDateString()}` : 'Not watched yet'}${progress.mastered_at ? ` • Mastered ${new Date(progress.mastered_at).toLocaleDateString()}` : ''}</div>
+            </div>
+            <div class="df-panel" style="padding:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);">Practice Timer</div>
+                <div id="video-timer-display" style="font-family:var(--f-mono);font-size:16px;">00:00</div>
+              </div>
+              <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="video-timer-start" type="button" class="df-btn df-btn--outline training-compact-btn">Start</button>
+                <button id="video-timer-pause" type="button" class="df-btn df-btn--outline training-compact-btn">Pause</button>
+                <button id="video-timer-reset" type="button" class="df-btn df-btn--outline training-compact-btn">Reset</button>
               </div>
             </div>
-          </div>
-          <div class="df-panel" style="padding:10px;margin-top:12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);">Practice Timer</div>
-              <div id="video-timer-display" style="font-family:var(--f-mono);font-size:16px;">00:00</div>
-            </div>
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-              <button id="video-timer-start" type="button" class="df-btn df-btn--primary">Start</button>
-              <button id="video-timer-pause" type="button" class="df-btn df-btn--outline">Pause</button>
-              <button id="video-timer-reset" type="button" class="df-btn df-btn--outline">Reset</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <a class="df-btn df-btn--outline" href="#/training/videos/${video.id}/edit">Edit Video</a>
+              <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || video.video_id || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Session</a>
             </div>
           </div>
-          <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
-            <button id="add-timestamp-toggle" class="df-btn df-btn--outline">Add Timestamp</button>
-            <a class="df-btn df-btn--outline" href="#/training/videos/${video.id}/edit">Edit Video</a>
-            <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || video.video_id || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Session</a>
-          </div>
-        </div>
-
-        <div class="df-panel" style="padding:12px;">
-          <div style="font-weight:700;margin-bottom:10px;">Timestamps</div>
-          <form id="timestamp-form" style="display:none;margin-bottom:12px;">
-            <input class="df-input" name="label" placeholder="Label" required style="margin-bottom:8px;">
-            <input class="df-input" name="seconds" placeholder="mm:ss or seconds" required style="margin-bottom:8px;">
-            <textarea class="df-input" name="notes" rows="2" placeholder="Notes"></textarea>
-            <button class="df-btn df-btn--primary" type="submit" style="margin-top:8px;">Save Timestamp</button>
-          </form>
-          <div id="timestamp-list">${(video.timestamps || []).map((stamp) => this.renderTimestamp(stamp, embedBase)).join('') || '<div style="color:var(--text3);">No timestamps yet.</div>'}</div>
         </div>
       </div>
-      
-        <div class="df-panel" style="padding:12px;">
-          <div style="font-weight:700;margin-bottom:10px;">Attachments</div>
-          ${(attachments || []).map((item) => `<div style="border-top:1px solid var(--line);padding:8px 0;"><a href="${item.url}" target="_blank" rel="noopener">${item.title || item.filename || item.url}</a></div>`).join('') || '<div style="color:var(--text3);">No attachments.</div>'}
-        </div>
-
     `;
-
     app.querySelector('#add-timestamp-toggle')?.addEventListener('click', () => {
       const form = app.querySelector('#timestamp-form');
       if (!form) return;
@@ -178,9 +179,21 @@ Pages.ResourceVideoDetail = {
       await this.render(video.id);
     });
 
-    app.querySelector('#video-progress-save')?.addEventListener('click', async () => {
-      const notes = app.querySelector('#video-progress-notes')?.value || '';
-      await DB.saveTrainingVideoProgress(video.id, { notes });
+    const notesEl = app.querySelector('#video-progress-notes');
+    const saveNotesBtn = app.querySelector('#video-progress-save');
+    const initialNotes = progress.notes || '';
+    const syncDirtyState = () => {
+      if (!notesEl || !saveNotesBtn) return;
+      const dirty = notesEl.value !== initialNotes;
+      saveNotesBtn.style.display = dirty ? 'inline-flex' : 'none';
+      saveNotesBtn.disabled = !dirty;
+    };
+    notesEl?.addEventListener('input', syncDirtyState);
+    syncDirtyState();
+
+    saveNotesBtn?.addEventListener('click', async () => {
+      if (!notesEl) return;
+      await DB.saveTrainingVideoProgress(video.id, { notes: notesEl.value || '' });
       await this.render(video.id);
     });
 

@@ -925,7 +925,17 @@ const saveVideoTimestamp = (data) => {
 };
 const deleteVideoTimestamp = (id) => run('DELETE FROM video_timestamps WHERE id = ?', Number(id));
 
-const listVideoPlaylists = () => all('SELECT * FROM video_playlists ORDER BY COALESCE(sort_order, 0) ASC, name COLLATE NOCASE ASC');
+const listVideoPlaylists = () => all(`
+  SELECT
+    p.*,
+    (
+      SELECT COUNT(*)
+      FROM video_playlist_items i
+      WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
+    ) AS video_count
+  FROM video_playlists p
+  ORDER BY COALESCE(p.sort_order, 0) ASC, p.name COLLATE NOCASE ASC
+`);
 const getVideoPlaylist = (id) => one('SELECT * FROM video_playlists WHERE id = ?', Number(id));
 const saveVideoPlaylist = (data) => {
   const row = coerceVideoPlaylist(data);
