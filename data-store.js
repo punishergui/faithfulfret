@@ -943,7 +943,15 @@ const listVideoPlaylists = () => all(`
       SELECT COUNT(*)
       FROM video_playlist_items i
       WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
-    ) AS video_count
+    ) AS video_count,
+    (
+      SELECT COALESCE(v.thumb_url, v.thumbUrl, '')
+      FROM video_playlist_items i
+      JOIN training_videos v ON v.id = COALESCE(i.video_id, i.videoId)
+      WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
+      ORDER BY COALESCE(i.position, 0) ASC, i.id ASC
+      LIMIT 1
+    ) AS preview_thumbnail_url
   FROM video_playlists p
   ORDER BY COALESCE(p.sort_order, 0) ASC, p.name COLLATE NOCASE ASC
 `);
