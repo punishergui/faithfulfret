@@ -2277,9 +2277,9 @@ select.df-input option {
 }
 
 .session-video {
-  max-width: 700px;
-  margin: 32px auto;
-  padding: 0 24px;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 0;
 }
 
 .session-video-nav {
@@ -2353,10 +2353,17 @@ select.df-input option {
 .session-body {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 24px 24px 32px;
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: 24px;
+  align-items: start;
+}
+
+.session-main {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
 }
 
 .session-win {
@@ -2409,7 +2416,12 @@ select.df-input option {
 }
 
 .session-sidebar {
-  flex-shrink: 0;
+  min-width: 0;
+}
+
+.session-sidebar__card {
+  position: sticky;
+  top: 12px;
 }
 
 .session-stat-row {
@@ -2657,6 +2669,10 @@ select.df-input option {
 @media (max-width: 860px) {
   .session-body {
     grid-template-columns: 1fr;
+  }
+
+  .session-sidebar__card {
+    position: static;
   }
 }
 
@@ -3172,26 +3188,24 @@ body.print-view .chord-chart-row {
   color: var(--text);
 }
 
-.training-rich-editor__surface [data-color="accent"],
-.training-description-content [data-color="accent"] { color: var(--accent); }
 .training-rich-editor__surface [data-color="text"],
 .training-description-content [data-color="text"] { color: var(--text); }
 .training-rich-editor__surface [data-color="muted"],
 .training-description-content [data-color="muted"] { color: var(--text2); }
-.training-rich-editor__surface [data-color="teal"],
-.training-description-content [data-color="teal"] { color: #14b8a6; }
-.training-rich-editor__surface [data-color="blue"],
-.training-description-content [data-color="blue"] { color: #60a5fa; }
-.training-rich-editor__surface [data-color="purple"],
-.training-description-content [data-color="purple"] { color: #a78bfa; }
-.training-rich-editor__surface [data-color="pink"],
-.training-description-content [data-color="pink"] { color: #f472b6; }
-.training-rich-editor__surface [data-color="orange"],
-.training-description-content [data-color="orange"] { color: #fb923c; }
-.training-rich-editor__surface [data-color="yellow"],
-.training-description-content [data-color="yellow"] { color: #facc15; }
-.training-rich-editor__surface [data-color="green"],
-.training-description-content [data-color="green"] { color: #4ade80; }
+.training-rich-editor__surface [data-color="accent"],
+.training-description-content [data-color="accent"] { color: var(--accent); }
+.training-rich-editor__surface [data-color="accent2"],
+.training-description-content [data-color="accent2"] { color: var(--accent2, var(--accent)); }
+.training-rich-editor__surface [data-color="success"],
+.training-description-content [data-color="success"] { color: var(--good, var(--success, color-mix(in srgb, var(--accent) 65%, #22c55e 35%))); }
+.training-rich-editor__surface [data-color="warn"],
+.training-description-content [data-color="warn"] { color: var(--warn, color-mix(in srgb, var(--accent) 45%, #f59e0b 55%)); }
+.training-rich-editor__surface [data-color="danger"],
+.training-description-content [data-color="danger"] { color: var(--bad, var(--danger, color-mix(in srgb, var(--accent) 30%, #ef4444 70%))); }
+.training-rich-editor__surface [data-color="soft"],
+.training-description-content [data-color="soft"] { color: var(--text3); }
+.training-rich-editor__surface [data-color="neutral"],
+.training-description-content [data-color="neutral"] { color: color-mix(in srgb, var(--text) 70%, var(--bg) 30%); }
 
 .training-rich-editor__surface pre,
 .training-description-content pre {
@@ -3199,7 +3213,8 @@ body.print-view .chord-chart-row {
   border: 1px solid var(--line2);
   border-radius: 8px;
   padding: 10px;
-  overflow-x: auto;
+  overflow: auto;
+  white-space: pre;
 }
 
 .training-rich-editor__surface blockquote,
@@ -3214,6 +3229,11 @@ body.print-view .chord-chart-row {
 .training-description-content code {
   font-family: var(--f-mono);
   font-size: 0.95em;
+}
+
+.training-rich-editor__surface pre code,
+.training-description-content pre code {
+  display: block;
 }
 
 .training-description-content {
