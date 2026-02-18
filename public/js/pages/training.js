@@ -21,7 +21,7 @@ function writeLocalJson(key, value) {
 function pushRecentPlaylist(playlist) {
   const list = readLocalJson('df_recent_playlists', []);
   const safe = Array.isArray(list) ? list : [];
-  const next = [{ id: Number(playlist.id), name: playlist.name || `Playlist ${playlist.id}`, usedAt: new Date().toISOString() }, ...safe.filter((item) => Number(item?.id) !== Number(playlist.id))].slice(0, 3);
+  const next = [{ id: Number(playlist.id), name: playlist.name || `Playlist ${playlist.id}`, at: Date.now() }, ...safe.filter((item) => Number(item?.id) !== Number(playlist.id))].slice(0, 3);
   writeLocalJson('df_recent_playlists', next);
 }
 
@@ -29,7 +29,7 @@ function savePlaylistProgress(playlistId, lastVideoId) {
   writeLocalJson('df_playlist_progress', {
     playlistId: Number(playlistId),
     lastVideoId: Number(lastVideoId),
-    updatedAt: new Date().toISOString(),
+    updatedAt: Date.now(),
   });
 }
 

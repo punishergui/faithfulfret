@@ -101,21 +101,27 @@ Pages.Dashboard = {
     const hasPlaylist = Number(data.playlistProgress?.playlistId) > 0;
     const hasRecentPlaylists = data.recentPlaylists.length > 0;
     return `
-      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide" id="start-practice-card" style="padding:14px;margin-bottom:16px;">
         <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Start Practice</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button type="button" id="sp-last-video" class="df-btn df-btn--primary" ${hasVideo ? '' : 'disabled'}>Continue Last Video</button>
-          <button type="button" id="sp-last-playlist" class="df-btn df-btn--outline" ${hasPlaylist ? '' : 'disabled'}>Continue Last Playlist</button>
+          <button type="button" class="df-btn df-btn--primary" data-action="continue-last-video" ${hasVideo ? '' : 'disabled'}>Continue Last Video</button>
+          <button type="button" class="df-btn df-btn--outline" data-action="continue-last-playlist" ${hasPlaylist ? '' : 'disabled'}>Continue Last Playlist</button>
           <select id="sp-playlist-select" class="df-input" style="max-width:260px;" ${hasRecentPlaylists ? '' : 'disabled'}>
-            <option value="">Quick Start Playlist</option>
+            <option value="">Quick Start Playlist…</option>
             ${data.recentPlaylists.map((item) => `<option value="${Number(item.id)}">${item.name || `Playlist ${item.id}`}</option>`).join('')}
           </select>
           <a href="#/training/videos" class="df-btn df-btn--outline">Browse Training</a>
         </div>
-        ${hasVideo || hasPlaylist || hasRecentPlaylists ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">No recent training activity yet. Open any training video or playlist to enable quick start.</div>'}
+        <div style="margin-top:8px;display:grid;gap:4px;">
+          ${hasVideo ? '' : '<div style="color:var(--text3);font-size:12px;">Open a video first.</div>'}
+          ${hasPlaylist ? '' : '<div style="color:var(--text3);font-size:12px;">Open a playlist first.</div>'}
+          ${hasRecentPlaylists ? '' : '<div style="color:var(--text3);font-size:12px;">Open a playlist first.</div>'}
+        </div>
+        <div id="sp-message" style="display:none;margin-top:8px;color:#fecaca;background:rgba(185,28,28,.16);border:1px solid rgba(185,28,28,.4);padding:8px;border-radius:8px;font-size:12px;"></div>
       </div>
     `;
   },
+
 
   _renderRecentActivity(data) {
     const fmt = (iso) => {
@@ -133,31 +139,64 @@ Pages.Dashboard = {
         </div>
         <div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Playlists</div>
-          ${(data.recentPlaylists || []).length ? data.recentPlaylists.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/playlists/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.name || `Playlist ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.usedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent playlists yet.</div>'}
+          ${(data.recentPlaylists || []).length ? data.recentPlaylists.map((item) => `<div style="border-top:1px solid var(--line);padding:6px 0;"><a href="#/training/playlists/${Number(item.id)}" style="color:var(--text);text-decoration:none;">${item.name || `Playlist ${item.id}`}</a><div style="color:var(--text3);font-size:11px;">${fmt(item.at || item.usedAt)}</div></div>`).join('') : '<div style="color:var(--text3);font-size:12px;">No recent playlists yet.</div>'}
         </div>
       </div>
     `;
   },
 
   _initStartPractice(container, data) {
-    container.querySelector('#sp-last-video')?.addEventListener('click', () => {
-      if (!Number(data.lastVideoId)) return;
-      go(`#/training/videos/${Number(data.lastVideoId)}`);
+    const card = container.querySelector('#start-practice-card');
+    if (!card) return;
+    const messageEl = card.querySelector('#sp-message');
+    const showMessage = (message) => {
+      if (!messageEl) return;
+      messageEl.textContent = message;
+      messageEl.style.display = 'block';
+    };
+
+    card.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+      const action = button.dataset.action;
+      if (action === 'continue-last-video') {
+        if (!Number(data.lastVideoId)) {
+          showMessage('Open a video first.');
+          return;
+        }
+        go(`#/training/videos/${Number(data.lastVideoId)}`);
+        return;
+      }
+      if (action === 'continue-last-playlist') {
+        const progress = data.playlistProgress || {};
+        if (!Number(progress.playlistId)) {
+          showMessage('Open a playlist first.');
+          return;
+        }
+        const query = Number(progress.lastVideoId) ? `?resumeVideoId=${Number(progress.lastVideoId)}` : '';
+        go(`#/training/playlists/${Number(progress.playlistId)}${query}`);
+      }
     });
 
-    container.querySelector('#sp-last-playlist')?.addEventListener('click', () => {
-      const progress = data.playlistProgress || {};
-      if (!Number(progress.playlistId)) return;
-      const query = Number(progress.lastVideoId) ? `?resumeVideoId=${Number(progress.lastVideoId)}` : '';
-      go(`#/training/playlists/${Number(progress.playlistId)}${query}`);
-    });
-
-    container.querySelector('#sp-playlist-select')?.addEventListener('change', (event) => {
+    const select = card.querySelector('#sp-playlist-select');
+    select?.addEventListener('change', (event) => {
       const playlistId = Number(event.target.value || 0);
-      if (!playlistId) return;
+      if (!playlistId) {
+        showMessage('Open a playlist first.');
+        event.target.value = '';
+        return;
+      }
+      const exists = (data.recentPlaylists || []).some((item) => Number(item?.id) === playlistId);
+      if (!exists) {
+        showMessage('Selected playlist is unavailable.');
+        event.target.value = '';
+        return;
+      }
       go(`#/training/playlists/${playlistId}`);
+      event.target.value = '';
     });
   },
+
 
   _renderHero(stats) {
     const greeting = Utils.greeting();

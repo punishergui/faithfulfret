@@ -17,23 +17,18 @@ Pages.ResourceVideoDetail = {
     } catch (e) {}
   },
 
-  _upsertRecentVideo(video, patch = {}) {
+  _upsertRecentVideo(video) {
     const id = Number(video.id);
-    const nowIso = new Date().toISOString();
     const existing = this._readJson('df_recent_videos', []);
     const list = Array.isArray(existing) ? existing : [];
+    const thumbId = video.videoId || video.video_id || '';
     const nextItem = {
       id,
       title: video.title || `Video ${id}`,
-      watchedAt: patch.watchedAt || nowIso,
-      lastPracticedAt: patch.lastPracticedAt || null,
+      thumb_url: thumbId ? Utils.ytThumb(thumbId) : '',
+      at: Date.now(),
     };
     const merged = list.filter((item) => Number(item?.id) !== id);
-    if (merged.length) {
-      const prev = list.find((item) => Number(item?.id) === id) || {};
-      nextItem.lastPracticedAt = patch.lastPracticedAt || prev.lastPracticedAt || null;
-      nextItem.watchedAt = patch.watchedAt || nowIso;
-    }
     this._writeJson('df_recent_videos', [nextItem, ...merged].slice(0, 5));
   },
 
@@ -69,7 +64,7 @@ Pages.ResourceVideoDetail = {
     const focus = encodeURIComponent(tags[0] || video.difficulty || 'Technique');
 
     try { localStorage.setItem('df_last_video_id', String(video.id)); } catch (e) {}
-    this._upsertRecentVideo(video, { watchedAt: new Date().toISOString() });
+    this._upsertRecentVideo(video);
 
     app.innerHTML = `
       ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '' })}
@@ -155,7 +150,7 @@ Pages.ResourceVideoDetail = {
       timerDisplay.textContent = `${mm}:${ss}`;
     };
     const markPracticeStop = () => {
-      this._upsertRecentVideo(video, { lastPracticedAt: new Date().toISOString() });
+      this._upsertRecentVideo(video);
     };
     startBtn?.addEventListener('click', () => {
       if (intervalId) return;
