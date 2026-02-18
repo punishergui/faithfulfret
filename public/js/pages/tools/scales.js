@@ -115,6 +115,7 @@ Pages.Scales = {
 
     const stopMetro = () => {
       writeLastPractice();
+      window.progressMem?.practicePauseOrStop?.();
       running = false;
       window.FFMetronome.stopMetronome();
       renderPracticePanel();
@@ -123,6 +124,11 @@ Pages.Scales = {
     const startMetro = () => {
       beatCount = 0;
       writeLastPractice();
+      window.progressMem?.practiceStart?.({
+        tool: 'scales',
+        key: `${keyEl.value} Major`,
+        progressionId: null,
+      });
       const countInBeats = countInEnabled ? 4 : 0;
       running = true;
       window.FFMetronome.startMetronome({
