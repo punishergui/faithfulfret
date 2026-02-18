@@ -588,7 +588,7 @@ function sanitizeTrainingDescriptionHtml(input = '') {
   const raw = String(input || '');
   if (!raw.trim()) return '';
   const allowedTags = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
-  const allowedColors = new Set(['accent', 'text', 'muted', 'teal', 'blue', 'purple', 'pink', 'orange', 'yellow', 'green']);
+  const allowedColors = new Set(['text', 'muted', 'accent', 'accent2', 'good', 'warn', 'bad']);
   const stack = [];
   const output = [];
   const tagRegex = /<[^>]*>/g;
