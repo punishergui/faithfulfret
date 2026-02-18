@@ -610,6 +610,7 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 4b) open #/training/videos/<id> and verify right sidebar order is Timestamps, Attachments, then Practice & Notes; attachments are not duplicated in the left column.
 # 4c) open #/training/playlists and verify clean 3-column cards, sort dropdown (Name/Recently Updated/Most Videos), and a single accurate video count line.
 # 4d) open #/training/playlists/<id> and verify larger 16:9 thumbs, 2-line title clamp, row click-to-open, and subtle right-aligned reorder/remove controls.
+# 4e) on #/training/playlists/<id>, hover a video row and verify card lift/shadow/accent border/thumbnail brighten effects are subtle and fast, click anywhere in row opens the video, and reorder/remove buttons still work without triggering navigation.
 # Phase A tools checks
 # 5) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
 # 6) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.
