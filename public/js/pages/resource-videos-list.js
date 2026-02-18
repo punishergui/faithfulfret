@@ -125,7 +125,7 @@ Pages.ResourceVideosList = {
   renderCard(video, viewMode) {
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
     const difficulty = video.difficulty_track && video.difficulty_level ? `${video.difficulty_track} ${video.difficulty_level}` : (video.difficulty || '');
-    const thumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || '';
+    const thumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || ((video.videoId || video.video_id) ? Utils.ytThumb(video.videoId || video.video_id) : '');
     const isUpload = video.source_type === 'upload';
     const hasNotes = Boolean(String(video.notes_preview || '').trim());
     const attachmentCount = Number(video.attachment_count) || 0;

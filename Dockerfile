@@ -18,7 +18,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=9999
 
-RUN apk add --no-cache libstdc++
+RUN apk add --no-cache libstdc++ ffmpeg
 
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules

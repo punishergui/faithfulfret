@@ -357,9 +357,17 @@ Pages.ResourceVideosEdit = {
       button.disabled = true;
       try {
         progressLabel.textContent = 'Uploading...';
-        await DB.uploadTrainingVideoFile(video.id, file, (percent) => {
+        const uploaded = await DB.uploadTrainingVideoFile(video.id, file, (percent) => {
           progressLabel.textContent = `Uploading... ${percent}%`;
         });
+        if (!(uploaded?.thumbnail_url || uploaded?.thumb_url || uploaded?.thumbUrl)) {
+          progressLabel.textContent = 'Generating thumbnail...';
+          try {
+            await DB.generateTrainingVideoThumbnail(video.id);
+          } catch (thumbError) {
+            console.warn('[training] thumbnail generation skipped:', thumbError.message || thumbError);
+          }
+        }
         progressLabel.textContent = 'Upload complete.';
         showStatus('Video uploaded.');
         await this.render(video.id);
