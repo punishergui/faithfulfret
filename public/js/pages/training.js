@@ -302,9 +302,9 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   }));
 
   app.querySelector('#playlist-add')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const videoId=Number(new FormData(e.target).get('videoId')); if (!videoId) return; await save([...items, { videoId }]); });
-  app.querySelectorAll('[data-remove]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.remove); const next=items.filter((_,i)=>i!==idx); await save(next); }));
-  app.querySelectorAll('[data-up]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.up); if (idx<1) return; const next=items.slice(); [next[idx-1], next[idx]]=[next[idx], next[idx-1]]; await save(next); }));
-  app.querySelectorAll('[data-down]').forEach((b)=>b.addEventListener('click', async ()=>{ const idx=Number(b.dataset.down); if (idx>=items.length-1) return; const next=items.slice(); [next[idx+1], next[idx]]=[next[idx], next[idx+1]]; await save(next); }));
+  app.querySelectorAll('[data-remove]').forEach((b)=>b.addEventListener('click', async (event)=>{ event.stopPropagation(); const idx=Number(b.dataset.remove); const next=items.filter((_,i)=>i!==idx); await save(next); }));
+  app.querySelectorAll('[data-up]').forEach((b)=>b.addEventListener('click', async (event)=>{ event.stopPropagation(); const idx=Number(b.dataset.up); if (idx<1) return; const next=items.slice(); [next[idx-1], next[idx]]=[next[idx], next[idx-1]]; await save(next); }));
+  app.querySelectorAll('[data-down]').forEach((b)=>b.addEventListener('click', async (event)=>{ event.stopPropagation(); const idx=Number(b.dataset.down); if (idx>=items.length-1) return; const next=items.slice(); [next[idx+1], next[idx]]=[next[idx], next[idx+1]]; await save(next); }));
   app.querySelector('#delete-playlist')?.addEventListener('click', async ()=>{ if (!confirm('Delete this playlist?')) return; await DB.deleteVideoPlaylist(id); sessionStorage.setItem('trainingPlaylistStatus', 'Playlist deleted.'); go('#/training/playlists'); });
 
   if (resumeId) {
