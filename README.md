@@ -613,7 +613,9 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 4e) on #/training/playlists/<id>, hover a video row and verify card lift/shadow/accent border/thumbnail brighten effects are subtle and fast, click anywhere in row opens the video, and reorder/remove buttons still work without triggering navigation.
 # 4f) open #/training and verify Video Library + Playlists are full-tile links (no side buttons), hover lift/glow is subtle, and keyboard Tab+Enter opens each tile.
 # 4g) verify breadcrumbs render under page titles on #/training, #/training/videos, #/training/videos/<id>, #/training/playlists, and #/training/playlists/<id>; only the last crumb is non-clickable.
-# 4h) on video add/edit, verify Description rich-text toolbar (bold/italic/underline/lists/link/clear) works, persists after save/refresh, and description renders formatted on video detail.
+# 4h) on video add/edit, verify Description rich-text toolbar supports bold/italic/underline/strikethrough, h2/h3, lists, quote, inline+block code, links, hr, undo/redo, clear formatting, palette-only text colors + reset, and 😀 emoji picker categories/insert.
+# 4i) verify Enter creates paragraphs, Shift+Enter inserts line breaks, save+refresh keeps formatted Description (including emoji), and video detail renders formatted Description with "No description yet." fallback.
+# 4j) verify sanitization blocks script/img/iframe/event-handler injection and only keeps safe http(s) links with target+rel + allowed span data-color values.
 # Phase A tools checks
 # 5) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
 # 6) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.
