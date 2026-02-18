@@ -4,6 +4,8 @@ function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&
 function fmt(sec) { const n = Number(sec) || 0; return `${Math.floor(n / 60)}m`; }
 function qv(name) { return new URLSearchParams(location.hash.split('?')[1] || '').get(name) || ''; }
 
+function trainingCrumbs(items) { return Utils.renderBreadcrumbs(items); }
+
 function readLocalJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -63,15 +65,17 @@ async function renderWithError(renderFn) {
 Pages.TrainingHome = { async render() { await renderWithError(async () => {
   const app = document.getElementById('app');
   const [videos, playlists] = await Promise.all([DB.getAllTrainingVideos(), DB.getVideoPlaylists()]);
-  app.innerHTML = `${Utils.renderPageHero({ title: 'Training', subtitle: 'Video library with playlists, difficulty, and attachments.', actions: '<a href="#/training/videos/new" class="df-btn df-btn--primary">+ New Video</a>' })}
-    <div class="page-wrap" style="padding:24px;display:grid;gap:16px;">
-      <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div><h3 style="margin:0 0 6px;">Video Library</h3><div style="color:var(--text2);">${videos.length} videos saved</div></div>
-        <a class="df-btn df-btn--outline" href="#/training/videos">Open Videos</a>
-      </div>
-      <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div><h3 style="margin:0 0 6px;">Playlists</h3><div style="color:var(--text2);">${playlists.length} playlists</div></div>
-        <a class="df-btn df-btn--outline" href="#/training/playlists">Manage Playlists</a>
+  app.innerHTML = `${Utils.renderPageHero({ title: 'Training', subtitle: 'Video library with playlists, difficulty, and attachments.', leftExtra: trainingCrumbs([{ label: 'Training' }]), actions: '<a href="#/training/videos/new" class="df-btn df-btn--primary">+ New Video</a>' })}
+    <div class="page-wrap" style="padding:24px;">
+      <div class="training-home-tiles">
+        <a class="training-home-tile" href="#/training/videos" role="link" tabindex="0" aria-label="Open Video Library">
+          <div><h3 style="margin:0 0 6px;">Video Library</h3><div style="color:var(--text2);">${videos.length} videos saved</div></div>
+          <div class="training-home-tile__hint" aria-hidden="true">›</div>
+        </a>
+        <a class="training-home-tile" href="#/training/playlists" role="link" tabindex="0" aria-label="Open Playlists">
+          <div><h3 style="margin:0 0 6px;">Playlists</h3><div style="color:var(--text2);">${playlists.length} playlists</div></div>
+          <div class="training-home-tile__hint" aria-hidden="true">›</div>
+        </a>
       </div>
     </div>`;
 }); }};
@@ -185,7 +189,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     return `Updated ${days} days ago`;
   };
 
-  app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
+  app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', leftExtra: trainingCrumbs([{ label: 'Training', href: '#/training' }, { label: 'Playlists' }]), actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
       <div id="playlist-status" class="df-panel" style="padding:10px;${status ? '' : 'display:none;'}">${esc(status)}</div>
       <div class="training-playlists-layout">
@@ -261,7 +265,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
 
   pushRecentPlaylist(playlist);
 
-  app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a><button id="delete-playlist" class="df-btn df-btn--danger" style="margin-left:8px;" type="button">Delete Playlist</button>' })}
+  app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', leftExtra: trainingCrumbs([{ label: 'Training', href: '#/training' }, { label: 'Playlists', href: '#/training/playlists' }, { label: playlist.name || 'Playlist' }]), actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a><button id="delete-playlist" class="df-btn df-btn--danger" style="margin-left:8px;" type="button">Delete Playlist</button>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
       <div class="df-panel" style="padding:12px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
         <div style="color:var(--text2);font-size:12px;">${canResume ? `Last saved video: #${Number(progress.lastVideoId)}` : 'No saved playlist progress yet.'}</div>
@@ -298,7 +302,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     if (!videoId) return;
     savePlaylistProgress(id, videoId);
     pushRecentPlaylist(playlist);
-    go(`#/training/videos/${videoId}`);
+    go(`#/training/videos/${videoId}?fromPlaylist=${encodeURIComponent(id)}`);
   }));
 
   app.querySelector('#playlist-add')?.addEventListener('submit', async (e)=>{ e.preventDefault(); const videoId=Number(new FormData(e.target).get('videoId')); if (!videoId) return; await save([...items, { videoId }]); });

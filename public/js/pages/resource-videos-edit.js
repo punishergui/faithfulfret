@@ -8,6 +8,28 @@ function escHtml(value) {
     .replace(/\"/g, '&quot;');
 }
 
+function escapeToParagraphs(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return `<p>${escHtml(raw).replace(/\n/g, '<br>')}</p>`;
+}
+
+function normalizeEditorSeed(data = {}) {
+  if (String(data.description_html || '').trim()) return String(data.description_html);
+  const legacy = String(data.description_text || data.notes || '').trim();
+  return escapeToParagraphs(legacy);
+}
+
+function stripHtmlToText(html = '') {
+  return String(html || '')
+    .replace(/<br\s*\/?\>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function renderVideoForm(video, options = {}) {
   const isEdit = !!options.isEdit;
   const attachments = Array.isArray(options.attachments) ? options.attachments : [];
@@ -31,7 +53,23 @@ function renderVideoForm(video, options = {}) {
       <div class="df-field"><label class="df-label">Difficulty Track</label><select class="df-input" name="difficulty_track"><option value="">Select track</option>${['Beginner', 'Intermediate', 'Advanced'].map((item) => `<option value="${item}" ${data.difficulty_track === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
       <div class="df-field"><label class="df-label">Difficulty Level</label><select class="df-input" name="difficulty_level"><option value="">Select level</option>${[1,2,3].map((item) => `<option value="${item}" ${Number(data.difficulty_level) === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
       <div class="df-field"><label class="df-label">Tags</label><input name="tags" class="df-input" value="${escHtml(data.tags || '')}" placeholder="technique,beginner,warmup"></div>
-      <div class="df-field"><label class="df-label">Notes</label><textarea name="notes" class="df-input" rows="4">${escHtml(data.notes || '')}</textarea></div>
+      <div class="df-field">
+        <label class="df-label">Description</label>
+        <div class="training-rich-editor">
+          <div class="training-rich-editor__toolbar" role="toolbar" aria-label="Description formatting">
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="bold">Bold</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="italic">Italic</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="underline">Underline</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertUnorderedList">Bullet List</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-cmd="insertOrderedList">Numbered List</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-link="1">Link</button>
+            <button type="button" class="training-rich-editor__btn" data-rich-clear="1">Clear</button>
+          </div>
+          <div id="video-description-editor" class="training-rich-editor__surface" contenteditable="true" data-placeholder="Add a description...">${normalizeEditorSeed(data)}</div>
+        </div>
+        <input type="hidden" name="description_html" value="">
+        <input type="hidden" name="description_text" value="">
+      </div>
       <div style="display:flex;gap:10px;margin-top:12px;">
         <button type="submit" class="df-btn df-btn--primary">${isEdit ? 'Save Changes' : 'Save Video'}</button>
         <a href="#/training/videos" class="df-btn df-btn--outline">Cancel</a>
@@ -69,7 +107,7 @@ Pages.ResourceVideosEdit = {
     const attachments = isEdit ? await DB.getVideoAttachments(id) : [];
 
     app.innerHTML = `
-      ${Utils.renderPageHero({ title: isEdit ? 'Edit Video' : 'New Video' })}
+      ${Utils.renderPageHero({ title: isEdit ? 'Edit Video' : 'New Video', leftExtra: Utils.renderBreadcrumbs([{ label: 'Training', href: '#/training' }, { label: 'Videos', href: '#/training/videos' }, { label: isEdit ? (video?.title || 'Video') : 'New Video' }]) })}
       <div class="page-wrap" style="padding:24px 24px 60px;">
         ${renderVideoForm(video, { isEdit, attachments })}
       </div>
@@ -97,6 +135,70 @@ Pages.ResourceVideosEdit = {
 
     app.querySelector('[name="thumbUrl"]')?.addEventListener('input', updateThumbPreview);
 
+    const editor = app.querySelector('#video-description-editor');
+    const applyCmd = (cmd) => {
+      if (!editor) return;
+      editor.focus();
+      document.execCommand(cmd, false, null);
+    };
+
+    const sanitizeDescriptionHtml = (html = '') => {
+      const allowed = new Set(['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a']);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = String(html || '');
+      const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return;
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          node.remove();
+          return;
+        }
+        const tag = node.tagName.toLowerCase();
+        if (!allowed.has(tag)) {
+          const parent = node.parentNode;
+          while (node.firstChild) parent.insertBefore(node.firstChild, node);
+          parent.removeChild(node);
+          return;
+        }
+        [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+        if (tag === 'a') {
+          const href = String(node.getAttribute('href') || '').trim();
+          if (!/^https?:\/\//i.test(href)) {
+            const textNode = document.createTextNode(node.textContent || '');
+            node.replaceWith(textNode);
+            return;
+          }
+          node.setAttribute('href', href);
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer');
+        }
+        [...node.childNodes].forEach(walk);
+      };
+      [...wrap.childNodes].forEach(walk);
+      return wrap.innerHTML.trim();
+    };
+
+    app.querySelectorAll('[data-rich-cmd]').forEach((button) => {
+      button.addEventListener('click', () => applyCmd(button.dataset.richCmd));
+    });
+    app.querySelector('[data-rich-link]')?.addEventListener('click', () => {
+      if (!editor) return;
+      const raw = prompt('Enter URL (https://...)');
+      if (!raw) return;
+      const url = String(raw).trim();
+      if (!/^https?:\/\//i.test(url)) {
+        showStatus('Links must start with http:// or https://');
+        return;
+      }
+      editor.focus();
+      document.execCommand('createLink', false, url);
+    });
+    app.querySelector('[data-rich-clear]')?.addEventListener('click', () => applyCmd('removeFormat'));
+    editor?.addEventListener('paste', (event) => {
+      event.preventDefault();
+      const text = event.clipboardData?.getData('text/plain') || '';
+      document.execCommand('insertText', false, text);
+    });
+
     app.querySelector('#fetch-meta')?.addEventListener('click', async () => {
       const urlInput = app.querySelector('[name="url"]');
       const rawUrl = urlInput.value.trim();
@@ -121,6 +223,10 @@ Pages.ResourceVideosEdit = {
       const formData = new FormData(event.target);
       const payload = Object.fromEntries(formData.entries());
       payload.tags = String(payload.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).join(',');
+      const html = sanitizeDescriptionHtml(editor?.innerHTML || '');
+      payload.description_html = html;
+      payload.description_text = stripHtmlToText(html);
+      payload.notes = payload.description_text;
       if (!payload.url) {
         showStatus('URL is required.');
         return;

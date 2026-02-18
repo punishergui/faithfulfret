@@ -3034,6 +3034,128 @@ body.print-view .chord-chart-row {
   border-color: var(--accent);
 }
 
+
+.training-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.training-breadcrumb__link {
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.training-breadcrumb__link:hover {
+  color: var(--text2);
+}
+
+.training-breadcrumb__link:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent 30%);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.training-breadcrumb__sep {
+  color: var(--text3);
+}
+
+.training-breadcrumb__current {
+  color: var(--text2);
+}
+
+.training-home-tiles {
+  display: grid;
+  gap: 16px;
+}
+
+.training-home-tile {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--card) 0%, color-mix(in srgb, var(--card) 88%, var(--bg2) 12%) 100%);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--bg) 74%, var(--text) 26%);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.training-home-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line) 60%);
+  box-shadow:
+    0 6px 14px color-mix(in srgb, var(--bg) 70%, var(--text) 30%),
+    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent 70%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 90%, var(--accent) 10%) 0%, color-mix(in srgb, var(--card) 84%, var(--bg2) 16%) 100%);
+}
+
+.training-home-tile:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent 25%);
+  outline-offset: 2px;
+}
+
+.training-home-tile__hint {
+  font-size: 20px;
+  color: var(--text3);
+  line-height: 1;
+}
+
+.training-rich-editor {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.training-rich-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+}
+
+.training-rich-editor__btn {
+  border: 1px solid var(--line2);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.training-rich-editor__btn:hover {
+  border-color: var(--accent);
+}
+
+.training-rich-editor__surface {
+  min-height: 140px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+
+.training-rich-editor__surface:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent 30%);
+  outline-offset: -1px;
+}
+
+.training-rich-editor__surface:empty:before {
+  content: attr(data-placeholder);
+  color: var(--text3);
+}
+
 .training-filter-chips {
   display: flex;
   flex-wrap: wrap;
