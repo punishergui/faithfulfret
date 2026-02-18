@@ -13,7 +13,85 @@ const TRAINING_TEXT_COLORS = Object.freeze([
 const TRAINING_ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'span']);
 const TRAINING_ALLOWED_COLORS = new Set(TRAINING_TEXT_COLORS.map((item) => item.key));
 
-const TRAINING_EMOJIS = ['🎸', '🎶', '⏱️', '✅', '⭐', '🔥', '🤘', '😅', '😤', '🙂', '🙌'];
+const TRAINING_EMOJI_CATEGORIES = Object.freeze([
+  {
+    key: 'frequent',
+    label: 'Frequently Used',
+    items: [
+      ['🎸', ['guitar', 'music', 'practice']], ['🎶', ['music', 'notes']], ['🎵', ['music', 'melody']], ['🎧', ['headphones', 'listen']], ['🥁', ['drums', 'rhythm']],
+      ['🎤', ['sing', 'microphone']], ['🎼', ['sheet', 'music']], ['⏱️', ['timer', 'speed']], ['⏲️', ['timer', 'clock']], ['✅', ['done', 'complete']],
+      ['☑️', ['checkbox', 'done']], ['⭐', ['star', 'favorite']], ['🌟', ['star', 'highlight']], ['🔥', ['fire', 'hot']], ['💪', ['strength', 'effort']],
+      ['🤘', ['rock', 'guitar']], ['🙌', ['celebrate', 'hands']], ['👌', ['okay', 'good']], ['👍', ['thumbs up', 'yes']], ['👎', ['thumbs down', 'no']],
+      ['✍️', ['write', 'notes']], ['🧠', ['brain', 'learn']], ['📌', ['pin', 'important']], ['📎', ['paperclip', 'attach']], ['📚', ['books', 'study']],
+      ['🗒️', ['notepad', 'notes']], ['📝', ['memo', 'write']], ['💡', ['idea', 'tip']], ['🎯', ['target', 'goal']], ['📈', ['progress', 'growth']],
+    ],
+  },
+  {
+    key: 'smileys',
+    label: 'Smileys',
+    items: [
+      ['😀', ['grin', 'happy']], ['😁', ['grin', 'smile']], ['😂', ['laugh', 'funny']], ['🤣', ['laugh', 'rolling']], ['😊', ['smile', 'warm']],
+      ['🙂', ['smile', 'calm']], ['🙃', ['upside down', 'silly']], ['😉', ['wink']], ['😍', ['love', 'eyes']], ['🥰', ['love', 'hearts']],
+      ['😎', ['cool', 'sunglasses']], ['🤩', ['starstruck', 'excited']], ['🥳', ['party', 'celebrate']], ['😇', ['angel', 'innocent']], ['😌', ['relief', 'calm']],
+      ['🤔', ['thinking']], ['🫡', ['salute', 'respect']], ['😅', ['sweat', 'nervous']], ['😤', ['determined', 'effort']], ['😴', ['sleepy', 'tired']],
+      ['😵', ['dizzy', 'overwhelmed']], ['🤯', ['mind blown']], ['🥶', ['cold']], ['🥵', ['hot']], ['😬', ['awkward']],
+      ['😮', ['surprised']], ['😢', ['sad', 'cry']], ['😭', ['cry', 'tears']], ['😡', ['angry']], ['🤬', ['angry', 'swear']],
+      ['😈', ['mischief']], ['👻', ['ghost', 'fun']], ['🤖', ['robot', 'tech']], ['💀', ['dead', 'metal']], ['✨', ['sparkles']],
+    ],
+  },
+  {
+    key: 'hands',
+    label: 'Hands',
+    items: [
+      ['👍', ['thumbs up']], ['👎', ['thumbs down']], ['👌', ['okay']], ['✌️', ['peace', 'victory']], ['🤞', ['crossed fingers', 'luck']],
+      ['🤟', ['love you', 'rock']], ['🤘', ['rock on']], ['🤙', ['call me']], ['👏', ['clap']], ['🙌', ['raise hands']],
+      ['👐', ['open hands']], ['🤲', ['palms up']], ['🙏', ['pray', 'thanks']], ['✍️', ['write']], ['🫶', ['heart hands']],
+      ['🫰', ['money', 'finger heart']], ['🫱', ['right hand']], ['🫲', ['left hand']], ['🫳', ['palm down']], ['🫴', ['palm up']],
+      ['☝️', ['point up']], ['👇', ['point down']], ['👉', ['point right']], ['👈', ['point left']], ['👆', ['point up back']],
+      ['🖕', ['middle finger']], ['✊', ['fist']], ['👊', ['fist bump']], ['🤛', ['left punch']], ['🤜', ['right punch']],
+      ['💪', ['muscle']], ['🦾', ['mechanical arm']], ['🤝', ['handshake']], ['🫂', ['hug']], ['🙋', ['raise hand']],
+    ],
+  },
+  {
+    key: 'music',
+    label: 'Music',
+    items: [
+      ['🎸', ['guitar']], ['🎶', ['notes']], ['🎵', ['note']], ['🎼', ['score']], ['🎹', ['keyboard', 'piano']],
+      ['🥁', ['drums']], ['🎤', ['mic', 'sing']], ['🎧', ['headphones']], ['🎺', ['trumpet']], ['🎷', ['saxophone']],
+      ['🎻', ['violin']], ['🪕', ['banjo']], ['🪘', ['drum']], ['🪈', ['flute']], ['📻', ['radio']],
+      ['🔊', ['loudspeaker']], ['🔉', ['volume']], ['🔈', ['quiet']], ['🔇', ['mute']], ['🎚️', ['level slider']],
+      ['🎛️', ['control knobs']], ['🎙️', ['studio mic']], ['📀', ['disc']], ['💿', ['cd']], ['📼', ['cassette']],
+      ['⏱️', ['timer']], ['⏲️', ['countdown']], ['⌛', ['hourglass']], ['🕒', ['clock']], ['🎯', ['goal']],
+      ['🏆', ['trophy']], ['🥇', ['gold medal']], ['🥈', ['silver medal']], ['🥉', ['bronze medal']], ['🎬', ['recording']],
+    ],
+  },
+  {
+    key: 'objects',
+    label: 'Objects',
+    items: [
+      ['🧠', ['brain']], ['💡', ['idea']], ['📌', ['pin']], ['📎', ['paperclip']], ['📚', ['books']],
+      ['📖', ['book open']], ['🗒️', ['notepad']], ['📝', ['memo']], ['📒', ['ledger']], ['📓', ['notebook']],
+      ['📔', ['decorative notebook']], ['📕', ['red book']], ['📗', ['green book']], ['📘', ['blue book']], ['📙', ['orange book']],
+      ['🧾', ['receipt']], ['📋', ['clipboard']], ['📁', ['folder']], ['📂', ['open folder']], ['🗂️', ['index dividers']],
+      ['📅', ['calendar']], ['🗓️', ['spiral calendar']], ['📍', ['location']], ['📐', ['triangle ruler']], ['📏', ['ruler']],
+      ['✂️', ['scissors']], ['🖊️', ['pen']], ['🖋️', ['fountain pen']], ['🖌️', ['paintbrush']], ['🧮', ['abacus']],
+      ['💻', ['laptop']], ['📱', ['phone']], ['🖥️', ['desktop']], ['🧰', ['toolbox']], ['🧱', ['brick']],
+    ],
+  },
+  {
+    key: 'symbols',
+    label: 'Symbols',
+    items: [
+      ['✅', ['check']], ['☑️', ['checkbox']], ['✔️', ['checkmark']], ['❌', ['x', 'no']], ['⚠️', ['warning']],
+      ['❗', ['exclamation']], ['❓', ['question']], ['⭐', ['star']], ['🌟', ['glowing star']], ['✨', ['sparkles']],
+      ['🔥', ['fire']], ['💯', ['100']], ['🎯', ['target']], ['🏁', ['finish']], ['🔁', ['repeat']],
+      ['🔂', ['repeat one']], ['🔄', ['refresh']], ['♻️', ['recycle']], ['➕', ['plus']], ['➖', ['minus']],
+      ['➗', ['divide']], ['✖️', ['multiply']], ['🟢', ['green circle']], ['🟡', ['yellow circle']], ['🔴', ['red circle']],
+      ['🟠', ['orange circle']], ['🟣', ['purple circle']], ['⚫', ['black circle']], ['⚪', ['white circle']], ['🟥', ['red square']],
+      ['🟦', ['blue square']], ['🟩', ['green square']], ['🟨', ['yellow square']], ['🔷', ['diamond']], ['🔶', ['orange diamond']],
+    ],
+  },
+]);
 
 function escHtml(value) {
   return String(value ?? '')
@@ -400,6 +478,74 @@ Pages.ResourceVideosEdit = {
       saveSelection();
     };
 
+    const BLOCK_TAGS = new Set(['p', 'div', 'h2', 'h3', 'li', 'blockquote', 'pre']);
+
+    const findBlockNode = (node) => {
+      let current = node?.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+      while (current && current !== editor) {
+        if (current.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(current.tagName.toLowerCase())) return current;
+        current = current.parentNode;
+      }
+      return null;
+    };
+
+    const renameBlockTag = (block, tagName) => {
+      if (!block || block.tagName.toLowerCase() === tagName) return block;
+      const next = document.createElement(tagName);
+      [...block.attributes].forEach((attr) => {
+        next.setAttribute(attr.name, attr.value);
+      });
+      while (block.firstChild) next.appendChild(block.firstChild);
+      block.replaceWith(next);
+      return next;
+    };
+
+    const applyHeadingTag = (tagName) => {
+      if (!editor) return;
+      editor.focus();
+      restoreSelection();
+      const range = getRangeInEditor();
+      if (!range) return;
+
+      const blocks = [];
+      const blockSet = new Set();
+      const addBlock = (node) => {
+        const block = findBlockNode(node);
+        if (!block || blockSet.has(block)) return;
+        blockSet.add(block);
+        blocks.push(block);
+      };
+
+      addBlock(range.startContainer);
+      addBlock(range.endContainer);
+
+      if (!range.collapsed) {
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT, {
+          acceptNode(node) {
+            if (!BLOCK_TAGS.has(node.tagName?.toLowerCase?.())) return NodeFilter.FILTER_SKIP;
+            return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          },
+        });
+        let node = walker.nextNode();
+        while (node) {
+          addBlock(node);
+          node = walker.nextNode();
+        }
+      }
+
+      if (!blocks.length) {
+        const fallback = document.createElement(tagName);
+        fallback.textContent = '\u00a0';
+        range.insertNode(fallback);
+        selectNodeContents(fallback, true);
+        return;
+      }
+
+      const renamed = blocks.map((block) => renameBlockTag(block, tagName));
+      selectNodeContents(renamed[renamed.length - 1], true);
+      saveSelection();
+    };
+
     const normalizeColorSpans = () => {
       if (!editor) return;
       editor.querySelectorAll('span[data-color]').forEach((span) => {
@@ -444,7 +590,11 @@ Pages.ResourceVideosEdit = {
     });
 
     app.querySelectorAll('[data-rich-block]').forEach((button) => {
-      button.addEventListener('click', () => applyCmd('formatBlock', `<${button.dataset.richBlock}>`));
+      button.addEventListener('click', () => {
+        const tagName = String(button.dataset.richBlock || '').toLowerCase();
+        if (!['h2', 'h3'].includes(tagName)) return;
+        applyHeadingTag(tagName);
+      });
     });
 
     app.querySelector('[data-rich-quote]')?.addEventListener('click', () => applyCmd('formatBlock', 'blockquote'));
@@ -502,6 +652,51 @@ Pages.ResourceVideosEdit = {
       wrapSelectionWithHtml(escHtml(raw));
     });
 
+    const emojiData = TRAINING_EMOJI_CATEGORIES.map((category) => ({
+      ...category,
+      items: category.items.map(([emoji, keywords]) => ({
+        emoji,
+        keywords: keywords || [],
+      })),
+    }));
+    const emojiLookup = emojiData.reduce((map, category) => {
+      category.items.forEach((entry) => {
+        if (!map.has(entry.emoji)) map.set(entry.emoji, new Set());
+        entry.keywords.forEach((word) => map.get(entry.emoji).add(String(word || '').toLowerCase()));
+        map.get(entry.emoji).add(category.key);
+        map.get(entry.emoji).add(category.label.toLowerCase());
+      });
+      return map;
+    }, new Map());
+    let activeEmojiCategory = 'frequent';
+
+    const renderEmojiPanel = (searchTerm = '') => {
+      if (!emojiPopover) return;
+      const panel = emojiPopover.querySelector('.training-emoji-popover__panel');
+      const query = String(searchTerm || '').trim().toLowerCase();
+      if (!panel) return;
+      const category = emojiData.find((item) => item.key === activeEmojiCategory) || emojiData[0];
+      const baseItems = category?.items || [];
+      const list = query
+        ? [...emojiLookup.entries()]
+            .filter(([emoji, words]) => emoji.includes(query) || [...words].some((word) => word.includes(query)))
+            .map(([emoji]) => emoji)
+        : baseItems.map((item) => item.emoji);
+      panel.innerHTML = list.length
+        ? list.map((emoji) => `<button type="button" class="training-emoji-popover__item" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join('')
+        : '<div class="training-emoji-popover__empty">No emoji found.</div>';
+      panel.querySelectorAll('[data-emoji]').forEach((button) => {
+        button.addEventListener('mousedown', (event) => event.preventDefault());
+      });
+    };
+
+    const renderEmojiTabs = () => {
+      if (!emojiPopover) return;
+      const tabs = emojiPopover.querySelector('.training-emoji-popover__tabs');
+      if (!tabs) return;
+      tabs.innerHTML = emojiData.map((category) => `<button type="button" class="training-emoji-popover__tab ${category.key === activeEmojiCategory ? 'is-active' : ''}" data-emoji-tab="${category.key}">${category.label}</button>`).join('');
+    };
+
     const buildEmojiPopover = () => {
       if (emojiPopover) return emojiPopover;
       const pop = document.createElement('div');
@@ -509,10 +704,13 @@ Pages.ResourceVideosEdit = {
       pop.hidden = true;
       pop.innerHTML = `
         <input type="search" class="df-input training-emoji-popover__search" placeholder="Search emoji" aria-label="Search emoji">
-        <div class="training-emoji-popover__panel">${TRAINING_EMOJIS.map((emoji) => `<button type="button" class="training-emoji-popover__item" data-emoji="${emoji}" aria-label="Insert ${emoji}">${emoji}</button>`).join('')}</div>
+        <div class="training-emoji-popover__tabs"></div>
+        <div class="training-emoji-popover__panel"></div>
       `;
       document.body.appendChild(pop);
       emojiPopover = pop;
+      renderEmojiTabs();
+      renderEmojiPanel('');
       return pop;
     };
 
@@ -543,11 +741,7 @@ Pages.ResourceVideosEdit = {
     };
 
     const onEmojiSearch = (event) => {
-      const q = String(event.target.value || '').trim().toLowerCase();
-      emojiPopover?.querySelectorAll('[data-emoji]').forEach((button) => {
-        const value = String(button.dataset.emoji || '').toLowerCase();
-        button.hidden = q && !value.includes(q);
-      });
+      renderEmojiPanel(event.target.value || '');
     };
 
     emojiToggleBtn?.addEventListener('click', () => {
@@ -568,6 +762,14 @@ Pages.ResourceVideosEdit = {
     };
 
     const onPopoverClick = (event) => {
+      const tab = event.target.closest('[data-emoji-tab]');
+      if (tab) {
+        activeEmojiCategory = String(tab.dataset.emojiTab || 'frequent');
+        renderEmojiTabs();
+        const q = emojiPopover?.querySelector('.training-emoji-popover__search')?.value || '';
+        renderEmojiPanel(q);
+        return;
+      }
       const button = event.target.closest('[data-emoji]');
       if (!button) return;
       insertTextAtRange(button.dataset.emoji || '');
@@ -575,9 +777,6 @@ Pages.ResourceVideosEdit = {
     };
 
     const pop = buildEmojiPopover();
-    pop.querySelectorAll('[data-emoji]').forEach((button) => {
-      button.addEventListener('mousedown', (event) => event.preventDefault());
-    });
     pop.addEventListener('click', onPopoverClick);
     pop.querySelector('.training-emoji-popover__search')?.addEventListener('input', onEmojiSearch);
     document.addEventListener('keydown', onDocKeydown);

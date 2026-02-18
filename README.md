@@ -74,6 +74,7 @@ After deploy, verify Dashboard → Progress Memory updates only after Practice M
 After deploy, verify Dashboard has no top stats strip; Progress Memory is the single stats area and includes Practice Summary rows for sessions/week, total sessions, and total hours without duplicate metrics.
 After deploy, verify Session Detail uses two columns on desktop (video + content left, stats/actions sidebar right aligned to top), and stacks to one column on mobile without changing top navigation.
 After deploy, verify Training Video Description editor supports inline code + code blocks (with preserved newlines), emoji picker insertions at caret, and theme-driven text colors (`data-color` spans) that adapt when switching themes.
+After deploy, verify `#/training/videos/:id` rich description display wraps in the main column (including links), H2/H3 toolbar creates real headings that persist after save/reload, and emoji picker shows category tabs with expanded sets plus search.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
