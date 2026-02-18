@@ -84,19 +84,26 @@ Pages.ResourceVideoDetail = {
     });
     this._upsertRecentVideo(video);
 
+    const hasNotes = Boolean(String(progress.notes || '').trim());
+    const badgeRow = [
+      progress.watched_at ? '<span class="training-status-badge">WATCHED</span>' : '',
+      progress.mastered_at ? '<span class="training-status-badge is-mastered">MASTERED</span>' : '',
+      hasNotes ? '<span class="training-status-badge">📝 NOTES</span>' : '',
+      (attachments || []).some((item) => item.kind === 'pdf') ? '<span class="training-status-badge">PDF</span>' : '',
+      !(attachments || []).some((item) => item.kind === 'pdf') && (attachments || []).length ? '<span class="training-status-badge">ATTACHMENTS</span>' : '',
+    ].filter(Boolean).join('');
+
     app.innerHTML = `
       ${Utils.renderPageHero({ title: video.title || 'Video Detail', subtitle: video.author || '' })}
       <div class="page-wrap training-video-detail-layout" style="padding:24px 24px 60px;display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px;">
         <div class="df-panel" style="padding:12px;">
           <iframe title="${video.title || ''}" src="${embedBase}" style="width:100%;height:420px;border:0;border-radius:12px;background:var(--bg2);" allowfullscreen loading="lazy"></iframe>
-          <div style="margin-top:10px;color:var(--text2);">${video.author || ''}</div>
+          <div class="training-row-title" style="margin-top:10px;">${video.title || '(Untitled)'}</div>
+          <div style="margin-top:6px;color:var(--text2);">${video.author || ''}</div>
+          <div style="margin-top:6px;color:var(--text2);font-size:13px;">Difficulty: ${video.difficulty || '—'}</div>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${badgeRow || '<span style="color:var(--text3);font-size:12px;">No progress yet.</span>'}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
-          <div style="margin-top:8px;color:var(--text2);">Difficulty: ${video.difficulty || '—'}</div>
           <div style="margin-top:12px;white-space:pre-wrap;color:var(--text2);">${video.notes || ''}</div>
-          <div class="df-panel" style="padding:12px;margin-top:12px;">
-            <div style="font-weight:700;margin-bottom:10px;">Attachments</div>
-            ${(attachments || []).map((item) => `<div style="border-top:1px solid var(--line);padding:8px 0;"><a href="${item.url}" target="_blank" rel="noopener">${item.title || item.filename || item.url}</a></div>`).join('') || '<div style="color:var(--text3);">No attachments.</div>'}
-          </div>
         </div>
 
         <div style="display:grid;gap:12px;align-content:start;">
@@ -112,6 +119,21 @@ Pages.ResourceVideoDetail = {
               <button class="df-btn df-btn--primary" type="submit" style="margin-top:8px;">Save Timestamp</button>
             </form>
             <div id="timestamp-list">${(video.timestamps || []).map((stamp) => this.renderTimestamp(stamp, embedBase)).join('') || '<div style="color:var(--text3);">No timestamps yet.</div>'}</div>
+          </div>
+
+          <div class="df-panel" style="padding:12px;display:grid;gap:8px;">
+            <div style="font-weight:700;">Attachments</div>
+            <div id="video-attachment-list">${(attachments || []).map((item) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding:8px 0;"><a href="${item.url}" target="_blank" rel="noopener">${item.title || item.filename || item.url}</a><button type="button" class="df-btn df-btn--ghost training-compact-btn" data-delete-attachment="${item.id}">Delete</button></div>`).join('') || '<div style="color:var(--text3);">No attachments.</div>'}</div>
+            <form id="video-attachment-link-form" style="display:grid;gap:8px;">
+              <input class="df-input" name="title" placeholder="Link title (optional)">
+              <input class="df-input" name="url" type="url" placeholder="https://..." required>
+              <button class="df-btn df-btn--outline" type="submit" style="justify-self:start;">Add Link</button>
+            </form>
+            <form id="video-attachment-file-form" style="display:grid;gap:8px;">
+              <input class="df-input" name="title" placeholder="File title (optional)">
+              <input class="df-input" name="file" type="file" accept="application/pdf,image/*" required>
+              <button class="df-btn df-btn--outline" type="submit" style="justify-self:start;">Upload File</button>
+            </form>
           </div>
 
           <div class="df-panel" style="padding:12px;display:grid;gap:10px;">
@@ -136,10 +158,8 @@ Pages.ResourceVideoDetail = {
                 <button id="video-timer-reset" type="button" class="df-btn df-btn--outline training-compact-btn">Reset</button>
               </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <a class="df-btn df-btn--outline" href="#/training/videos/${video.id}/edit">Edit Video</a>
-              <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || video.video_id || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Session</a>
-            </div>
+            <a class="df-btn df-btn--primary" href="#/log?videoId=${encodeURIComponent(video.videoId || video.video_id || '')}&title=${encodeURIComponent(video.title || '')}&focus=${focus}">Start Practice</a>
+            <a class="df-btn df-btn--outline" href="#/training/videos/${video.id}/edit">Edit Video</a>
           </div>
         </div>
       </div>
@@ -160,6 +180,30 @@ Pages.ResourceVideoDetail = {
       }
       await DB.addVideoTimestamp(video.id, { label: data.label, seconds, notes: data.notes || '' });
       await this.render(video.id);
+    });
+
+
+    app.querySelector('#video-attachment-link-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.target).entries());
+      if (!String(data.url || '').trim()) return;
+      await DB.addVideoAttachmentLink(video.id, { title: data.title || '', url: data.url || '' });
+      await this.render(video.id);
+    });
+
+    app.querySelector('#video-attachment-file-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      if (!data.get('file')) return;
+      await DB.uploadVideoAttachment(video.id, data);
+      await this.render(video.id);
+    });
+
+    app.querySelectorAll('[data-delete-attachment]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        await DB.deleteVideoAttachment(button.dataset.deleteAttachment);
+        await this.render(video.id);
+      });
     });
 
     app.querySelectorAll('[data-delete-stamp]').forEach((button) => {
