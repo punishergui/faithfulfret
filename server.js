@@ -216,7 +216,18 @@ function extractYouTubeId(value) {
 function playlistWithItems(id) {
   const playlist = Store.getVideoPlaylist(id);
   if (!playlist) return null;
-  return { ...playlist, items: Store.listPlaylistItems(id) };
+  const items = Store.listPlaylistItems(id);
+  const enriched = items.map((item) => {
+    const videoId = Number(item.video_id || item.videoId);
+    const video = videoId ? Store.getTrainingVideo(videoId) : null;
+    const progress = videoId ? Store.getTrainingVideoProgress(videoId) : null;
+    return {
+      ...item,
+      video,
+      progress,
+    };
+  });
+  return { ...playlist, items: enriched };
 }
 
 function fetchJson(url, headers) {
@@ -938,6 +949,7 @@ apiRouter.get('/training-videos', (req, res) => {
     category: req.query.category,
     difficulty_track: track || undefined,
     difficulty_level: Number.isFinite(level) ? level : undefined,
+    includeProgress: req.query.includeProgress,
   });
   res.json(rows);
 });
@@ -950,6 +962,23 @@ apiRouter.get('/training-videos/:id', (req, res) => {
     timestamps: Store.listVideoTimestamps(req.params.id),
     playlists: Store.listPlaylistsByVideo(req.params.id),
   });
+});
+
+apiRouter.get('/training/videos/:id/progress', (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  return res.json(Store.getTrainingVideoProgress(req.params.id));
+});
+
+apiRouter.put('/training/videos/:id/progress', (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  const payload = req.body || {};
+  const changes = {};
+  if (Object.prototype.hasOwnProperty.call(payload, 'watched')) changes.watched = Boolean(payload.watched);
+  if (Object.prototype.hasOwnProperty.call(payload, 'mastered')) changes.mastered = Boolean(payload.mastered);
+  if (Object.prototype.hasOwnProperty.call(payload, 'notes')) changes.notes = String(payload.notes ?? '');
+  return res.json(Store.saveTrainingVideoProgress(req.params.id, changes));
 });
 
 apiRouter.post('/training-videos', async (req, res) => {

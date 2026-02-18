@@ -254,6 +254,13 @@ CREATE TABLE IF NOT EXISTS attachments (
   caption TEXT,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS training_video_progress (
+  video_id INTEGER PRIMARY KEY,
+  watched_at INTEGER,
+  mastered_at INTEGER,
+  notes TEXT,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 function ensureSchema() {
@@ -326,6 +333,10 @@ ensureColumn('lessons', 'notes_md', 'TEXT');
 ensureColumn('lessons', 'practice_plan_md', 'TEXT');
 ensureColumn('lessons', 'chords_md', 'TEXT');
 ensureColumn('courses', 'level', 'INTEGER');
+ensureColumn('training_video_progress', 'watched_at', 'INTEGER');
+ensureColumn('training_video_progress', 'mastered_at', 'INTEGER');
+ensureColumn('training_video_progress', 'notes', 'TEXT');
+ensureColumn('training_video_progress', 'updated_at', 'INTEGER');
 
 db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_module_id ON lessons(module_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_modules_course_id ON modules(course_id)');
@@ -804,7 +815,17 @@ const listTrainingVideos = (filters = {}) => {
     where.push('id IN (SELECT COALESCE(video_id, videoId) FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?)');
     values.push(Number(filters.playlistId));
   }
-  const sql = `SELECT * FROM training_videos ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY updatedAt DESC, id DESC`;
+  const includeProgress = String(filters.includeProgress || '') === '1' || filters.includeProgress === true;
+  const selectProgress = includeProgress
+    ? `, p.watched_at, p.mastered_at,
+      CASE
+        WHEN p.notes IS NULL OR trim(p.notes) = '' THEN ''
+        WHEN length(trim(p.notes)) <= 80 THEN trim(p.notes)
+        ELSE substr(trim(p.notes), 1, 80) || '…'
+      END AS notes_preview`
+    : '';
+  const joinProgress = includeProgress ? ' LEFT JOIN training_video_progress p ON p.video_id = training_videos.id' : '';
+  const sql = `SELECT training_videos.*${selectProgress} FROM training_videos${joinProgress} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY training_videos.updatedAt DESC, training_videos.id DESC`;
   return db.prepare(sql).all(...values);
 };
 
@@ -825,11 +846,75 @@ const saveTrainingVideo = (data) => {
 };
 const deleteTrainingVideo = (id) => {
   const tx = db.transaction((targetId) => {
+    run('DELETE FROM training_video_progress WHERE video_id = ?', targetId);
     run('DELETE FROM video_timestamps WHERE videoId = ?', targetId);
     run('DELETE FROM video_playlist_items WHERE videoId = ?', targetId);
     run('DELETE FROM training_videos WHERE id = ?', targetId);
   });
   tx(Number(id));
+};
+
+function normalizeTrainingVideoProgress(row, videoId) {
+  return {
+    video_id: Number(videoId),
+    watched_at: row?.watched_at || null,
+    mastered_at: row?.mastered_at || null,
+    notes: typeof row?.notes === 'string' ? row.notes : '',
+    updated_at: row?.updated_at || 0,
+  };
+}
+
+const getTrainingVideoProgress = (videoId) => {
+  const id = Number(videoId);
+  const row = one('SELECT video_id, watched_at, mastered_at, notes, updated_at FROM training_video_progress WHERE video_id = ?', id);
+  return normalizeTrainingVideoProgress(row, id);
+};
+
+const saveTrainingVideoProgress = (videoId, changes = {}) => {
+  const id = Number(videoId);
+  const existing = getTrainingVideoProgress(id);
+  const now = Date.now();
+  let watchedAt = existing.watched_at;
+  let masteredAt = existing.mastered_at;
+  let notes = existing.notes;
+
+  if (Object.prototype.hasOwnProperty.call(changes, 'watched')) {
+    if (changes.watched) {
+      watchedAt = watchedAt || now;
+    } else {
+      watchedAt = null;
+      masteredAt = null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, 'mastered')) {
+    if (changes.mastered) {
+      masteredAt = masteredAt || now;
+      watchedAt = watchedAt || now;
+    } else {
+      masteredAt = null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, 'notes')) {
+    notes = String(changes.notes ?? '');
+  }
+
+  db.prepare(`INSERT INTO training_video_progress (video_id, watched_at, mastered_at, notes, updated_at)
+    VALUES (@video_id, @watched_at, @mastered_at, @notes, @updated_at)
+    ON CONFLICT(video_id) DO UPDATE SET
+      watched_at=excluded.watched_at,
+      mastered_at=excluded.mastered_at,
+      notes=excluded.notes,
+      updated_at=excluded.updated_at`).run({
+    video_id: id,
+    watched_at: watchedAt,
+    mastered_at: masteredAt,
+    notes,
+    updated_at: now,
+  });
+
+  return getTrainingVideoProgress(id);
 };
 
 const listVideoTimestamps = (videoId) => db.prepare('SELECT * FROM video_timestamps WHERE videoId = ? ORDER BY seconds ASC, id ASC').all(Number(videoId));
@@ -1370,4 +1455,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

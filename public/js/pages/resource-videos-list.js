@@ -15,6 +15,8 @@ Pages.ResourceVideosList = {
       category: params.get('category') || '',
       difficulty: params.get('difficulty') || '',
       playlistId: params.get('playlistId') || '',
+      progress: params.get('progress') || 'all',
+      sort: params.get('sort') || 'recentlyAdded',
     };
 
     const difficultyTrack = filters.difficulty ? filters.difficulty.split('-')[0] : '';
@@ -30,6 +32,8 @@ Pages.ResourceVideosList = {
       }),
       DB.getVideoPlaylists(),
     ]);
+
+    const normalized = this.applyProgressFilterAndSort(videos, filters.progress, filters.sort);
 
     const difficultyOptions = ['Beginner', 'Intermediate', 'Advanced']
       .flatMap((track) => [1, 2, 3].map((level) => ({ value: `${track}-${level}`, label: `${track} ${level}` })));
@@ -62,9 +66,17 @@ Pages.ResourceVideosList = {
               ${playlists.map((item) => `<option value="${item.id}" ${String(filters.playlistId) === String(item.id) ? 'selected' : ''}>${item.name || `Playlist ${item.id}`}</option>`).join('')}
             </select>
           </div>
+          <div class="training-filter-chips">
+            ${['all', 'unwatched', 'watched', 'mastered'].map((key) => `<button type="button" class="training-chip ${filters.progress === key ? 'is-active' : ''}" data-progress-chip="${key}">${key[0].toUpperCase()}${key.slice(1)}</button>`).join('')}
+            <select id="video-sort" class="df-input" style="max-width:220px;margin-left:auto;">
+              <option value="recentlyAdded" ${filters.sort === 'recentlyAdded' ? 'selected' : ''}>Recently Added</option>
+              <option value="recentlyWatched" ${filters.sort === 'recentlyWatched' ? 'selected' : ''}>Recently Watched</option>
+              <option value="unwatchedFirst" ${filters.sort === 'unwatchedFirst' ? 'selected' : ''}>Unwatched First</option>
+            </select>
+          </div>
         </div>
 
-        ${videos.length ? `<div id="video-results" style="display:${this.viewMode === 'grid' ? 'grid' : 'block'};grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">${videos.map((video) => this.renderCard(video, this.viewMode)).join('')}</div>` : '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No videos found.</div>'}
+        ${normalized.length ? `<div id="video-results" style="display:${this.viewMode === 'grid' ? 'grid' : 'block'};grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">${normalized.map((video) => this.renderCard(video, this.viewMode)).join('')}</div>` : '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No videos found.</div>'}
       </div>
     `;
 
@@ -72,52 +84,98 @@ Pages.ResourceVideosList = {
       if (event.key !== 'Enter') return;
       this.updateFilters({ ...filters, q: event.target.value.trim() });
     });
-
-    app.querySelector('#video-category')?.addEventListener('change', (event) => {
-      this.updateFilters({ ...filters, category: event.target.value });
-    });
-
-    app.querySelector('#video-difficulty')?.addEventListener('change', (event) => {
-      this.updateFilters({ ...filters, difficulty: event.target.value });
-    });
-
-    app.querySelector('#video-playlist')?.addEventListener('change', (event) => {
-      this.updateFilters({ ...filters, playlistId: event.target.value });
+    app.querySelector('#video-category')?.addEventListener('change', (event) => this.updateFilters({ ...filters, category: event.target.value }));
+    app.querySelector('#video-difficulty')?.addEventListener('change', (event) => this.updateFilters({ ...filters, difficulty: event.target.value }));
+    app.querySelector('#video-playlist')?.addEventListener('change', (event) => this.updateFilters({ ...filters, playlistId: event.target.value }));
+    app.querySelector('#video-sort')?.addEventListener('change', (event) => this.updateFilters({ ...filters, sort: event.target.value }));
+    app.querySelectorAll('[data-progress-chip]').forEach((button) => {
+      button.addEventListener('click', () => this.updateFilters({ ...filters, progress: button.dataset.progressChip }));
     });
 
     app.querySelector('#view-toggle')?.addEventListener('click', async () => {
       this.viewMode = this.viewMode === 'grid' ? 'list' : 'grid';
       await this.render();
     });
+
+    app.querySelectorAll('[data-toggle-watched]').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await DB.saveTrainingVideoProgress(button.dataset.toggleWatched, { watched: button.dataset.next === '1' });
+        await this.render();
+      });
+    });
+
+    app.querySelectorAll('[data-toggle-mastered]').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await DB.saveTrainingVideoProgress(button.dataset.toggleMastered, { mastered: button.dataset.next === '1' });
+        await this.render();
+      });
+    });
+  },
+
+  applyProgressFilterAndSort(videos = [], progressFilter = 'all', sort = 'recentlyAdded') {
+    let list = (videos || []).filter((video) => {
+      if (progressFilter === 'unwatched') return !video.watched_at;
+      if (progressFilter === 'watched') return Boolean(video.watched_at) && !video.mastered_at;
+      if (progressFilter === 'mastered') return Boolean(video.mastered_at);
+      return true;
+    });
+
+    if (sort === 'recentlyWatched') {
+      list = list.sort((a, b) => (Number(b.watched_at) || 0) - (Number(a.watched_at) || 0));
+    } else if (sort === 'unwatchedFirst') {
+      list = list.sort((a, b) => {
+        const aWatched = a.watched_at ? 1 : 0;
+        const bWatched = b.watched_at ? 1 : 0;
+        if (aWatched !== bWatched) return aWatched - bWatched;
+        return (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+      });
+    } else {
+      list = list.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+    }
+    return list;
   },
 
   renderCard(video, viewMode) {
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
     const difficulty = video.difficulty_track && video.difficulty_level ? `${video.difficulty_track} ${video.difficulty_level}` : (video.difficulty || '');
+    const thumb = video.thumbUrl || video.thumb_url || '';
+    const statusBadges = `${video.watched_at ? '<span class="training-status-badge">Watched</span>' : ''}${video.mastered_at ? '<span class="training-status-badge is-mastered">Mastered</span>' : ''}`;
+    const actionBar = `<div class="training-card-actions"><button class="df-btn df-btn--outline" data-toggle-watched="${video.id}" data-next="${video.watched_at ? '0' : '1'}">${video.watched_at ? 'Unwatch' : 'Watched'}</button><button class="df-btn df-btn--outline" data-toggle-mastered="${video.id}" data-next="${video.mastered_at ? '0' : '1'}">${video.mastered_at ? 'Unmaster' : 'Mastered'}</button><a href="#/training/videos/${video.id}" class="df-btn df-btn--ghost">Notes</a></div>`;
+    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '100px' : '150px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : '<div class="training-thumb-fallback">🎬</div>';
+
     if (viewMode === 'list') {
-      return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:flex;gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">
-        <img src="${video.thumbUrl || video.thumb_url || ''}" alt="${video.title || ''}" style="width:180px;height:100px;object-fit:cover;border-radius:10px;background:var(--bg2);">
-        <div>
-          <div style="font-weight:700;">${video.title || '(Untitled)'}</div>
+      return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">${thumbHtml}
+        <div style="min-width:0;">
+          <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
+          <div class="training-status-row">${statusBadges || '<span style="color:var(--text3);font-size:12px;">Unwatched</span>'}</div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"><span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
+          ${video.notes_preview ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;">${video.notes_preview}</div>` : ''}
+          ${actionBar}
         </div>
       </a>`;
     }
-    return `<a href="#/training/videos/${video.id}" class="df-panel" style="text-decoration:none;color:inherit;padding:10px;display:block;">
-      <img src="${video.thumbUrl || video.thumb_url || ''}" alt="${video.title || ''}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;background:var(--bg2);">
-      <div style="margin-top:10px;font-weight:700;">${video.title || '(Untitled)'}</div>
+
+    return `<a href="#/training/videos/${video.id}" class="df-panel" style="text-decoration:none;color:inherit;padding:10px;display:block;">${thumbHtml}
+      <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
+      <div class="training-status-row">${statusBadges || '<span style="color:var(--text3);font-size:12px;">Unwatched</span>'}</div>
+      ${video.notes_preview ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;">${video.notes_preview}</div>` : ''}
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"><span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
+      ${actionBar}
     </a>`;
   },
 
   updateFilters(next) {
     const params = new URLSearchParams();
     Object.entries(next).forEach(([key, value]) => {
-      if (value == null || value === '') return;
+      if (value == null || value === '' || (key === 'progress' && value === 'all') || (key === 'sort' && value === 'recentlyAdded')) return;
       params.set(key, value);
     });
     const query = params.toString();
