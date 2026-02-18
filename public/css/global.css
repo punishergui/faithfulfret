@@ -2765,3 +2765,46 @@ select.df-input option {
   #app { width: calc(100% - 12px); padding-top: var(--nav-h); }
   .ff-panel--page { border-radius: 12px; }
 }
+
+.help-card {
+  border: 1px solid var(--line2);
+  background: var(--bg1);
+}
+
+.help-card__toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.help-card__body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--line2);
+}
+
+.help-card__body.is-collapsed {
+  display: none;
+}
+
+.help-card__desc {
+  color: var(--text2);
+  font-size: 14px;
+  margin: 10px 0;
+}
+
+.help-card__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text2);
+  font-size: 13px;
+}

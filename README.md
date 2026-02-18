@@ -597,6 +597,12 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 1) open #/training/videos/<id>, verify timer Start/Pause/Reset appears and df_last_video_id updates
 # 2) open #/training/playlists/<id>, click a video title, verify df_playlist_progress updates
 # 3) open #/dashboard, verify Start Practice + Recent Activity cards show recent localStorage data
+# Phase A tools checks
+# 4) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
+# 5) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.
+# 6) open #/tools/chords and verify diagram labels plus playing-view orientation (Low E bottom, High e top).
+# 7) open #/tools/scales and verify expanded scale list, string labels, and collapsible scale help card.
+# 8) open each tool page and collapse Help once, refresh page, and verify collapsed state persists from localStorage.
 ```
 
 Keep rollback path unchanged: publish immutable tags (`vX.Y.Z`) and pin `docker-compose.prod.yml` image to the selected tag when rolling back.
