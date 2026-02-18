@@ -14,6 +14,9 @@ window.renderChordSvg = function renderChordSvg(shape, options = {}) {
   const fretGap = 32;
   const leftPad = 44;
   const topPad = 28;
+  const bottomPad = markerRadius + 8;
+  const markerLabelX = leftPad - 10;
+  const stringLabelX = leftPad - 28;
 
   const numericFrets = shape.frets.filter((f) => typeof f === 'number' && f > 0);
   const minFret = numericFrets.length ? Math.min(...numericFrets) : 1;
@@ -39,21 +42,23 @@ window.renderChordSvg = function renderChordSvg(shape, options = {}) {
     const stringIndex = leftHanded ? 5 - i : i;
     const y = yForStringIndex(stringIndex);
 
-    if (fret === 'x') return `<text x="20" y="${y + 4}" text-anchor="middle" fill="var(--text2)" font-size="13">X</text>`;
-    if (fret === 0) return `<text x="20" y="${y + 4}" text-anchor="middle" fill="var(--text2)" font-size="13">O</text>`;
+    if (fret === 'x') return `<text x="${markerLabelX}" y="${y + 4}" text-anchor="middle" fill="var(--text2)" font-size="13">X</text>`;
+    if (fret === 0) return `<text x="${markerLabelX}" y="${y + 4}" text-anchor="middle" fill="var(--text2)" font-size="13">O</text>`;
     return `<circle cx="${xForFret(fret)}" cy="${y}" r="${markerRadius}" fill="var(--accent)" />`;
   }).join('');
 
   const labels = showStringLabels
-    ? strings.map((name, i) => `<text x="${leftPad - 18}" y="${yForStringIndex(i) + 4}" text-anchor="middle" fill="var(--text3)" font-size="12">${name}</text>`).join('')
+    ? strings.map((name, i) => `<text x="${stringLabelX}" y="${yForStringIndex(i) + 4}" text-anchor="middle" fill="var(--text3)" font-size="12">${name}</text>`).join('')
     : '';
 
   const fretLabel = baseFret > 1
-    ? `<text x="${leftPad + stringGap * fretCount + 8}" y="${topPad + 12}" fill="var(--text3)" font-size="11">${baseFret}fr</text>`
+    ? `<text x="${leftPad + stringGap * fretCount + 8}" y="${topPad + 14}" fill="var(--text2)" font-size="14">${baseFret}fr</text>`
     : '';
 
+  const viewBoxHeight = topPad + fretGap * 5 + bottomPad;
+
   return `
-    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${shape.name} chord diagram">
+    <svg viewBox="0 0 ${width} ${viewBoxHeight}" width="100%" height="${height}" role="img" aria-label="${shape.name} chord diagram">
       ${stringLines}
       ${fretLines}
       ${markers}
