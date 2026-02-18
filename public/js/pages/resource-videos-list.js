@@ -126,7 +126,6 @@ Pages.ResourceVideosList = {
     const tags = String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
     const difficulty = video.difficulty_track && video.difficulty_level ? `${video.difficulty_track} ${video.difficulty_level}` : (video.difficulty || '');
     const thumb = video.thumbnail_url || video.thumb_url || video.thumbUrl || ((video.videoId || video.video_id) ? Utils.ytThumb(video.videoId || video.video_id) : '');
-    const isUpload = video.source_type === 'upload';
     const hasNotes = Boolean(String(video.notes_preview || '').trim());
     const attachmentCount = Number(video.attachment_count) || 0;
     const pdfCount = Number(video.pdf_attachment_count) || 0;
@@ -138,7 +137,7 @@ Pages.ResourceVideosList = {
       !pdfCount && attachmentCount > 0 ? '<span class="training-status-badge">ATTACHMENTS</span>' : '',
     ].filter(Boolean).join('');
     const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${statusTags}`;
-    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '120px' : '170px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : `<div class="training-thumb-fallback">${isUpload ? 'Thumbnail pending / ffmpeg not installed' : '🎬'}</div>`;
+    const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" style="width:100%;height:${viewMode === 'list' ? '120px' : '170px'};object-fit:cover;border-radius:10px;background:var(--bg2);">` : '<div class="training-thumb-fallback">🎬</div>';
 
     if (viewMode === 'list') {
       return `<a href="#/training/videos/${video.id}" class="df-panel" style="display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:12px;text-decoration:none;color:inherit;padding:10px;margin-bottom:10px;">${thumbHtml}

@@ -194,38 +194,18 @@ window.TrainingDescription = window.TrainingDescription || {
 function renderVideoForm(video, options = {}) {
   const isEdit = !!options.isEdit;
   const attachments = Array.isArray(options.attachments) ? options.attachments : [];
-  const data = video || { source_type: 'youtube', youtube_url: '', url: '', title: '', author: '', thumbUrl: '', thumbnail_url: '', tags: '', category: 'general', difficulty_track: '', difficulty_level: '', notes: '' };
+  const data = video || { youtube_url: '', url: '', title: '', author: '', thumbUrl: '', thumbnail_url: '', tags: '', category: 'general', difficulty_track: '', difficulty_level: '', notes: '' };
   const colorButtons = TRAINING_TEXT_COLORS.map((item) => `<button type="button" class="training-rich-editor__btn training-rich-editor__color" data-rich-color="${item.key}" title="${item.label}"><span style="background:${item.value};"></span></button>`).join('');
 
   return `
     <form id="video-form" class="df-panel df-panel--wide" style="padding:16px;">
       <div id="video-form-status" class="df-panel" style="padding:10px;display:none;margin-bottom:10px;"></div>
       <div class="df-field">
-        <label class="df-label" for="video-source-type">Source *</label>
-        <select id="video-source-type" class="df-input" name="source_type">
-          <option value="youtube" ${(data.source_type || 'youtube') === 'youtube' ? 'selected' : ''}>YouTube</option>
-          <option value="upload" ${data.source_type === 'upload' ? 'selected' : ''}>Upload</option>
-        </select>
-      </div>
-      <div class="df-field" id="youtube-fields" style="${data.source_type === 'upload' ? 'display:none;' : ''}">
         <label class="df-label" for="video-url">YouTube URL *</label>
         <div style="display:flex;gap:8px;">
           <input id="video-url" class="df-input" name="youtube_url" value="${escHtml(data.youtube_url || data.url || '')}">
           <button type="button" id="fetch-meta" class="df-btn df-btn--outline">Fetch Details</button>
         </div>
-      </div>
-      <div class="df-field" id="upload-fields" style="display:${data.source_type === 'upload' ? 'grid' : 'none'};gap:8px;">
-        <label class="df-label">Uploaded file</label>
-        ${isEdit ? `<div style="display:grid;gap:8px;">
-          <div style="font-size:12px;color:var(--text2);">${data.upload_original_name ? `${escHtml(data.upload_original_name)} (${Math.round((Number(data.upload_size)||0)/1024/1024)} MB)` : 'No upload yet.'}</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input id="video-upload-input" type="file" class="df-input" accept="video/mp4,video/webm,video/ogg">
-            <button type="button" id="upload-video-file" class="df-btn df-btn--outline">Upload</button>
-            <span id="upload-progress-label" style="font-size:12px;color:var(--text2);"></span>
-          </div>
-          <div id="upload-thumb-preview">${(data.thumbnail_url || data.thumb_url || data.thumbUrl) ? `<img src="${escHtml(data.thumbnail_url || data.thumb_url || data.thumbUrl || '')}" alt="Upload thumbnail" style="max-width:320px;border-radius:10px;border:1px solid var(--line);">` : '<div class="training-thumb-fallback" style="max-width:320px;">Thumbnail pending / ffmpeg not installed</div>'}</div>
-          ${data.upload_url ? `<video controls src="${escHtml(data.upload_url)}" style="width:100%;max-width:640px;border-radius:10px;background:var(--bg2);"></video>` : ''}
-        </div>` : '<div style="font-size:12px;color:var(--text2);">Save first, then upload a video file.</div>'}
       </div>
       <div class="df-field"><label class="df-label">Title *</label><input name="title" class="df-input" value="${escHtml(data.title || '')}" required></div>
       <div class="df-field"><label class="df-label">Author</label><input name="author" class="df-input" value="${escHtml(data.author || '')}"></div>
@@ -332,52 +312,6 @@ Pages.ResourceVideosEdit = {
       wrap.querySelector('img').src = url;
     };
     app.querySelector('[name="thumbUrl"]')?.addEventListener('input', updateThumbPreview);
-
-    const sourceSelect = app.querySelector('#video-source-type');
-    const youtubeFields = app.querySelector('#youtube-fields');
-    const uploadFields = app.querySelector('#upload-fields');
-    const applySourceVisibility = () => {
-      const mode = sourceSelect?.value === 'upload' ? 'upload' : 'youtube';
-      if (youtubeFields) youtubeFields.style.display = mode === 'youtube' ? 'grid' : 'none';
-      if (uploadFields) uploadFields.style.display = mode === 'upload' ? 'grid' : 'none';
-    };
-    sourceSelect?.addEventListener('change', applySourceVisibility);
-    applySourceVisibility();
-
-    app.querySelector('#upload-video-file')?.addEventListener('click', async () => {
-      if (!isEdit || !video?.id) return;
-      const input = app.querySelector('#video-upload-input');
-      const file = input?.files?.[0];
-      if (!file) {
-        showStatus('Choose a video file first.');
-        return;
-      }
-      const button = app.querySelector('#upload-video-file');
-      const progressLabel = app.querySelector('#upload-progress-label');
-      button.disabled = true;
-      try {
-        progressLabel.textContent = 'Uploading...';
-        const uploaded = await DB.uploadTrainingVideoFile(video.id, file, (percent) => {
-          progressLabel.textContent = `Uploading... ${percent}%`;
-        });
-        if (!(uploaded?.thumbnail_url || uploaded?.thumb_url || uploaded?.thumbUrl)) {
-          progressLabel.textContent = 'Generating thumbnail...';
-          try {
-            await DB.generateTrainingVideoThumbnail(video.id);
-          } catch (thumbError) {
-            console.warn('[training] thumbnail generation skipped:', thumbError.message || thumbError);
-          }
-        }
-        progressLabel.textContent = 'Upload complete.';
-        showStatus('Video uploaded.');
-        await this.render(video.id);
-      } catch (error) {
-        progressLabel.textContent = '';
-        showStatus(error.message || 'Upload failed.');
-      } finally {
-        button.disabled = false;
-      }
-    });
 
     const editor = app.querySelector('#video-description-editor');
     const emojiToggleBtn = app.querySelector('[data-rich-emoji-toggle]');
@@ -836,15 +770,11 @@ Pages.ResourceVideosEdit = {
       payload.description_html = html;
       payload.description_text = stripHtmlToText(html);
       payload.notes = payload.description_text;
-      payload.source_type = payload.source_type === 'upload' ? 'upload' : 'youtube';
-      if (payload.source_type === 'youtube') {
-        payload.url = String(payload.youtube_url || '').trim();
-        if (!payload.url) {
-          showStatus('URL is required.');
-          return;
-        }
-      } else {
-        payload.url = String(video?.youtube_url || video?.url || '').trim();
+      payload.source_type = 'youtube';
+      payload.url = String(payload.youtube_url || '').trim();
+      if (!payload.url) {
+        showStatus('URL is required.');
+        return;
       }
       if (isEdit) payload.id = video.id;
       try {
