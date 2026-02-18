@@ -249,6 +249,55 @@ window.Utils = {
 
   getDisplayName: () => (localStorage.getItem('displayName') || '').trim(),
 
+  readLocalJson: (key, fallback = null) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  },
+
+  writeLocalJson: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  },
+
+  getLastPractice: () => {
+    const raw = window.Utils.readLocalJson('df_last_practice', null);
+    if (!raw || typeof raw !== 'object') return null;
+    return raw;
+  },
+
+  setLastPractice: (patch = {}) => {
+    const now = Date.now();
+    const current = window.Utils.getLastPractice() || {};
+    const next = {
+      tool: null,
+      key_root: null,
+      key_mode: null,
+      progression_id: null,
+      scale_id: null,
+      chord_id: null,
+      bpm: null,
+      beats_per_chord: null,
+      countin_enabled: null,
+      countin_bars: null,
+      playlist_id: null,
+      video_id: null,
+      started_at: current.started_at || now,
+      updated_at: now,
+      ...current,
+      ...patch,
+      updated_at: now,
+    };
+    if (!next.started_at) next.started_at = now;
+    window.Utils.writeLocalJson('df_last_practice', next);
+    return next;
+  },
+
   renderPageHero: ({ title = '', subtitle = '', leftExtra = '', actions = '', image = '', texture = true } = {}) => {
     const heroClasses = `page-hero ${image ? 'page-hero--img' : ''} ${texture ? 'vert-texture' : ''}`.trim();
     const bgStyle = image ? ` style="background-image:url('${image}');"` : '';

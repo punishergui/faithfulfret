@@ -36,12 +36,15 @@ Pages.Dashboard = {
     const today = Utils.today();
     const topResources = resources.slice(0, 5);
     const quickStart = this._readQuickStart();
+    const lastPractice = Utils.getLastPractice();
 
     app.innerHTML = `
       ${this._renderHero(stats)}
       ${this._renderStatBar(stats)}
       <div class="page-wrap" style="padding:32px 24px;">
         ${this._renderStartPractice(quickStart)}
+        ${this._renderLastPracticeSnapshot(lastPractice)}
+        ${this._renderNextUp(lastPractice)}
         <div class="two-col" style="align-items:start;">
           <div>
             <div class="section-header">
@@ -71,6 +74,7 @@ Pages.Dashboard = {
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
     this._initStartPractice(app, quickStart);
+    this._initLastPractice(app, lastPractice);
 
     // Stagger reveal
     setTimeout(() => Utils.staggerReveal(app, '.session-row', 0), 50);
@@ -122,6 +126,167 @@ Pages.Dashboard = {
     `;
   },
 
+
+
+  _formatLastPracticeWhen(timestamp) {
+    if (!timestamp) return '—';
+    const date = new Date(Number(timestamp));
+    if (Number.isNaN(date.getTime())) return '—';
+    const today = new Date();
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startTarget = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((startToday - startTarget) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return date.toLocaleDateString();
+  },
+
+  _toolLabel(tool) {
+    return {
+      progressions: 'Progressions',
+      scales: 'Scales',
+      chords: 'Chords',
+      metronome: 'Metronome',
+      tunings: 'Tunings',
+      training: 'Training',
+    }[tool] || 'Practice';
+  },
+
+  _renderLastPracticeSnapshot(lastPractice) {
+    if (!lastPractice) {
+      return `
+        <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+          <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Last Practice</div>
+          <div style="color:var(--text3);font-size:13px;">Start a practice loop and we’ll remember it here.</div>
+          <div style="margin-top:10px;color:var(--text3);font-size:12px;">Continue Last Practice unlocks after your first loop.</div>
+          <button type="button" class="df-btn df-btn--primary" disabled style="margin-top:10px;">Continue Last Practice</button>
+        </div>
+      `;
+    }
+
+    const keyLabel = lastPractice.key_root && lastPractice.key_mode
+      ? `${lastPractice.key_root} ${String(lastPractice.key_mode).charAt(0).toUpperCase()}${String(lastPractice.key_mode).slice(1)}`
+      : null;
+    const itemLabel = lastPractice.progression_id || lastPractice.scale_id || lastPractice.chord_id || null;
+    const bpmLabel = Number.isFinite(Number(lastPractice.bpm)) ? `${Number(lastPractice.bpm)} BPM` : null;
+    const whenLabel = this._formatLastPracticeWhen(lastPractice.updated_at || lastPractice.started_at);
+
+    return `
+      <div class="df-panel df-panel--wide" id="last-practice-card" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Last Practice</div>
+        <div style="display:grid;gap:4px;font-size:13px;">
+          <div><strong>Tool:</strong> ${this._toolLabel(lastPractice.tool)}</div>
+          ${keyLabel ? `<div><strong>Key:</strong> ${keyLabel}</div>` : ''}
+          ${itemLabel ? `<div><strong>Item:</strong> ${itemLabel}</div>` : ''}
+          ${bpmLabel ? `<div><strong>BPM:</strong> ${bpmLabel}</div>` : ''}
+          <div><strong>When:</strong> ${whenLabel}</div>
+        </div>
+        <button type="button" class="df-btn df-btn--primary" data-action="continue-last-practice" style="margin-top:10px;">Continue Last Practice</button>
+      </div>
+    `;
+  },
+
+  _renderNextUp(lastPractice) {
+    if (!lastPractice) return '';
+    const step = Utils.getBpmStep();
+    const bpm = Number(lastPractice.bpm);
+    const hasBpm = Number.isFinite(bpm) && bpm > 0;
+    const suggestion = this._buildNextUpSuggestion(lastPractice, step);
+    if (!suggestion) return '';
+
+    return `
+      <div class="df-panel df-panel--wide" id="next-up-card" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Next Up</div>
+        <div style="font-size:13px;color:var(--text2);">${suggestion.primaryText}</div>
+        ${suggestion.primaryAction ? `<button type="button" class="df-btn df-btn--primary" data-next-action="${suggestion.primaryAction.type}" data-next-value="${suggestion.primaryAction.value}" style="margin-top:10px;">${suggestion.primaryAction.label}</button>` : ''}
+        ${suggestion.secondaryText ? `<div style="font-size:12px;color:var(--text3);margin-top:8px;">${suggestion.secondaryText}</div>` : ''}
+        ${suggestion.secondaryAction ? `<button type="button" class="df-btn df-btn--outline" data-next-action="${suggestion.secondaryAction.type}" data-next-value="${suggestion.secondaryAction.value}" style="margin-top:8px;">${suggestion.secondaryAction.label}</button>` : ''}
+      </div>
+    `;
+  },
+
+  _buildNextUpSuggestion(lastPractice, step) {
+    const bpm = Number(lastPractice.bpm);
+    const hasBpm = Number.isFinite(bpm) && bpm > 0;
+    if (lastPractice.tool === 'progressions' && hasBpm) {
+      const progressionMap = {
+        'I-V-vi-IV': 'I-IV-V',
+        'I-IV-V': 'vi-IV-I-V',
+      };
+      const current = (lastPractice.progression_id || '').replace(/\s+/g, '');
+      const alt = progressionMap[current] || 'I-V-vi-IV';
+      return {
+        primaryText: `Keep momentum: try +${step} BPM.`,
+        primaryAction: {
+          type: 'set-bpm',
+          value: String(Math.min(240, bpm + step)),
+          label: `Set BPM to ${Math.min(240, bpm + step)}`
+        },
+        secondaryText: 'Or switch progression for variety.',
+        secondaryAction: {
+          type: 'try-progression',
+          value: alt,
+          label: `Try ${alt}`
+        },
+      };
+    }
+
+    if (lastPractice.tool === 'scales' && hasBpm) {
+      return {
+        primaryText: `Keep momentum: try +${step} BPM.`,
+        primaryAction: {
+          type: 'set-bpm',
+          value: String(Math.min(240, bpm + step)),
+          label: `Set BPM to ${Math.min(240, bpm + step)}`
+        },
+        secondaryText: 'Secondary: try this same scale in a nearby key.',
+      };
+    }
+
+    return null;
+  },
+
+  _initLastPractice(container, lastPractice) {
+    const lastCard = container.querySelector('#last-practice-card');
+    lastCard?.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-action="continue-last-practice"]');
+      if (!btn) return;
+      const state = Utils.getLastPractice();
+      if (!state?.tool) return;
+      const routeMap = {
+        progressions: '#/tools/progressions?resume=1',
+        scales: '#/tools/scales?resume=1',
+        chords: '#/tools/chords?resume=1',
+      };
+      const nextRoute = routeMap[state.tool];
+      if (nextRoute) go(nextRoute);
+    });
+
+    const nextCard = container.querySelector('#next-up-card');
+    nextCard?.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-next-action]');
+      if (!btn) return;
+      const action = btn.dataset.nextAction;
+      const value = btn.dataset.nextValue;
+      const state = Utils.getLastPractice();
+      if (!state) return;
+
+      if (action === 'set-bpm') {
+        const nextBpm = Math.max(30, Math.min(240, parseInt(value, 10) || 80));
+        localStorage.setItem('df_last_bpm', String(nextBpm));
+        Utils.setLastPractice({ bpm: nextBpm });
+        btn.textContent = `BPM set to ${nextBpm}`;
+        btn.disabled = true;
+        return;
+      }
+
+      if (action === 'try-progression') {
+        const progressionId = String(value || 'I-V-vi-IV');
+        Utils.setLastPractice({ progression_id: progressionId, tool: 'progressions' });
+        go('#/tools/progressions?resume=1');
+      }
+    });
+  },
 
   _renderRecentActivity(data) {
     const fmt = (iso) => {

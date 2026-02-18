@@ -64,9 +64,19 @@ Pages.Progressions = {
       ...CHROMATIC.map((note) => ({ value: `${note}|major`, label: `${toNoteName(note)} Major` })),
       ...CHROMATIC.map((note) => ({ value: `${note}|minor`, label: `${toNoteName(note)} Minor` })),
     ];
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+
     const savedKeyRoot = localStorage.getItem('df_last_key_root');
     const savedKeyMode = localStorage.getItem('df_last_key_mode');
-    const savedKeyValue = savedKeyRoot && savedKeyMode ? `${savedKeyRoot}|${savedKeyMode}` : 'C|major';
+    const resumeKeyRoot = lastPractice?.tool === 'progressions' ? lastPractice.key_root : null;
+    const resumeKeyMode = lastPractice?.tool === 'progressions' ? lastPractice.key_mode : null;
+    const savedKeyValue = resumeKeyRoot && resumeKeyMode
+      ? `${resumeKeyRoot}|${resumeKeyMode}`
+      : savedKeyRoot && savedKeyMode
+        ? `${savedKeyRoot}|${savedKeyMode}`
+        : 'C|major';
 
     app.innerHTML = `
       <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80');">
@@ -129,6 +139,10 @@ Pages.Progressions = {
     let progressionBeatsDone = 0;
     let practiceTickOffset = 0;
 
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const resumeRequested = params.get('resume') === '1';
+    const lastPractice = resumeRequested ? Utils.getLastPractice() : null;
+
     let practiceModeEnabled = localStorage.getItem('df_practice_mode_enabled') === '1';
     let bpm = getInt('df_last_bpm', 80);
     let beatsPerChord = getInt('df_practice_beats_per_chord', 4);
@@ -136,11 +150,40 @@ Pages.Progressions = {
     let countInEnabled = localStorage.getItem('df_practice_countin_enabled') !== '0';
     let countInBars = getInt('df_practice_countin_bars', 1);
 
+    if (lastPractice?.tool === 'progressions') {
+      if (Number.isFinite(Number(lastPractice.bpm))) bpm = Number(lastPractice.bpm);
+      if (Number.isFinite(Number(lastPractice.beats_per_chord))) beatsPerChord = Number(lastPractice.beats_per_chord);
+      if (typeof lastPractice.countin_enabled === 'boolean') countInEnabled = lastPractice.countin_enabled;
+      if (Number.isFinite(Number(lastPractice.countin_bars))) countInBars = Number(lastPractice.countin_bars);
+      practiceModeEnabled = true;
+    }
+
     const stopMetronome = () => {
       window.FFMetronome.stopMetronome();
     };
 
     const getCountInBeatsTotal = () => (countInEnabled ? countInBars * 4 : 0);
+
+
+    const progressionToId = (progression = []) => progression.join('-').replace(/\s+/g, '');
+
+    const writeLastPractice = (extra = {}) => {
+      if (!activeProgression) return;
+      const [keyRoot, keyMode] = keyEl.value.split('|');
+      Utils.setLastPractice({
+        tool: 'progressions',
+        key_root: keyRoot || null,
+        key_mode: keyMode || null,
+        progression_id: progressionToId(activeProgression),
+        scale_id: null,
+        chord_id: null,
+        bpm,
+        beats_per_chord: beatsPerChord,
+        countin_enabled: countInEnabled,
+        countin_bars: countInBars,
+        ...extra,
+      });
+    };
 
     const pausePractice = () => {
       if (modeState !== 'countin' && modeState !== 'playing') return;
@@ -151,6 +194,7 @@ Pages.Progressions = {
     };
 
     const stopPractice = () => {
+      writeLastPractice();
       stopMetronome();
       modeState = 'stopped';
       activeChordIndex = 0;
@@ -174,6 +218,8 @@ Pages.Progressions = {
 
       modeState = countInBeats > 0 && countInBeatsDone < countInBeats ? 'countin' : 'playing';
       practiceTickOffset = countInBeatsDone + progressionBeatsDone;
+
+      writeLastPractice();
 
       window.FFMetronome.startMetronome({
         bpm,
@@ -261,6 +307,7 @@ Pages.Progressions = {
       practicePanelEl.querySelector('#practice-bpm').addEventListener('change', (e) => {
         bpm = Math.max(30, Math.min(240, parseInt(e.target.value, 10) || 80));
         localStorage.setItem('df_last_bpm', String(bpm));
+        if (activeProgression) writeLastPractice();
         if (modeState === 'countin' || modeState === 'playing') startPractice();
         else renderPracticePanel();
       });
@@ -268,6 +315,7 @@ Pages.Progressions = {
       practicePanelEl.querySelector('#practice-beats').addEventListener('change', (e) => {
         beatsPerChord = parseInt(e.target.value, 10);
         localStorage.setItem('df_practice_beats_per_chord', String(beatsPerChord));
+        if (activeProgression) writeLastPractice();
         renderPracticePanel();
       });
 
@@ -279,12 +327,14 @@ Pages.Progressions = {
       practicePanelEl.querySelector('#practice-countin').addEventListener('change', (e) => {
         countInEnabled = e.target.checked;
         localStorage.setItem('df_practice_countin_enabled', countInEnabled ? '1' : '0');
+        if (activeProgression) writeLastPractice();
         renderPracticePanel();
       });
 
       practicePanelEl.querySelector('#practice-countin-bars').addEventListener('change', (e) => {
         countInBars = parseInt(e.target.value, 10);
         localStorage.setItem('df_practice_countin_bars', String(countInBars));
+        if (activeProgression) writeLastPractice();
       });
 
       practicePanelEl.querySelector('#practice-start').addEventListener('click', () => startPractice());
@@ -364,6 +414,7 @@ Pages.Progressions = {
           countInBeatsDone = 0;
           progressionBeatsDone = 0;
           modeState = 'stopped';
+          writeLastPractice({ started_at: Date.now() });
           renderState();
         });
       });
@@ -371,6 +422,19 @@ Pages.Progressions = {
       renderPracticePanel();
       renderOutput();
     };
+
+    const applyResumeProgression = () => {
+      if (!lastPractice || lastPractice.tool !== 'progressions' || !lastPractice.progression_id) return;
+      const target = String(lastPractice.progression_id).replace(/\s+/g, '');
+      const progressionSet = keyEl.value.endsWith('|major') ? MAJOR_PROGRESSIONS : MINOR_PROGRESSIONS;
+      const match = progressionSet.find((item) => item.roman.join('-').replace(/\s+/g, '') === target);
+      if (match) activeProgression = match.roman.slice();
+    };
+
+    applyResumeProgression();
+    if (resumeRequested && activeProgression && practiceModeEnabled) {
+      setTimeout(() => startPractice(), 0);
+    }
 
     keyEl.addEventListener('change', () => {
       activeProgression = null;
