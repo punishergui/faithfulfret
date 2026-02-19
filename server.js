@@ -1080,6 +1080,10 @@ apiRouter.get('/video-playlists', (req, res) => {
   return res.json(playlists);
 });
 
+apiRouter.get('/video-playlist-groups', (req, res) => {
+  return res.json(Store.listPlaylistGroups());
+});
+
 apiRouter.get('/video-playlists/:id', (req, res) => {
   const playlist = playlistWithItems(req.params.id);
   if (!playlist) return res.status(404).json({ error: 'not found' });
@@ -1096,6 +1100,21 @@ apiRouter.put('/video-playlists/:id', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const saved = Store.saveVideoPlaylist({ ...existing, ...req.body, id: Number(req.params.id) });
+  return res.json(playlistWithItems(saved.id));
+});
+
+apiRouter.patch('/training/playlists/:id', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const allowedTypes = new Set(['Skill', 'Song', 'Course', 'General']);
+  const type = req.body?.playlist_type || req.body?.type || existing.playlist_type || 'General';
+  const payload = {
+    ...existing,
+    ...req.body,
+    id: Number(req.params.id),
+    playlist_type: allowedTypes.has(type) ? type : 'General',
+  };
+  const saved = Store.saveVideoPlaylist(payload);
   return res.json(playlistWithItems(saved.id));
 });
 

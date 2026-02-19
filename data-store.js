@@ -136,6 +136,19 @@ CREATE TABLE IF NOT EXISTS video_playlists (
   createdAt INTEGER,
   updatedAt INTEGER
 );
+CREATE TABLE IF NOT EXISTS playlist_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS playlist_group_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER,
+  playlist_id INTEGER,
+  order_index INTEGER DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS video_playlist_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   playlistId INTEGER,
@@ -330,6 +343,15 @@ ensureColumn('video_playlist_items', 'position', 'INTEGER');
 ensureColumn('video_playlists', 'created_at', 'INTEGER');
 ensureColumn('video_playlists', 'updated_at', 'INTEGER');
 ensureColumn('video_playlists', 'sort_order', 'INTEGER DEFAULT 0');
+ensureColumn('video_playlists', 'difficulty_label', 'TEXT');
+ensureColumn('video_playlists', 'playlist_type', "TEXT DEFAULT 'General'");
+ensureColumn('playlist_groups', 'name', 'TEXT');
+ensureColumn('playlist_groups', 'description', 'TEXT');
+ensureColumn('playlist_groups', 'order_index', 'INTEGER DEFAULT 0');
+ensureColumn('playlist_groups', 'created_at', 'TEXT');
+ensureColumn('playlist_group_items', 'group_id', 'INTEGER');
+ensureColumn('playlist_group_items', 'playlist_id', 'INTEGER');
+ensureColumn('playlist_group_items', 'order_index', 'INTEGER DEFAULT 0');
 ensureColumn('video_playlist_items', 'playlist_id', 'INTEGER');
 ensureColumn('video_playlist_items', 'video_id', 'INTEGER');
 ensureColumn('video_attachments', 'video_id', 'INTEGER');
@@ -366,6 +388,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity
 db.exec('CREATE INDEX IF NOT EXISTS idx_training_playlist_items_playlist_id ON training_playlist_items(playlist_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_video_playlist_items_playlist_id ON video_playlist_items(playlist_id, playlistId)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_video_attachments_video_id ON video_attachments(video_id)');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_group_items_playlist ON playlist_group_items(playlist_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_playlist_group_items_group_order ON playlist_group_items(group_id, order_index)');
 
 db.exec(`CREATE TABLE IF NOT EXISTS levels (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -730,11 +754,18 @@ function coerceTrainingVideo(input = {}) {
 function coerceVideoPlaylist(input = {}) {
   const now = Date.now();
   const sortOrder = input.sort_order == null || input.sort_order === '' ? 0 : Number(input.sort_order);
+  const groupId = input.group_id == null || input.group_id === '' ? null : Number(input.group_id);
+  const orderIndex = input.order_index == null || input.order_index === '' ? sortOrder : Number(input.order_index);
   return {
     id: input.id == null || input.id === '' ? null : Number(input.id),
     name: input.name || '',
     description: input.description || '',
     sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
+    order_index: Number.isFinite(orderIndex) ? orderIndex : 0,
+    difficulty_label: input.difficulty_label || input.difficulty || '',
+    playlist_type: input.playlist_type || input.type || 'General',
+    group_id: Number.isFinite(groupId) ? groupId : null,
+    group_name: input.group_name || '',
     createdAt: Number(input.createdAt) || now,
     updatedAt: Number(input.updatedAt) || now,
   };
@@ -1116,9 +1147,43 @@ const saveVideoTimestamp = (data) => {
 };
 const deleteVideoTimestamp = (id) => run('DELETE FROM video_timestamps WHERE id = ?', Number(id));
 
+const listPlaylistGroups = () => all('SELECT * FROM playlist_groups ORDER BY COALESCE(order_index, 0) ASC, name COLLATE NOCASE ASC');
+
+const upsertPlaylistGroupItem = (playlistId, groupId, orderIndex) => {
+  if (groupId) {
+    db.prepare(`INSERT INTO playlist_group_items (group_id, playlist_id, order_index)
+      VALUES (@group_id, @playlist_id, @order_index)
+      ON CONFLICT(playlist_id) DO UPDATE SET
+        group_id=excluded.group_id,
+        order_index=excluded.order_index`).run({
+      group_id: Number(groupId),
+      playlist_id: Number(playlistId),
+      order_index: Number.isFinite(Number(orderIndex)) ? Number(orderIndex) : 0,
+    });
+    return;
+  }
+  run('DELETE FROM playlist_group_items WHERE playlist_id = ?', Number(playlistId));
+};
+
+const resolvePlaylistGroupId = (row) => {
+  if (Number(row.group_id)) return Number(row.group_id);
+  const name = String(row.group_name || '').trim();
+  if (!name) return null;
+  const existing = one('SELECT * FROM playlist_groups WHERE LOWER(name) = LOWER(?)', name);
+  if (existing) return Number(existing.id);
+  const result = db.prepare('INSERT INTO playlist_groups (name, description, order_index, created_at) VALUES (?,?,?,?)')
+    .run(name, '', 0, String(Date.now()));
+  return Number(result.lastInsertRowid);
+};
+
 const listVideoPlaylists = () => all(`
   SELECT
     p.*,
+    gi.group_id,
+    gi.order_index,
+    g.name AS group_name,
+    g.description AS group_description,
+    g.order_index AS group_order_index,
     (
       SELECT COUNT(*)
       FROM video_playlist_items i
@@ -1133,23 +1198,42 @@ const listVideoPlaylists = () => all(`
       LIMIT 1
     ) AS preview_thumbnail_url
   FROM video_playlists p
-  ORDER BY COALESCE(p.sort_order, 0) ASC, p.name COLLATE NOCASE ASC
+  LEFT JOIN playlist_group_items gi ON gi.playlist_id = p.id
+  LEFT JOIN playlist_groups g ON g.id = gi.group_id
+  ORDER BY COALESCE(g.order_index, 999999) ASC, COALESCE(gi.order_index, COALESCE(p.sort_order, 0)) ASC, p.name COLLATE NOCASE ASC
 `);
-const getVideoPlaylist = (id) => one('SELECT * FROM video_playlists WHERE id = ?', Number(id));
+const getVideoPlaylist = (id) => one(`
+  SELECT
+    p.*,
+    gi.group_id,
+    gi.order_index,
+    g.name AS group_name,
+    g.description AS group_description,
+    g.order_index AS group_order_index
+  FROM video_playlists p
+  LEFT JOIN playlist_group_items gi ON gi.playlist_id = p.id
+  LEFT JOIN playlist_groups g ON g.id = gi.group_id
+  WHERE p.id = ?
+`, Number(id));
 const saveVideoPlaylist = (data) => {
   const row = coerceVideoPlaylist(data);
   const existing = row.id ? getVideoPlaylist(row.id) : null;
   if (existing) {
-    db.prepare('UPDATE video_playlists SET name=@name, description=@description, sort_order=@sort_order, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
+    db.prepare('UPDATE video_playlists SET name=@name, description=@description, sort_order=@sort_order, difficulty_label=@difficulty_label, playlist_type=@playlist_type, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
       .run({ ...row, createdAt: existing.createdAt || row.createdAt, updatedAt: Date.now() });
+    const groupId = resolvePlaylistGroupId(row);
+    upsertPlaylistGroupItem(row.id, groupId, row.order_index);
     return getVideoPlaylist(row.id);
   }
-  const result = db.prepare('INSERT INTO video_playlists (name,description,sort_order,createdAt,updatedAt) VALUES (@name,@description,@sort_order,@createdAt,@updatedAt)')
+  const result = db.prepare('INSERT INTO video_playlists (name,description,sort_order,difficulty_label,playlist_type,createdAt,updatedAt) VALUES (@name,@description,@sort_order,@difficulty_label,@playlist_type,@createdAt,@updatedAt)')
     .run({ ...row, updatedAt: Date.now() });
+  const groupId = resolvePlaylistGroupId(row);
+  upsertPlaylistGroupItem(result.lastInsertRowid, groupId, row.order_index);
   return getVideoPlaylist(result.lastInsertRowid);
 };
 const deleteVideoPlaylist = (id) => {
   const tx = db.transaction((playlistId) => {
+    run('DELETE FROM playlist_group_items WHERE playlist_id = ?', playlistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', playlistId);
     run('DELETE FROM video_playlists WHERE id = ?', playlistId);
   });
@@ -1664,4 +1748,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
