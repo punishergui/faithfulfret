@@ -523,7 +523,6 @@ Pages.Presets = {
     app.innerHTML = `
       ${Utils.renderPageHero({
         title: 'Presets',
-        image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&q=80',
         actions: '<button id="new-preset-btn" class="df-btn df-btn--primary">+ Add Preset</button>',
       })}
       <div class="page-wrap" style="padding:24px;">

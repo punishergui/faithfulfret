@@ -26,7 +26,6 @@ Pages.Sessions = {
   _renderHero(stats) {
     return Utils.renderPageHero({
       title: 'Sessions',
-      image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=1200&q=80',
       actions: '<a href="#/log" class="df-btn df-btn--primary">+ Log Session</a>',
     });
   },

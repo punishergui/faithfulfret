@@ -19,7 +19,7 @@ Pages.SessionForm = {
     const today = Utils.today();
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">${title}</div>
         </div>

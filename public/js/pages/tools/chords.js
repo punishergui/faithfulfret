@@ -28,7 +28,7 @@ Pages.Chords = {
     const savedBpm = parseInt(localStorage.getItem('df_last_bpm') || '', 10);
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1516924962500-2b4b3b99ea02?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">Chords</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>

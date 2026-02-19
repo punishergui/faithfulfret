@@ -79,7 +79,7 @@ Pages.Progressions = {
         : 'C|major';
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">Progressions</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>
