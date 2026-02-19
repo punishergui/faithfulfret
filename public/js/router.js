@@ -14,7 +14,7 @@
     { pattern: /^#\/gear$/,                       handler: () => Pages.Gear.render() },
     { pattern: /^#\/training\/videos\/new$/,       handler: () => Pages.ResourceVideosEdit.render(null) },
     { pattern: /^#\/training\/playlists$/,          handler: () => Pages.TrainingPlaylists.render() },
-    { pattern: /^#\/training\/playlists\/(\d+)$/,   handler: (m) => Pages.TrainingPlaylistEdit.render(m[1]) },
+    { pattern: /^#\/training\/playlists\/(\d+)(?:\?.*)?$/,   handler: (m) => Pages.TrainingPlaylistEdit.render(m[1]) },
     { pattern: /^#\/training(?:\?.*)?$/,        handler: () => Pages.TrainingHome.render() },
     { pattern: /^#\/training\/levels$/,           handler: () => Pages.TrainingLevels.render() },
     { pattern: /^#\/training\/level\/(\d+)$/,     handler: (m) => Pages.TrainingLevel.render(m[1]) },

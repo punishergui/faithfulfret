@@ -388,6 +388,18 @@
       return api(`/api/video-playlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) });
     },
 
+    async addTrainingPlaylistItem(id, data) {
+      return api(`/api/training/playlists/${id}/items`, { method: 'POST', body: JSON.stringify(data || {}) });
+    },
+
+    async deleteTrainingPlaylistItem(id, itemId) {
+      return api(`/api/training/playlists/${id}/items/${itemId}`, { method: 'DELETE' });
+    },
+
+    async getTrainingPlaylistDetail(id) {
+      return api(`/api/training/playlists/${id}`);
+    },
+
     async getVideoAttachments(videoId) {
       return api(`/api/videos/${videoId}/attachments`);
     },
