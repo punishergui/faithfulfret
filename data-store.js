@@ -819,7 +819,11 @@ assertQueriesInitialized();
 
 const all = (sql) => db.prepare(sql).all();
 const one = (sql, v) => db.prepare(sql).get(v);
-const run = (sql, v) => db.prepare(sql).run(v);
+const run = (sql, ...params) => {
+  if (!params.length) return db.prepare(sql).run();
+  if (params.length === 1) return db.prepare(sql).run(params[0]);
+  return db.prepare(sql).run(...params);
+};
 
 const listSessions = () => all('SELECT * FROM sessions ORDER BY date DESC, createdAt DESC');
 
@@ -1614,15 +1618,23 @@ const addPlaylistItem = (playlistId, item = {}) => {
     console.log('[addPlaylistItem] SQL', insertSql, 'params', params);
   }
 
-  const result = insertItem.run(...params);
-  run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
-  return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
+  const tx = db.transaction(() => {
+    const result = insertItem.run(...params);
+    run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
+    return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
+  });
+
+  return tx();
 };
 
 const deletePlaylistItem = (playlistId, itemId) => {
   const targetPlaylistId = Number(playlistId);
-  run('DELETE FROM video_playlist_items WHERE id = ? AND COALESCE(playlist_id, playlistId) = ?', Number(itemId), targetPlaylistId);
-  run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', Date.now(), targetPlaylistId);
+  const tx = db.transaction(() => {
+    run('DELETE FROM video_playlist_items WHERE id = ? AND COALESCE(playlist_id, playlistId) = ?', Number(itemId), targetPlaylistId);
+    run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', Date.now(), targetPlaylistId);
+  });
+
+  tx();
 };
 
 const listTrainingPlaylists = () => all('SELECT * FROM training_playlists ORDER BY updated_at DESC, name COLLATE NOCASE ASC');
