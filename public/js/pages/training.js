@@ -389,10 +389,11 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
 Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async () => {
   const app = document.getElementById('app');
   const parentId = Number(qv('parentId') || 0);
-  const [playlist, videos, allPlaylists] = await Promise.all([
+  const [playlist, videos, allPlaylists, videoAssignments] = await Promise.all([
     DB.getTrainingPlaylistDetail(id),
     DB.getAllTrainingVideos({ includeProgress: 1 }),
     DB.getVideoPlaylists({ scope: 'all' }),
+    DB.getTrainingPlaylistVideoAssignments(),
   ]);
   if (!playlist) { app.innerHTML = '<div class="page-wrap" style="padding:24px;">Playlist not found.</div>'; return; }
 
@@ -405,6 +406,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     lastSavedAt: Number(playlist.updatedAt || playlist.updated_at || Date.now()),
     deepVideoIds: new Set((playlist.deep_video_ids || []).map((id) => Number(id)).filter(Boolean)),
     deepStats: playlist.deep_stats || { deepVideoCount: 0, deepDurationSeconds: 0, unknownDurationCount: 0 },
+    videoAssignments: Object.fromEntries(Object.entries(videoAssignments || {}).map(([videoId, playlistId]) => [Number(videoId), Number(playlistId)])),
   };
   const videosMap = new Map(videos.map((v) => [Number(v.id), v]));
   const idToPlaylist = new Map(allPlaylists.map((p) => [Number(p.id), p]));
@@ -450,10 +452,14 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
 
   const route = `#/training/playlists/${id}${parentId ? `?parentId=${parentId}` : ''}`;
   const refreshDeepData = async () => {
-    const refreshed = await DB.getTrainingPlaylistDetail(id);
+    const [refreshed, assignments] = await Promise.all([
+      DB.getTrainingPlaylistDetail(id),
+      DB.getTrainingPlaylistVideoAssignments(),
+    ]);
     if (!refreshed) return;
     state.deepVideoIds = new Set((refreshed.deep_video_ids || []).map((entryId) => Number(entryId)).filter(Boolean));
     state.deepStats = refreshed.deep_stats || { deepVideoCount: 0, deepDurationSeconds: 0, unknownDurationCount: 0 };
+    state.videoAssignments = Object.fromEntries(Object.entries(assignments || {}).map(([videoId, playlistId]) => [Number(videoId), Number(playlistId)]));
     state.items = Array.isArray(refreshed.items)
       ? refreshed.items.slice().sort((a, b) => (Number(a.order_index ?? a.position) || 0) - (Number(b.order_index ?? b.position) || 0))
       : state.items;
@@ -513,7 +519,9 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const { existingVideoIds, existingPlaylistIds } = getSelectableIds();
     const selectableVideos = videos.filter((video) => {
       const videoId = Number(video.id);
-      return videoId && !existingVideoIds.has(videoId) && !state.deepVideoIds.has(videoId);
+      if (!videoId || existingVideoIds.has(videoId) || state.deepVideoIds.has(videoId)) return false;
+      const assignedPlaylistId = Number(state.videoAssignments?.[videoId] || 0);
+      return !assignedPlaylistId || assignedPlaylistId === Number(id);
     });
     const selectablePlaylists = allPlaylists.filter((entry) => {
       const playlistId = Number(entry.id);
@@ -654,7 +662,11 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       await syncAfterMutation();
       renderPlaylistItems(state.items);
     } catch (error) {
-      showErr(error.message || 'Add video failed.');
+      if (String(error.message || '').includes('409')) {
+        showErr('Video already assigned to another playlist.');
+      } else {
+        showErr(error.message || 'Add video failed.');
+      }
     }
     setBusy(false);
   });
