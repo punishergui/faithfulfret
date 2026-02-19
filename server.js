@@ -241,11 +241,28 @@ function playlistWithItems(id) {
   if (!playlist) return null;
   const items = Store.listPlaylistItems(id);
   const enriched = items.map((item) => {
+    const itemType = String(item.item_type || 'video');
+    if (itemType === 'playlist') {
+      const childPlaylistId = Number(item.child_playlist_id);
+      const child = childPlaylistId ? Store.getVideoPlaylist(childPlaylistId) : null;
+      const thumbnail = childPlaylistId ? Store.getPlaylistFirstThumbnail(childPlaylistId) : '';
+      return {
+        ...item,
+        item_type: 'playlist',
+        child_playlist: child ? {
+          id: child.id,
+          name: child.name,
+          description: child.description,
+          thumbnail,
+        } : null,
+      };
+    }
     const videoId = Number(item.video_id || item.videoId);
     const video = videoId ? Store.getTrainingVideo(videoId) : null;
     const progress = videoId ? Store.getTrainingVideoProgress(videoId) : null;
     return {
       ...item,
+      item_type: 'video',
       video,
       progress,
     };
@@ -1131,6 +1148,33 @@ apiRouter.put('/video-playlists/:id/items', (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   Store.replacePlaylistItems(req.params.id, items);
   return res.json(playlistWithItems(req.params.id));
+});
+
+apiRouter.post('/training/playlists/:id/items', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  const item = req.body || {};
+  const itemType = String(item.item_type || 'video');
+  if (itemType !== 'video' && itemType !== 'playlist') return res.status(400).json({ error: 'invalid item_type' });
+  try {
+    const saved = Store.addPlaylistItem(req.params.id, item);
+    return res.status(201).json(saved);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'unable to add item' });
+  }
+});
+
+apiRouter.get('/training/playlists/:id', (req, res) => {
+  const playlist = playlistWithItems(req.params.id);
+  if (!playlist) return res.status(404).json({ error: 'not found' });
+  return res.json(playlist);
+});
+
+apiRouter.delete('/training/playlists/:id/items/:itemId', (req, res) => {
+  const existing = Store.getVideoPlaylist(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'not found' });
+  Store.deletePlaylistItem(req.params.id, req.params.itemId);
+  return res.json({ ok: true });
 });
 
 

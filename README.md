@@ -77,6 +77,7 @@ After deploy, verify Session Detail uses two columns on desktop (video + content
 After deploy, verify Training Video Description editor supports inline code + code blocks (with preserved newlines), emoji picker insertions at caret, and theme-driven text colors (`data-color` spans) that adapt when switching themes.
 After deploy, verify `#/training/videos/:id` rich description display wraps in the main column (including links), H2/H3 toolbar creates real headings that persist after save/reload, and emoji picker shows category tabs with expanded sets plus search.
 After deploy, verify `#/training/playlists/:id` right sidebar includes **Edit Playlist**, and modal saves name, description, difficulty label, type, and order-within-group.
+After deploy, verify Training playlists support mixed nested items (videos + child playlists), breadcrumb trail updates when opening nested playlists, cycle-prevention blocks adding parent into descendants, and nested playlist thumbnails resolve from first depth-first video (or placeholder).
 After deploy, verify `#/training/playlists` renders one-level group cards with expand/collapse, grouped playlists sorted by order, and ungrouped playlists under **General**.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 

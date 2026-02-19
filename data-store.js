@@ -354,6 +354,9 @@ ensureColumn('playlist_group_items', 'playlist_id', 'INTEGER');
 ensureColumn('playlist_group_items', 'order_index', 'INTEGER DEFAULT 0');
 ensureColumn('video_playlist_items', 'playlist_id', 'INTEGER');
 ensureColumn('video_playlist_items', 'video_id', 'INTEGER');
+ensureColumn('video_playlist_items', 'item_type', "TEXT NOT NULL DEFAULT 'video'");
+ensureColumn('video_playlist_items', 'child_playlist_id', 'INTEGER');
+ensureColumn('video_playlist_items', 'order_index', 'INTEGER DEFAULT 0');
 ensureColumn('video_attachments', 'video_id', 'INTEGER');
 ensureColumn('video_attachments', 'kind', "TEXT CHECK(kind IN ('pdf','image','link'))");
 ensureColumn('video_attachments', 'title', 'TEXT');
@@ -387,6 +390,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_session_items_session_id ON session_item
 db.exec('CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity_type, entity_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_training_playlist_items_playlist_id ON training_playlist_items(playlist_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_video_playlist_items_playlist_id ON video_playlist_items(playlist_id, playlistId)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_video_playlist_items_child_playlist_id ON video_playlist_items(child_playlist_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_video_attachments_video_id ON video_attachments(video_id)');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_group_items_playlist ON playlist_group_items(playlist_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_playlist_group_items_group_order ON playlist_group_items(group_id, order_index)');
@@ -1482,28 +1486,127 @@ const listVideoAttachments = (videoId) => db.prepare('SELECT * FROM video_attach
 const getVideoAttachment = (id) => one('SELECT * FROM video_attachments WHERE id = ?', Number(id));
 const deleteVideoAttachment = (id) => run('DELETE FROM video_attachments WHERE id = ?', Number(id));
 
-const listPlaylistItems = (playlistId) => db.prepare('SELECT * FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ? ORDER BY position ASC, id ASC').all(Number(playlistId));
+const listPlaylistItems = (playlistId) => db.prepare(`
+  SELECT *
+  FROM video_playlist_items
+  WHERE COALESCE(playlist_id, playlistId) = ?
+  ORDER BY COALESCE(order_index, position, 0) ASC, id ASC
+`).all(Number(playlistId));
+
+const playlistContainsTarget = (playlistId, targetId, visited = new Set()) => {
+  const start = Number(playlistId);
+  const target = Number(targetId);
+  if (!start || !target) return false;
+  if (start === target) return true;
+  if (visited.has(start)) return false;
+  visited.add(start);
+  const children = db.prepare(`
+    SELECT child_playlist_id
+    FROM video_playlist_items
+    WHERE COALESCE(playlist_id, playlistId) = ?
+      AND COALESCE(item_type, 'video') = 'playlist'
+      AND child_playlist_id IS NOT NULL
+  `).all(start);
+  for (const child of children) {
+    const childId = Number(child.child_playlist_id);
+    if (!childId) continue;
+    if (childId === target) return true;
+    if (playlistContainsTarget(childId, target, visited)) return true;
+  }
+  return false;
+};
+
+const getPlaylistFirstThumbnail = (playlistId, visited = new Set()) => {
+  const targetId = Number(playlistId);
+  if (!targetId || visited.has(targetId)) return '';
+  visited.add(targetId);
+  const items = listPlaylistItems(targetId);
+  for (const item of items) {
+    const itemType = String(item.item_type || 'video');
+    if (itemType === 'video') {
+      const videoId = Number(item.video_id || item.videoId);
+      if (!videoId) continue;
+      const video = getTrainingVideo(videoId);
+      const thumb = video?.thumbnail_url || video?.thumb_url || video?.thumbUrl || '';
+      if (thumb) return thumb;
+      continue;
+    }
+    if (itemType === 'playlist') {
+      const childId = Number(item.child_playlist_id);
+      if (!childId) continue;
+      const nested = getPlaylistFirstThumbnail(childId, visited);
+      if (nested) return nested;
+    }
+  }
+  return '';
+};
 const listPlaylistsByVideo = (videoId) => db.prepare(`
-  SELECT p.*, i.position
+  SELECT p.*, COALESCE(i.order_index, i.position, 0) AS position
   FROM video_playlist_items i
   JOIN video_playlists p ON p.id = COALESCE(i.playlist_id, i.playlistId)
-  WHERE COALESCE(i.video_id, i.videoId) = ?
+  WHERE COALESCE(i.item_type, 'video') = 'video'
+    AND COALESCE(i.video_id, i.videoId) = ?
   ORDER BY p.name COLLATE NOCASE ASC
 `).all(Number(videoId));
 const replacePlaylistItems = (playlistId, items = []) => {
   const tx = db.transaction((targetPlaylistId, nextItems) => {
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId);
-    const insert = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,videoId,video_id,position) VALUES (?,?,?,?,?)');
+    const insert = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)');
     nextItems.forEach((item, index) => {
-      const videoId = Number(item.videoId);
+      const itemType = String(item.item_type || item.itemType || 'video');
+      const requestedOrder = Number(item.order_index ?? item.position);
+      const orderIndex = Number.isFinite(requestedOrder) ? requestedOrder : index + 1;
+      if (itemType === 'playlist') {
+        const childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
+        if (!childPlaylistId) return;
+        if (childPlaylistId === targetPlaylistId) throw new Error('Playlist cannot contain itself');
+        if (playlistContainsTarget(childPlaylistId, targetPlaylistId)) throw new Error('Adding this playlist would create a cycle');
+        insert.run(targetPlaylistId, targetPlaylistId, 'playlist', null, null, childPlaylistId, orderIndex, orderIndex);
+        return;
+      }
+      const videoId = Number(item.video_id || item.videoId);
       if (!videoId) return;
-      const position = Number(item.position);
-      insert.run(targetPlaylistId, targetPlaylistId, videoId, videoId, Number.isFinite(position) ? position : index + 1);
+      insert.run(targetPlaylistId, targetPlaylistId, 'video', videoId, videoId, null, orderIndex, orderIndex);
     });
     db.prepare('UPDATE video_playlists SET updatedAt = ? WHERE id = ?').run(Date.now(), targetPlaylistId);
   });
   tx(Number(playlistId), items);
   return listPlaylistItems(playlistId);
+};
+
+const addPlaylistItem = (playlistId, item = {}) => {
+  const targetPlaylistId = Number(playlistId);
+  const parent = getVideoPlaylist(targetPlaylistId);
+  if (!parent) throw new Error('playlist not found');
+  const itemType = String(item.item_type || item.itemType || 'video');
+  const now = Date.now();
+  const existingCount = Number(one('SELECT COUNT(1) AS c FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId)?.c || 0);
+  const requestedOrder = Number(item.order_index);
+  const orderIndex = Number.isFinite(requestedOrder) ? requestedOrder : existingCount + 1;
+  if (itemType === 'playlist') {
+    const childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
+    if (!childPlaylistId) throw new Error('child_playlist_id is required');
+    if (!getVideoPlaylist(childPlaylistId)) throw new Error('child playlist not found');
+    if (childPlaylistId === targetPlaylistId) throw new Error('Playlist cannot contain itself');
+    if (playlistContainsTarget(childPlaylistId, targetPlaylistId)) throw new Error('Adding this playlist would create a cycle');
+    const result = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)')
+      .run(targetPlaylistId, targetPlaylistId, 'playlist', null, null, childPlaylistId, orderIndex, orderIndex);
+    run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
+    return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
+  }
+  const videoId = Number(item.video_id || item.videoId);
+  if (!videoId) throw new Error('video_id is required');
+  if (!getTrainingVideo(videoId)) throw new Error('video not found');
+  const result = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)')
+    .run(targetPlaylistId, targetPlaylistId, 'video', videoId, videoId, null, orderIndex, orderIndex);
+  run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
+  return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
+};
+
+const deletePlaylistItem = (playlistId, itemId) => {
+  const targetPlaylistId = Number(playlistId);
+  run('DELETE FROM video_playlist_items WHERE id = ? AND COALESCE(playlist_id, playlistId) = ?', Number(itemId), targetPlaylistId);
+  run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', Date.now(), targetPlaylistId);
 };
 
 const listTrainingPlaylists = () => all('SELECT * FROM training_playlists ORDER BY updated_at DESC, name COLLATE NOCASE ASC');
@@ -1748,4 +1851,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, listPlaylistsByVideo, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
