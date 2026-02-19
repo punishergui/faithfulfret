@@ -1302,7 +1302,7 @@ select.df-input option {
    TOOL CARDS
    ============================================================ */
 .tools-wrap {
-  padding: 28px 24px 56px;
+  padding: 40px 24px 56px;
 }
 
 .tools-grid {
@@ -1394,7 +1394,7 @@ select.df-input option {
 
 @media (max-width: 699px) {
   .tools-wrap {
-    padding: 18px 14px 34px;
+    padding: 24px 14px 34px;
   }
 
   .tools-grid {
@@ -3678,6 +3678,23 @@ body.print-view .chord-chart-row {
   display: grid;
   gap: 6px;
   justify-self: end;
+}
+
+
+.playlist-item-action {
+  color: var(--text);
+  opacity: 0.92;
+}
+
+.playlist-item-action:hover {
+  color: var(--text);
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.playlist-item-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .training-video-library-card {
