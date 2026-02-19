@@ -3182,6 +3182,12 @@ body.print-view .chord-chart-row {
   border-color: var(--accent);
 }
 
+
+.word-wrap {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
 .training-rich-editor__surface {
   min-height: 140px;
   padding: 10px 12px;

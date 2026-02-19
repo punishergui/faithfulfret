@@ -130,7 +130,7 @@ Pages.ResourceVideoDetail = {
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:3px 8px;font-size:11px;">${tag}</span>`).join('')}</div>
           <div style="margin-top:12px;">
             <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Description</div>
-            ${descriptionHtml ? `<div class="training-description-content rt-display">${descriptionHtml}</div>` : '<div style="color:var(--text3);font-size:13px;">No description yet.</div>'}
+            ${descriptionHtml ? `<div class="training-description-content rt-display word-wrap">${descriptionHtml}</div>` : '<div style="color:var(--text3);font-size:13px;">No description yet.</div>'}
           </div>
         </div>
 

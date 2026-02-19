@@ -345,6 +345,7 @@ ensureColumn('video_playlists', 'updated_at', 'INTEGER');
 ensureColumn('video_playlists', 'sort_order', 'INTEGER DEFAULT 0');
 ensureColumn('video_playlists', 'difficulty_label', 'TEXT');
 ensureColumn('video_playlists', 'playlist_type', "TEXT DEFAULT 'General'");
+ensureColumn('video_playlists', 'parent_playlist_id', 'INTEGER');
 ensureColumn('playlist_groups', 'name', 'TEXT');
 ensureColumn('playlist_groups', 'description', 'TEXT');
 ensureColumn('playlist_groups', 'order_index', 'INTEGER DEFAULT 0');
@@ -760,6 +761,7 @@ function coerceVideoPlaylist(input = {}) {
   const sortOrder = input.sort_order == null || input.sort_order === '' ? 0 : Number(input.sort_order);
   const groupId = input.group_id == null || input.group_id === '' ? null : Number(input.group_id);
   const orderIndex = input.order_index == null || input.order_index === '' ? sortOrder : Number(input.order_index);
+  const parentPlaylistId = input.parent_playlist_id == null || input.parent_playlist_id === '' ? null : Number(input.parent_playlist_id);
   return {
     id: input.id == null || input.id === '' ? null : Number(input.id),
     name: input.name || '',
@@ -770,6 +772,7 @@ function coerceVideoPlaylist(input = {}) {
     playlist_type: input.playlist_type || input.type || 'General',
     group_id: Number.isFinite(groupId) ? groupId : null,
     group_name: input.group_name || '',
+    parent_playlist_id: Number.isFinite(parentPlaylistId) ? parentPlaylistId : null,
     createdAt: Number(input.createdAt) || now,
     updatedAt: Number(input.updatedAt) || now,
   };
@@ -1188,12 +1191,7 @@ const listVideoPlaylists = ({ scope = 'all', q = '' } = {}) => {
   const query = String(q || '').trim();
   const where = [];
   const args = [];
-  const nestedSql = `EXISTS (
-    SELECT 1
-    FROM video_playlist_items ni
-    WHERE ni.item_type = 'playlist'
-      AND ni.child_playlist_id = p.id
-  )`;
+  const nestedSql = `COALESCE(p.parent_playlist_id, 0) > 0`;
   if (query) {
     where.push('(LOWER(COALESCE(p.name, "")) LIKE LOWER(?) OR LOWER(COALESCE(p.description, "")) LIKE LOWER(?))');
     args.push(`%${query}%`, `%${query}%`);
@@ -1250,13 +1248,13 @@ const saveVideoPlaylist = (data) => {
   const row = coerceVideoPlaylist(data);
   const existing = row.id ? getVideoPlaylist(row.id) : null;
   if (existing) {
-    db.prepare('UPDATE video_playlists SET name=@name, description=@description, sort_order=@sort_order, difficulty_label=@difficulty_label, playlist_type=@playlist_type, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
+    db.prepare('UPDATE video_playlists SET name=@name, description=@description, sort_order=@sort_order, difficulty_label=@difficulty_label, playlist_type=@playlist_type, parent_playlist_id=@parent_playlist_id, createdAt=@createdAt, updatedAt=@updatedAt WHERE id=@id')
       .run({ ...row, createdAt: existing.createdAt || row.createdAt, updatedAt: Date.now() });
     const groupId = resolvePlaylistGroupId(row);
     upsertPlaylistGroupItem(row.id, groupId, row.order_index);
     return getVideoPlaylist(row.id);
   }
-  const result = db.prepare('INSERT INTO video_playlists (name,description,sort_order,difficulty_label,playlist_type,createdAt,updatedAt) VALUES (@name,@description,@sort_order,@difficulty_label,@playlist_type,@createdAt,@updatedAt)')
+  const result = db.prepare('INSERT INTO video_playlists (name,description,sort_order,difficulty_label,playlist_type,parent_playlist_id,createdAt,updatedAt) VALUES (@name,@description,@sort_order,@difficulty_label,@playlist_type,@parent_playlist_id,@createdAt,@updatedAt)')
     .run({ ...row, updatedAt: Date.now() });
   const groupId = resolvePlaylistGroupId(row);
   upsertPlaylistGroupItem(result.lastInsertRowid, groupId, row.order_index);
@@ -1266,9 +1264,23 @@ const deleteVideoPlaylist = (id) => {
   const tx = db.transaction((playlistId) => {
     run('DELETE FROM playlist_group_items WHERE playlist_id = ?', playlistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', playlistId);
+    run('UPDATE video_playlists SET parent_playlist_id = NULL WHERE parent_playlist_id = ?', playlistId);
     run('DELETE FROM video_playlists WHERE id = ?', playlistId);
   });
   tx(Number(id));
+};
+
+const refreshPlaylistParent = (childPlaylistId) => {
+  const childId = Number(childPlaylistId);
+  if (!childId) return;
+  const parent = one(`
+    SELECT COALESCE(playlist_id, playlistId) AS playlist_id
+    FROM video_playlist_items
+    WHERE item_type = 'playlist' AND child_playlist_id = ?
+    ORDER BY COALESCE(order_index, position, 0) ASC, id ASC
+    LIMIT 1
+  `, childId);
+  run('UPDATE video_playlists SET parent_playlist_id = ? WHERE id = ?', parent ? Number(parent.playlist_id) : null, childId);
 };
 
 const slugify = (value = '') => String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `item-${Date.now()}`;
@@ -1630,6 +1642,7 @@ const listPlaylistsByVideo = (videoId) => db.prepare(`
 `).all(Number(videoId));
 const replacePlaylistItems = (playlistId, items = []) => {
   const tx = db.transaction((targetPlaylistId, nextItems) => {
+    const previousChildren = db.prepare(`SELECT child_playlist_id FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ? AND item_type = 'playlist' AND child_playlist_id IS NOT NULL`).all(targetPlaylistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId);
     const insert = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)');
     nextItems.forEach((item, index) => {
@@ -1642,6 +1655,7 @@ const replacePlaylistItems = (playlistId, items = []) => {
         if (childPlaylistId === targetPlaylistId) throw new Error('Playlist cannot contain itself');
         if (playlistContainsTarget(childPlaylistId, targetPlaylistId)) throw new Error('Adding this playlist would create a cycle');
         insert.run(targetPlaylistId, targetPlaylistId, 'playlist', null, null, childPlaylistId, orderIndex, orderIndex);
+        run('UPDATE video_playlists SET parent_playlist_id = ? WHERE id = ?', targetPlaylistId, childPlaylistId);
         return;
       }
       const videoId = Number(item.video_id || item.videoId);
@@ -1649,6 +1663,7 @@ const replacePlaylistItems = (playlistId, items = []) => {
       insert.run(targetPlaylistId, targetPlaylistId, 'video', videoId, videoId, null, orderIndex, orderIndex);
     });
     db.prepare('UPDATE video_playlists SET updatedAt = ? WHERE id = ?').run(Date.now(), targetPlaylistId);
+    previousChildren.forEach((row) => refreshPlaylistParent(row.child_playlist_id));
   });
   tx(Number(playlistId), items);
   return listPlaylistItems(playlistId);
@@ -1697,6 +1712,7 @@ const addPlaylistItem = (playlistId, item = {}) => {
   const tx = db.transaction(() => {
     const result = insertItem.run(...params);
     run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
+    if (childPlaylistId) run('UPDATE video_playlists SET parent_playlist_id = ? WHERE id = ?', targetPlaylistId, childPlaylistId);
     return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
   });
 
@@ -1706,8 +1722,10 @@ const addPlaylistItem = (playlistId, item = {}) => {
 const deletePlaylistItem = (playlistId, itemId) => {
   const targetPlaylistId = Number(playlistId);
   const tx = db.transaction(() => {
+    const row = one('SELECT child_playlist_id FROM video_playlist_items WHERE id = ? AND COALESCE(playlist_id, playlistId) = ?', Number(itemId), targetPlaylistId);
     run('DELETE FROM video_playlist_items WHERE id = ? AND COALESCE(playlist_id, playlistId) = ?', Number(itemId), targetPlaylistId);
     run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', Date.now(), targetPlaylistId);
+    if (row?.child_playlist_id) refreshPlaylistParent(row.child_playlist_id);
   });
 
   tx();
