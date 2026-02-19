@@ -537,27 +537,32 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   const renderAddSelectors = () => {
     const addVideoSelect = app.querySelector('#playlist-add-video');
     const addPlaylistSelect = app.querySelector('#playlist-add-child');
-    if (!addVideoSelect || !addPlaylistSelect) return;
     const { existingVideoIds, existingPlaylistIds } = getSelectableIds();
-    const selectableVideos = videos.filter((video) => {
-      const videoId = Number(video.id);
-      if (!videoId || existingVideoIds.has(videoId) || state.deepVideoIds.has(videoId)) return false;
-      const assignedPlaylistId = Number(state.videoAssignments?.[videoId] || 0);
-      return !assignedPlaylistId || assignedPlaylistId === Number(id);
-    });
-    const blockedByCycle = getDescendantIds(id);
-    const selectablePlaylists = allPlaylists.filter((entry) => {
-      const playlistId = Number(entry.id);
-      if (!playlistId || playlistId === Number(id) || existingPlaylistIds.has(playlistId)) return false;
-      if (blockedByCycle.has(playlistId)) return false;
-      return !Number(entry.parent_playlist_id || 0);
-    });
-    addVideoSelect.innerHTML = selectableVideos.length
-      ? selectableVideos.map((video) => `<option value="${video.id}">${esc(video.title || `Video ${video.id}`)}</option>`).join('')
-      : '<option value="">All videos already added</option>';
-    addPlaylistSelect.innerHTML = selectablePlaylists.length
-      ? selectablePlaylists.map((entry) => `<option value="${entry.id}">${esc(entry.name || `Playlist ${entry.id}`)}</option>`).join('')
-      : '<option value="">No playlists available</option>';
+
+    if (addVideoSelect) {
+      const selectableVideos = videos.filter((video) => {
+        const videoId = Number(video.id);
+        if (!videoId || existingVideoIds.has(videoId) || state.deepVideoIds.has(videoId)) return false;
+        const assignedPlaylistId = Number(state.videoAssignments?.[videoId] || 0);
+        return !assignedPlaylistId || assignedPlaylistId === Number(id);
+      });
+      addVideoSelect.innerHTML = selectableVideos.length
+        ? selectableVideos.map((video) => `<option value="${video.id}">${esc(video.title || `Video ${video.id}`)}</option>`).join('')
+        : '<option value="">All videos already added</option>';
+    }
+
+    if (addPlaylistSelect) {
+      const blockedByCycle = getDescendantIds(id);
+      const selectablePlaylists = allPlaylists.filter((entry) => {
+        const playlistId = Number(entry.id);
+        if (!playlistId || playlistId === Number(id) || existingPlaylistIds.has(playlistId)) return false;
+        if (blockedByCycle.has(playlistId)) return false;
+        return !Number(entry.parent_playlist_id || 0);
+      });
+      addPlaylistSelect.innerHTML = selectablePlaylists.length
+        ? selectablePlaylists.map((entry) => `<option value="${entry.id}">${esc(entry.name || `Playlist ${entry.id}`)}</option>`).join('')
+        : '<option value="">No playlists available</option>';
+    }
   };
 
   const setBusy = (nextBusy) => {
