@@ -1156,8 +1156,20 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
   const item = req.body || {};
   const itemType = String(item.item_type || 'video');
   if (itemType !== 'video' && itemType !== 'playlist') return res.status(400).json({ error: 'invalid item_type' });
+  if (itemType === 'playlist' && !Number(item.child_playlist_id || item.childPlaylistId)) {
+    return res.status(400).json({ error: 'child_playlist_id is required for item_type=playlist' });
+  }
+  if (itemType === 'video' && !Number(item.video_id || item.videoId)) {
+    return res.status(400).json({ error: 'video_id is required for item_type=video' });
+  }
+  const requestedOrder = Number(item.order_index);
+  const normalizedItem = {
+    ...item,
+    item_type: itemType,
+    order_index: Number.isFinite(requestedOrder) ? requestedOrder : 0,
+  };
   try {
-    const saved = Store.addPlaylistItem(req.params.id, item);
+    const saved = Store.addPlaylistItem(req.params.id, normalizedItem);
     return res.status(201).json(saved);
   } catch (error) {
     return res.status(400).json({ error: error.message || 'unable to add item' });
