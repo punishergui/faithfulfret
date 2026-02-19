@@ -1738,6 +1738,15 @@ app.use('/media/gear', express.static(gearMediaDir));
 app.use('/uploads', express.static('/data/uploads', { maxAge: 0 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  const hasFileExtension = /\.[a-z0-9]+$/i.test(req.path);
+  const looksLikeAssetPath = /^(\/img\/|\/css\/|\/js\/|\/textures\/)/i.test(req.path);
+  if (hasFileExtension || looksLikeAssetPath) {
+    return res.status(404).send('Not Found');
+  }
+  return next();
+});
+
 // SPA fallback — return index.html for any unmatched route
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

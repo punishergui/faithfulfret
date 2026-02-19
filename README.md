@@ -193,6 +193,7 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # UI polish deploy check: verify Dashboard, Sessions, Stats, and Settings headers render full-width with compact, uniform hero height.
 # UI polish deploy check: verify title/subtitle/filters/tabs stay left-aligned while hero action buttons stay right-aligned, and nav touches hero with no blank gap.
 # UI polish deploy check: verify `/#/gear` and `/#/resources` now share an identical hero/header layout (hero bar, action button alignment, search row, and filter pills), with only page text/content differing.
+# Asset routing deploy check: `curl -I http://127.0.0.1:3000/img/hero/djent.svg` should be `200 image/svg+xml`, and missing files like `/img/hero/djent.webp` must return `404` (never SPA HTML).
 # Dashboard layout deploy check: verify Recent Sessions + Recent Activity rows are fully clickable in the 70/30 layout, Quick Log remains the only fresh-start button, and mobile stacks into one column.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 
