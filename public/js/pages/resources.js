@@ -5,6 +5,8 @@ window.Pages = window.Pages || {};
 Pages.Resources = {
   activeFilter: 'All',
   searchTerm: '',
+  sortBy: 'Pinned first',
+  filtersExpanded: true,
   pinStorageKey: 'ff-resource-pins-v1',
 
   async render() {
@@ -16,20 +18,29 @@ Pages.Resources = {
 
     app.innerHTML = `
       <section class="resources-hero page-wrap">
-        <div>
+        <div class="resources-hero__intro">
           <h1 class="resources-hero__title">RESOURCES</h1>
-          <p class="resources-hero__subtitle">Curated tools & learning platforms</p>
+          <p class="resources-hero__subtitle">Curated tools, channels, and lesson platforms for faster practice wins.</p>
         </div>
         <a href="#/resources/add" class="df-btn df-btn--primary resources-hero__add" aria-label="Add resource">+ Add Resource</a>
       </section>
 
       <div class="resources-filter-wrap">
         <div class="page-wrap resources-filter">
-          <input type="search" id="resource-search" class="df-input" placeholder="Search resources…" aria-label="Search resources">
-          <div class="resources-chip-row" role="tablist" aria-label="Resource category filters">
+          <div class="resources-filter__top-row">
+            <input type="search" id="resource-search" class="df-input" placeholder="Quick search: title, author, notes, tags" aria-label="Search resources">
+            <button type="button" class="df-btn df-btn--outline" id="resources-filters-toggle">${this.filtersExpanded ? 'Hide' : 'Show'} filters</button>
+          </div>
+          <div class="resources-filter__chips" style="display:${this.filtersExpanded ? 'flex' : 'none'};" role="tablist" aria-label="Resource category filters">
             ${this._filterList().map(filter => `
               <button type="button" class="df-btn df-btn--outline resources-chip ${filter === this.activeFilter ? 'is-active' : ''}" data-filter="${filter}" role="tab" aria-selected="${filter === this.activeFilter}">${filter}</button>
             `).join('')}
+          </div>
+          <div class="resources-filter__sort-row">
+            <label class="df-label" for="resource-sort">Sort</label>
+            <select id="resource-sort" class="df-input">
+              ${['Newest', 'Rating', 'Name A-Z', 'Pinned first'].map((opt) => `<option value="${opt}" ${this.sortBy === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+            </select>
           </div>
         </div>
       </div>
@@ -49,7 +60,15 @@ Pages.Resources = {
   _renderGrid() {
     const filtered = this._filteredResources();
     if (!this.resources?.length) return this._renderEmpty();
-    if (!filtered.length) return '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No resources match this filter.</div>';
+    if (!filtered.length) {
+      return `
+        <div class="df-panel df-panel--wide resources-empty-filter">
+          <div class="empty-state__title">No matches found</div>
+          <div class="empty-state__text">Try a different category or search term, or add a new resource to grow your library.</div>
+          <a href="#/resources/add" class="df-btn df-btn--primary" style="margin:0 auto;">+ Add Resource</a>
+        </div>
+      `;
+    }
     return `<div class="resources-grid">${filtered.map(r => this._renderCard(r)).join('')}</div>`;
   },
 
@@ -62,7 +81,7 @@ Pages.Resources = {
     const cardTags = [mappedCategory, ...(isPinned ? ['Pinned'] : [])];
 
     return `
-      <article class="resource-card" tabindex="0" aria-label="Resource ${r.title}">
+      <article class="resource-card ${openUrl ? 'is-openable' : ''}" tabindex="0" aria-label="Resource ${r.title}" data-open-url="${openUrl}">
         <div class="resource-card__head">
           <div class="resource-card__title-wrap">
             <span class="resource-card__icon" aria-hidden="true">${this._categoryIcon(mappedCategory)}</span>
@@ -74,12 +93,12 @@ Pages.Resources = {
           <div class="resource-card__stars" aria-label="Rating ${Number(r.rating) || 0} out of 5">${stars}</div>
         </div>
         <p class="resource-card__desc">${Utils.truncate(r.notes || tags.join(' • ') || 'No description added yet.', 95)}</p>
-        <div class="resource-card__chips">${cardTags.map(tag => `<span class="resource-card__chip">${tag}</span>`).join('')}</div>
+        <div class="resource-card__chips">${cardTags.map(tag => `<span class="resource-card__chip">${tag}</span>`).join('')}${r.level ? `<span class="resource-card__chip">${r.level}</span>` : ''}</div>
         <div class="resource-card__actions">
-          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" class="df-btn df-btn--outline" aria-label="Open ${r.title}">Open</a>` : '<span></span>'}
+          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" class="df-btn df-btn--outline" aria-label="Open ${r.title}" data-no-open="true">Visit</a>` : '<span></span>'}
           <div class="resource-card__actions-right">
-            <button type="button" class="df-btn resource-card__pin ${isPinned ? 'is-active' : ''}" data-pin-id="${r.id}" aria-label="${isPinned ? 'Unpin' : 'Pin'} ${r.title}" title="${isPinned ? 'Unpin' : 'Pin'}">★</button>
-            <button type="button" class="df-btn resource-card__edit" onclick="go('#/resources/edit/${r.id}')" aria-label="Edit ${r.title}" title="Edit resource">Edit</button>
+            <button type="button" class="df-btn resource-card__pin ${isPinned ? 'is-active' : ''}" data-pin-id="${r.id}" data-no-open="true" aria-label="${isPinned ? 'Unpin' : 'Pin'} ${r.title}" title="${isPinned ? 'Unpin' : 'Pin'}">★</button>
+            <button type="button" class="df-btn resource-card__edit" onclick="go('#/resources/edit/${r.id}')" data-no-open="true" aria-label="Edit ${r.title}" title="Edit resource">Edit</button>
           </div>
         </div>
       </article>
@@ -98,11 +117,22 @@ Pages.Resources = {
     });
 
     return filtered.sort((a, b) => {
-      if (this.activeFilter === 'All') {
-        const pinDelta = Number(!!this.pinned[String(b.id)]) - Number(!!this.pinned[String(a.id)]);
+      const aPinned = Number(!!this.pinned[String(a.id)]);
+      const bPinned = Number(!!this.pinned[String(b.id)]);
+      if (this.sortBy === 'Pinned first') {
+        const pinDelta = bPinned - aPinned;
         if (pinDelta) return pinDelta;
+        return String(a.title || '').localeCompare(String(b.title || ''));
       }
-      return String(a.title || '').localeCompare(String(b.title || ''));
+      if (this.sortBy === 'Name A-Z') {
+        return String(a.title || '').localeCompare(String(b.title || ''));
+      }
+      if (this.sortBy === 'Rating') {
+        const ratingDelta = (Number(b.rating) || 0) - (Number(a.rating) || 0);
+        if (ratingDelta) return ratingDelta;
+        return String(a.title || '').localeCompare(String(b.title || ''));
+      }
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
     });
   },
 
@@ -154,12 +184,42 @@ Pages.Resources = {
 
     app.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-pin-id]');
-      if (!btn) return;
-      const id = btn.getAttribute('data-pin-id');
-      if (!id) return;
-      this.pinned[id] = !this.pinned[id];
-      if (!this.pinned[id]) delete this.pinned[id];
-      localStorage.setItem(this.pinStorageKey, JSON.stringify(this.pinned));
+      if (btn) {
+        const id = btn.getAttribute('data-pin-id');
+        if (!id) return;
+        this.pinned[id] = !this.pinned[id];
+        if (!this.pinned[id]) delete this.pinned[id];
+        localStorage.setItem(this.pinStorageKey, JSON.stringify(this.pinned));
+        this._updateGrid(app);
+        return;
+      }
+
+      const toggleBtn = e.target.closest('#resources-filters-toggle');
+      if (toggleBtn) {
+        this.filtersExpanded = !this.filtersExpanded;
+        this.render();
+        return;
+      }
+
+      const card = e.target.closest('.resource-card');
+      if (!card) return;
+      if (e.target.closest('[data-no-open="true"],button,a,input,select,textarea,label')) return;
+      const openUrl = card.getAttribute('data-open-url');
+      if (!openUrl) return;
+      window.open(openUrl, '_blank', 'noopener');
+    });
+
+    app.addEventListener('keydown', (e) => {
+      const card = e.target.closest('.resource-card');
+      if (!card || e.key !== 'Enter') return;
+      if (e.target.closest('[data-no-open="true"],button,a,input,select,textarea,label')) return;
+      const openUrl = card.getAttribute('data-open-url');
+      if (!openUrl) return;
+      window.open(openUrl, '_blank', 'noopener');
+    });
+
+    app.querySelector('#resource-sort')?.addEventListener('change', (e) => {
+      this.sortBy = e.target.value || 'Pinned first';
       this._updateGrid(app);
     });
   },
