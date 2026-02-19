@@ -435,6 +435,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   const progress = readLocalJson('df_playlist_progress', null);
   const resumeId = Number(qv('resumeVideoId') || 0) || Number(progress?.lastVideoId || 0);
   const canResume = Number(progress?.playlistId) === Number(id) && Number(progress?.lastVideoId);
+  const isNestedPlaylist = Number(playlist.parent_playlist_id || 0) > 0;
   const crumbs = [{ label: 'Training', href: '#/training' }, { label: 'Playlists', href: '#/training/playlists' }, { label: playlist.name || `Playlist ${id}` }];
 
   pushRecentPlaylist(playlist);
@@ -463,10 +464,9 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
             <select class="df-input" id="playlist-add-video"></select>
             <button id="add-video" class="df-btn df-btn--primary" type="button">Add Video</button>
           </div>
-          <div class="df-panel" style="padding:12px;display:grid;gap:8px;grid-template-columns:1fr auto;">
-            <select class="df-input" id="playlist-add-child"></select>
-            <button id="add-playlist" class="df-btn df-btn--outline" type="button">Add Playlist</button>
-          </div>
+          ${isNestedPlaylist
+            ? '<div class="df-panel" style="padding:12px;color:var(--text2);font-size:12px;">This playlist is nested. Only top-level playlists can contain other playlists.</div>'
+            : '<div class="df-panel" style="padding:12px;display:grid;gap:8px;grid-template-columns:1fr auto;"><select class="df-input" id="playlist-add-child"></select><button id="add-playlist" class="df-btn df-btn--outline" type="button">Add Nested Playlist</button></div>'}
         </div>
         <aside class="training-playlists-sidebar"><div class="df-panel" style="padding:12px;display:grid;gap:8px;align-content:start;"><div style="font-weight:700;">Playlist</div><div style="color:var(--text2);font-size:12px;" id="playlist-video-count"></div><div style="color:var(--text2);font-size:12px;" id="playlist-total-time"></div><div style="color:var(--text2);font-size:12px;" id="playlist-nested-count"></div><div style="color:var(--text2);font-size:12px;">Type: ${esc(playlist.playlist_type || 'General')}</div><div style="color:var(--text2);font-size:12px;">Difficulty: ${esc(playlist.difficulty_label || 'No difficulty')}</div><div style="color:var(--text2);font-size:12px;">Group: ${esc(playlist.group_name || 'General')}</div><button id="edit-playlist" class="df-btn df-btn--primary" type="button">Edit Playlist</button>${Number(playlist.parent_playlist_id) ? '<button id="unnest-self" class="df-btn df-btn--outline" type="button">Unnest Playlist</button>' : ''}</div></aside>
       </div>

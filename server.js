@@ -1311,6 +1311,10 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
 
   if (itemType === 'playlist') {
     const childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
+    const parentParentId = Store.getParentPlaylistId(parentId);
+    if (parentParentId != null) {
+      return res.status(409).json({ error: 'Cannot nest playlists inside a nested playlist. Only top-level playlists can contain playlists.' });
+    }
     if (!Store.getVideoPlaylist(childPlaylistId)) {
       return res.status(400).json({ error: 'child playlist not found' });
     }
