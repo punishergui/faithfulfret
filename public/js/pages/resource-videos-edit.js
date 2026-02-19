@@ -768,10 +768,15 @@ Pages.ResourceVideosEdit = {
     const titleInput = app.querySelector('[name="title"]');
     const thumbInput = app.querySelector('[name="thumbUrl"]');
     const durationInput = app.querySelector('[name="duration_text"]');
+    const isBlankOrDefaultDurationText = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) return true;
+      return ['00:00', '0:00', '00:00:00', '0:00:00'].includes(raw);
+    };
     let titleTouched = Boolean(String(titleInput?.value || '').trim());
-    let durationTouched = Boolean(String(durationInput?.value || '').trim());
+    let durationTouched = !isBlankOrDefaultDurationText(durationInput?.value);
     titleInput?.addEventListener('input', () => { titleTouched = true; });
-    durationInput?.addEventListener('input', () => { durationTouched = true; });
+    durationInput?.addEventListener('input', () => { durationTouched = !isBlankOrDefaultDurationText(durationInput?.value); });
 
     app.querySelector('#fetch-meta')?.addEventListener('click', async () => {
       const urlInput = app.querySelector('[name="youtube_url"]');
@@ -785,7 +790,8 @@ Pages.ResourceVideosEdit = {
         if (meta.title && (!titleTouched || !String(titleInput?.value || '').trim())) titleInput.value = meta.title;
         if (meta.uploader && !String(app.querySelector('[name="author"]')?.value || '').trim()) app.querySelector('[name="author"]').value = meta.uploader;
         if (meta.thumbnail_url && !String(thumbInput?.value || '').trim()) thumbInput.value = meta.thumbnail_url;
-        if (meta.duration_seconds != null && (!durationTouched || !String(durationInput?.value || '').trim())) durationInput.value = secondsToHms(meta.duration_seconds);
+        const shouldOverwriteDuration = !durationTouched || isBlankOrDefaultDurationText(durationInput?.value);
+        if (meta.duration_seconds != null && shouldOverwriteDuration) durationInput.value = secondsToHms(meta.duration_seconds);
         updateThumbPreview();
         showStatus('Fetched video details.');
       } catch (error) {

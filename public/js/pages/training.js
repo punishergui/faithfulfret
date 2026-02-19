@@ -239,8 +239,9 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     const name = esc(playlist.name || `Playlist ${playlist.id}`);
     const description = esc(playlist.description || '');
     const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
-    const totalDur = Number(playlist.deepDurationSeconds) || 0;
-    const durationLabel = formatDurationWithUnknown(totalDur, Number(playlist.unknownDurationCount) || 0);
+    const totalDur = Number(playlist.deepDurationSeconds ?? playlist.deep_stats?.deepDurationSeconds) || 0;
+    const unknownDur = Number(playlist.unknownDurationCount ?? playlist.deep_stats?.unknownDurationCount) || 0;
+    const durationLabel = formatDurationWithUnknown(totalDur, unknownDur);
     const nested = Number(playlist.is_nested) === 1;
     return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
       <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
@@ -482,9 +483,14 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       const child = item.child_playlist || idToPlaylist.get(Number(item.child_playlist_id));
       const childId = Number(item.child_playlist_id || child?.id);
       const thumb = child?.thumbnail || child?.preview_thumbnail_url || '';
+      const deepStats = item.deep_stats || child?.deep_stats || {};
+      const deepVideoCount = Number(deepStats.deepVideoCount) || 0;
+      const deepDurationSeconds = Number(child?.deepDurationSeconds ?? deepStats.deepDurationSeconds) || 0;
+      const unknownDurationCount = Number(child?.unknownDurationCount ?? deepStats.unknownDurationCount) || 0;
+      const nestedMeta = `${deepVideoCount} videos • ${formatDurationWithUnknown(deepDurationSeconds, unknownDurationCount)}`;
       return `<div class="training-playlist-row" data-open-playlist="${childId}" data-item-id="${item.id}">
         ${thumb ? `<img src="${thumb}" alt="${esc(child?.name || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">📁</div>'}
-        <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(child?.name || `Playlist ${childId}`)}</div><div style="color:var(--text2);font-size:12px;margin-top:6px;">${item.deep_stats ? `${Number(item.deep_stats.deepVideoCount) || 0} Videos` : 'Playlist'}</div></div>
+        <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(child?.name || `Playlist ${childId}`)}</div><div style="color:var(--text2);font-size:12px;margin-top:6px;">${nestedMeta}</div></div>
         <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
       </div>`;
     }
