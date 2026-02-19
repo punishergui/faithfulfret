@@ -10,37 +10,37 @@ Pages.ToolsHub = {
       {
         href: '#/tools/tunings',
         icon: '🎵',
-        title: 'TUNINGS',
+        title: 'Tunings',
         desc: 'Switch between common tunings and preview string pitches.',
       },
       {
         href: '#/tools/metronome',
         icon: '⏱',
-        title: 'METRONOME',
+        title: 'Metronome',
         desc: 'Set BPM, accent beat one, and practice with quarter/eighth notes.',
       },
       {
         href: '#/tools/chords',
         icon: '🎸',
-        title: 'CHORDS',
+        title: 'Chords',
         desc: 'Pick root + chord type and view a clean SVG chord diagram.',
       },
       {
         href: '#/tools/scales',
         icon: '🎼',
-        title: 'SCALES',
+        title: 'Scales',
         desc: 'Choose key + scale type and view scale tones on a fretboard.',
       },
       {
         href: '#/tools/progressions',
         icon: '🧭',
-        title: 'PROGRESSIONS',
+        title: 'Progressions',
         desc: 'Build common progressions by key and view why they resolve.',
       },
       {
         href: '#/tools/chord-chart',
         icon: '🗂️',
-        title: 'CHORD CHART',
+        title: 'Chord Chart',
         desc: 'Open the full reference chart with major, minor, extended, and altered shapes.',
       },
     ];
@@ -54,14 +54,14 @@ Pages.ToolsHub = {
         <div class="fret-line"></div>
       </div>
 
-      <div class="page-wrap" style="padding:40px 24px 60px;">
-        <div class="tools-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);">
+      <div class="page-wrap tools-wrap">
+        <div class="tools-grid">
           ${tools.map(t => `
-            <a href="${t.href}" class="tool-card">
+            <a href="${t.href}" class="tool-card" aria-label="Open ${t.title}">
               <div class="tool-card__icon">${t.icon}</div>
               <div class="tool-card__title">${t.title}</div>
               <div class="tool-card__desc">${t.desc}</div>
-              <div class="tool-card__arrow">&rarr;</div>
+              <div class="tool-card__arrow">Open &rarr;</div>
             </a>
           `).join('')}
         </div>

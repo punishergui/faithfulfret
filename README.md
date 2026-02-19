@@ -70,6 +70,7 @@ After deploy, verify `#/training/videos` cards are fully clickable with keyboard
 After deploy, verify Dashboard → Start Practice works: Continue Last Video, Continue Last Playlist, and Quick Start Playlist should enable only after opening training content, and should show helper text when empty.
 After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 After deploy, verify Tools routes load: `#/tools`, `#/tools/tunings`, `#/tools/metronome`, `#/tools/chords`, `#/tools/scales`, `#/tools/progressions`, and `#/tools/chord-chart`; then set BPM once in Metronome and confirm `localStorage.df_last_bpm` updates.
+After deploy, verify `#/tools` uses compact responsive cards (1 column at ~375px, 2 columns near ~900px, 3 columns near ~1300px) with visible keyboard focus and working theme toggle.
 After deploy, in Progressions confirm key changes refresh diatonic chords + progression diagrams, and in Chord Chart confirm Print View toggles a clean white export layout for poster-style references.
 After deploy, verify Dashboard → Progress Memory updates only after Practice Mode Start/Stop in Progressions/Scales (streak, week/total minutes, top key, and top progression).
 After deploy, verify Dashboard has no top stats strip; Progress Memory is the single stats area and includes Practice Summary rows for sessions/week, total sessions, and total hours without duplicate metrics.
