@@ -318,6 +318,10 @@
       return api(`/api/oembed?url=${encodeURIComponent(url || '')}`);
     },
 
+    async fetchTrainingVideoMetadata(url) {
+      return api('/api/training/videos/metadata', { method: 'POST', body: JSON.stringify({ url: url || '' }) });
+    },
+
     async getAllTrainingVideos(filters = {}) {
       const params = new URLSearchParams();
       const merged = { includeProgress: 1, ...(filters || {}) };

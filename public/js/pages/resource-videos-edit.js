@@ -1,6 +1,6 @@
 window.Pages = window.Pages || {};
 
-function parseDurationToSeconds(raw) {
+function hmsToSeconds(raw) {
   const input = String(raw || '').trim();
   if (!input) return null;
   if (/^\d+$/.test(input)) return Number(input);
@@ -11,7 +11,7 @@ function parseDurationToSeconds(raw) {
   return null;
 }
 
-function formatDurationInput(seconds) {
+function secondsToHms(seconds) {
   const n = Number(seconds);
   if (!Number.isFinite(n) || n < 0) return '';
   const total = Math.floor(n);
@@ -236,7 +236,7 @@ function renderVideoForm(video, options = {}) {
       <div class="df-field"><label class="df-label">Category</label><select class="df-input" name="category"><option value="general" ${data.category === 'general' ? 'selected' : ''}>General</option><option value="skill" ${data.category === 'skill' ? 'selected' : ''}>Skill</option><option value="song" ${data.category === 'song' ? 'selected' : ''}>Song</option></select></div>
       <div class="df-field"><label class="df-label">Difficulty Track</label><select class="df-input" name="difficulty_track"><option value="">Select track</option>${['Beginner', 'Intermediate', 'Advanced'].map((item) => `<option value="${item}" ${data.difficulty_track === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
       <div class="df-field"><label class="df-label">Difficulty Level</label><select class="df-input" name="difficulty_level"><option value="">Select level</option>${[1,2,3].map((item) => `<option value="${item}" ${Number(data.difficulty_level) === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
-      <div class="df-field"><label class="df-label">Duration (mm:ss or hh:mm:ss)</label><input name="duration_text" class="df-input" value="${escHtml(formatDurationInput(data.duration_seconds))}" placeholder="07:06"></div>
+      <div class="df-field"><label class="df-label">Duration (mm:ss or hh:mm:ss)</label><input name="duration_text" class="df-input" value="${escHtml(secondsToHms(data.duration_seconds))}" placeholder="07:06"></div>
       <div class="df-field"><label class="df-label">Tags</label><input name="tags" class="df-input" value="${escHtml(data.tags || '')}" placeholder="technique,beginner,warmup"></div>
       <div class="df-field">
         <label class="df-label">Description</label>
@@ -765,6 +765,14 @@ Pages.ResourceVideosEdit = {
       document.execCommand('insertText', false, text);
     });
 
+    const titleInput = app.querySelector('[name="title"]');
+    const thumbInput = app.querySelector('[name="thumbUrl"]');
+    const durationInput = app.querySelector('[name="duration_text"]');
+    let titleTouched = Boolean(String(titleInput?.value || '').trim());
+    let durationTouched = Boolean(String(durationInput?.value || '').trim());
+    titleInput?.addEventListener('input', () => { titleTouched = true; });
+    durationInput?.addEventListener('input', () => { durationTouched = true; });
+
     app.querySelector('#fetch-meta')?.addEventListener('click', async () => {
       const urlInput = app.querySelector('[name="youtube_url"]');
       const rawUrl = urlInput?.value.trim();
@@ -773,10 +781,11 @@ Pages.ResourceVideosEdit = {
         return;
       }
       try {
-        const meta = await DB.fetchOEmbed(rawUrl);
-        if (meta.title) app.querySelector('[name="title"]').value = meta.title;
-        if (meta.author_name) app.querySelector('[name="author"]').value = meta.author_name;
-        if (meta.thumbnail_url) app.querySelector('[name="thumbUrl"]').value = meta.thumbnail_url;
+        const meta = await DB.fetchTrainingVideoMetadata(rawUrl);
+        if (meta.title && (!titleTouched || !String(titleInput?.value || '').trim())) titleInput.value = meta.title;
+        if (meta.uploader && !String(app.querySelector('[name="author"]')?.value || '').trim()) app.querySelector('[name="author"]').value = meta.uploader;
+        if (meta.thumbnail_url && !String(thumbInput?.value || '').trim()) thumbInput.value = meta.thumbnail_url;
+        if (meta.duration_seconds != null && (!durationTouched || !String(durationInput?.value || '').trim())) durationInput.value = secondsToHms(meta.duration_seconds);
         updateThumbPreview();
         showStatus('Fetched video details.');
       } catch (error) {
@@ -789,7 +798,7 @@ Pages.ResourceVideosEdit = {
       const formData = new FormData(event.target);
       const payload = Object.fromEntries(formData.entries());
       payload.tags = String(payload.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).join(',');
-      payload.duration_seconds = parseDurationToSeconds(payload.duration_text);
+      payload.duration_seconds = hmsToSeconds(payload.duration_text);
       const html = sanitizeTrainingDescriptionHtml(editor?.innerHTML || '');
       payload.description_html = html;
       payload.description_text = stripHtmlToText(html);

@@ -18,7 +18,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=9999
 
-RUN apk add --no-cache libstdc++
+RUN apk add --no-cache libstdc++ python3 py3-pip
+RUN pip3 install --no-cache-dir yt-dlp
 
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules

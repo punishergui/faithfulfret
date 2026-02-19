@@ -4,7 +4,7 @@ function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&
 function fmt(sec) { const n = Number(sec) || 0; return `${Math.floor(n / 60)}m`; }
 function formatDuration(seconds) {
   const total = Number(seconds);
-  if (!Number.isFinite(total) || total < 0) return '';
+  if (!Number.isFinite(total) || total <= 0) return '';
   const n = Math.floor(total);
   const h = Math.floor(n / 3600);
   const m = Math.floor((n % 3600) / 60);
