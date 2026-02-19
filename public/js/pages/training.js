@@ -19,6 +19,37 @@ function formatDurationWithUnknown(seconds, unknownCount) {
 }
 function qv(name) { return new URLSearchParams(location.hash.split('?')[1] || '').get(name) || ''; }
 
+function getDurSec(obj) {
+  if (!obj) return null;
+
+  const direct =
+    obj.duration_seconds ??
+    obj.durationSeconds ??
+    obj.duration_sec ??
+    obj.durationSec ??
+    obj.video_duration_seconds ??
+    obj.videoDurationSeconds;
+
+  if (direct != null && direct !== '') {
+    const n = Number(direct);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  const nested = obj.video;
+  if (!nested) return null;
+
+  const nestedDur =
+    nested.duration_seconds ??
+    nested.durationSeconds ??
+    nested.duration_sec ??
+    nested.durationSec;
+
+  if (nestedDur == null || nestedDur === '') return null;
+
+  const n = Number(nestedDur);
+  return Number.isFinite(n) ? n : null;
+}
+
 function trainingCrumbs(items) { return Utils.renderBreadcrumbs(items); }
 
 function readLocalJson(key, fallback) {
@@ -208,7 +239,8 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     const name = esc(playlist.name || `Playlist ${playlist.id}`);
     const description = esc(playlist.description || '');
     const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
-    const durationLabel = formatDurationWithUnknown(playlist.deepDurationSeconds, Number(playlist.unknownDurationCount) || 0);
+    const totalDur = Number(playlist.deepDurationSeconds) || 0;
+    const durationLabel = formatDurationWithUnknown(totalDur, Number(playlist.unknownDurationCount) || 0);
     const nested = Number(playlist.is_nested) === 1;
     return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
       <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
@@ -463,7 +495,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const thumb = video?.thumbnail_url || video?.thumb_url || video?.thumbUrl || '';
     return `<div id="playlist-video-${videoId}" class="training-playlist-row" data-open-video="${videoId}" data-item-id="${item.id}">
       ${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">🎬</div>'}
-      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${formatDuration(video?.duration_seconds) ? `<span style="color:var(--text3);font-size:12px;">${formatDuration((video.duration_seconds ?? video.durationSeconds ?? video.duration_sec ?? video.durationSec))}</span>` : ''}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
+      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${(() => { const sec = getDurSec(video); if (sec == null) return `<span style=\"color:var(--text3);font-size:12px;\">—</span>`; const label = formatDuration(sec) || '00:00'; return `<span style=\"color:var(--text3);font-size:12px;\">${label}</span>`; })()}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
       <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
     </div>`;
   };
