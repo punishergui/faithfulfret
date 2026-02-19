@@ -71,6 +71,7 @@ After deploy, verify Dashboard → Start Practice works: Continue Last Video, Co
 After deploy, create an export from **Stats → Data Management** and confirm the backup JSON includes `schemaVersion`, `createdAt`, `counts`, `tables`, and `localSettings` so restores stay verifiable across upgrades.
 After deploy, verify Tools routes load: `#/tools`, `#/tools/tunings`, `#/tools/metronome`, `#/tools/chords`, `#/tools/scales`, `#/tools/progressions`, and `#/tools/chord-chart`; then set BPM once in Metronome and confirm `localStorage.df_last_bpm` updates.
 After deploy, verify `#/tools` uses compact responsive cards (1 column at ~375px, 2 columns near ~900px, 3 columns near ~1300px) with visible keyboard focus and working theme toggle.
+After deploy, verify `#/tools` has breathing room between the hero/header and the first row of tool cards on desktop and mobile.
 After deploy, in Progressions confirm key changes refresh diatonic chords + progression diagrams, and in Chord Chart confirm Print View toggles a clean white export layout for poster-style references.
 After deploy, verify Dashboard → Progress Memory updates only after Practice Mode Start/Stop in Progressions/Scales (streak, week/total minutes, top key, and top progression).
 After deploy, verify Dashboard has no top stats strip; Progress Memory is the single stats area and includes Practice Summary rows for sessions/week, total sessions, and total hours without duplicate metrics.
@@ -79,6 +80,7 @@ After deploy, verify Training Video Description editor supports inline code + co
 After deploy, verify `#/training/videos/:id` rich description display wraps in the main column (including links), H2/H3 toolbar creates real headings that persist after save/reload, and emoji picker shows category tabs with expanded sets plus search.
 After deploy, verify `#/training/playlists/:id` right sidebar includes **Edit Playlist**, and modal saves name, description, difficulty label, type, and order-within-group.
 After deploy, verify adding nested playlist/video items from `#/training/playlists/:id` succeeds without popup errors, and add/move/remove controls update the list immediately (optimistic UI, no route refresh).
+After deploy, verify `#/training/playlists/:id` action controls (**Move up/Move down/Remove**) are readable in both themes, and Add Video/Add Playlist dropdowns exclude items already present (including self-playlist nesting).
 After deploy, verify Training playlists support mixed nested items (videos + child playlists), breadcrumb trail updates when opening nested playlists, cycle-prevention blocks adding parent into descendants, and nested playlist thumbnails resolve from first depth-first video (or placeholder).
 After deploy, verify `#/training/playlists` renders one-level group cards with expand/collapse, grouped playlists sorted by order, and ungrouped playlists under **General**.
 After deploy, verify `#/training/playlists` defaults to **Top-level** view (nested playlists hidden), scope toggle supports **All/Nested**, search returns matches across all playlists regardless of scope, and nested results show a **Nested** badge while still opening normally.

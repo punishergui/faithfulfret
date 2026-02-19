@@ -364,11 +364,16 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
 
   pushRecentPlaylist(playlist);
 
-  const videoOptions = videos.map((v) => `<option value="${v.id}">${esc(v.title || `Video ${v.id}`)}</option>`).join('');
-  const playlistOptions = allPlaylists
-    .filter((p) => Number(p.id) !== Number(id))
-    .map((p) => `<option value="${p.id}">${esc(p.name || `Playlist ${p.id}`)}</option>`)
-    .join('');
+  const getSelectableIds = () => ({
+    existingVideoIds: new Set(state.items
+      .filter((item) => String(item.item_type || 'video') === 'video')
+      .map((item) => Number(item.video_id || item.videoId))
+      .filter(Boolean)),
+    existingPlaylistIds: new Set(state.items
+      .filter((item) => String(item.item_type || 'video') === 'playlist')
+      .map((item) => Number(item.child_playlist_id || item.childPlaylistId || item.child_playlist?.id))
+      .filter(Boolean)),
+  });
 
   app.innerHTML = `${Utils.renderPageHero({ title: playlist.name || 'Playlist', leftExtra: trainingCrumbs(crumbs), actions: '<a href="#/training/playlists" class="df-btn df-btn--outline">Back</a><button id="delete-playlist" class="df-btn df-btn--danger" style="margin-left:8px;" type="button">Delete Playlist</button>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
@@ -380,11 +385,11 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
           </div>
           <div id="playlist-items" class="df-panel" style="padding:12px;display:grid;gap:8px;"></div>
           <div class="df-panel" style="padding:12px;display:grid;gap:8px;grid-template-columns:1fr auto;">
-            <select class="df-input" id="playlist-add-video">${videoOptions}</select>
+            <select class="df-input" id="playlist-add-video"></select>
             <button id="add-video" class="df-btn df-btn--primary" type="button">Add Video</button>
           </div>
           <div class="df-panel" style="padding:12px;display:grid;gap:8px;grid-template-columns:1fr auto;">
-            <select class="df-input" id="playlist-add-child">${playlistOptions}</select>
+            <select class="df-input" id="playlist-add-child"></select>
             <button id="add-playlist" class="df-btn df-btn--outline" type="button">Add Playlist</button>
           </div>
         </div>
@@ -417,7 +422,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       return `<div class="training-playlist-row" data-open-playlist="${childId}" data-item-id="${item.id}">
         ${thumb ? `<img src="${thumb}" alt="${esc(child?.name || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">📁</div>'}
         <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(child?.name || `Playlist ${childId}`)}</div><div style="color:var(--text2);font-size:12px;margin-top:6px;">Nested playlist</div></div>
-        <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn" data-remove-id="${item.id}" type="button">Remove</button></div>
+        <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
       </div>`;
     }
     const videoId = Number(item.video_id || item.videoId);
@@ -428,8 +433,26 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     return `<div id="playlist-video-${videoId}" class="training-playlist-row" data-open-video="${videoId}" data-item-id="${item.id}">
       ${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">🎬</div>'}
       <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${video?.duration_sec ? `<span style="color:var(--text3);font-size:12px;">${fmt(video.duration_sec)}</span>` : ''}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
-      <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn" data-remove-id="${item.id}" type="button">Remove</button></div>
+      <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
     </div>`;
+  };
+
+  const renderAddSelectors = () => {
+    const addVideoSelect = app.querySelector('#playlist-add-video');
+    const addPlaylistSelect = app.querySelector('#playlist-add-child');
+    if (!addVideoSelect || !addPlaylistSelect) return;
+    const { existingVideoIds, existingPlaylistIds } = getSelectableIds();
+    const selectableVideos = videos.filter((video) => !existingVideoIds.has(Number(video.id)));
+    const selectablePlaylists = allPlaylists.filter((entry) => {
+      const playlistId = Number(entry.id);
+      return playlistId !== Number(id) && !existingPlaylistIds.has(playlistId);
+    });
+    addVideoSelect.innerHTML = selectableVideos.length
+      ? selectableVideos.map((video) => `<option value="${video.id}">${esc(video.title || `Video ${video.id}`)}</option>`).join('')
+      : '<option value="">All videos already added</option>';
+    addPlaylistSelect.innerHTML = selectablePlaylists.length
+      ? selectablePlaylists.map((entry) => `<option value="${entry.id}">${esc(entry.name || `Playlist ${entry.id}`)}</option>`).join('')
+      : '<option value="">No playlists available</option>';
   };
 
   const setBusy = (nextBusy) => {
@@ -441,6 +464,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const container = app.querySelector('#playlist-items');
     if (!container) return;
     container.innerHTML = items.length ? items.map(rowHtml).join('') : '<div style="color:var(--text3);">No items yet.</div>';
+    renderAddSelectors();
     updateSidebarStats();
     bindListEvents();
     setBusy(state.saving);
