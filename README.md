@@ -77,11 +77,11 @@ After deploy, verify Session Detail uses two columns on desktop (video + content
 After deploy, verify Training Video Description editor supports inline code + code blocks (with preserved newlines), emoji picker insertions at caret, and theme-driven text colors (`data-color` spans) that adapt when switching themes.
 After deploy, verify `#/training/videos/:id` rich description display wraps in the main column (including links), H2/H3 toolbar creates real headings that persist after save/reload, and emoji picker shows category tabs with expanded sets plus search.
 After deploy, verify `#/training/playlists/:id` right sidebar includes **Edit Playlist**, and modal saves name, description, difficulty label, type, and order-within-group.
-After deploy, verify adding nested playlist/video items from `#/training/playlists/:id` succeeds without popup errors, and add/move/remove controls continue working (including removing nested playlist rows by playlist item id).
+After deploy, verify adding nested playlist/video items from `#/training/playlists/:id` succeeds without popup errors, and add/move/remove controls update the list immediately (optimistic UI, no route refresh).
 After deploy, verify Training playlists support mixed nested items (videos + child playlists), breadcrumb trail updates when opening nested playlists, cycle-prevention blocks adding parent into descendants, and nested playlist thumbnails resolve from first depth-first video (or placeholder).
 After deploy, verify `#/training/playlists` renders one-level group cards with expand/collapse, grouped playlists sorted by order, and ungrouped playlists under **General**.
 After deploy, verify `#/training/playlists` defaults to **Top-level** view (nested playlists hidden), scope toggle supports **All/Nested**, search returns matches across all playlists regardless of scope, and nested results show a **Nested** badge while still opening normally.
-After deploy, verify each playlist card’s **X videos** value is recursive + distinct (direct videos + nested playlist videos across all depths, no double-counting duplicates, and no infinite loops if bad cycle data exists).
+After deploy, verify each playlist card’s **X videos** value is recursive + distinct (direct videos + nested playlist videos across all depths, no double-counting duplicates, and no infinite loops if bad cycle data exists), using backend `totalVideoCount`.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
@@ -543,7 +543,7 @@ MIT — do whatever you want with it.
 - `POST /api/attachments` (multipart form-data)
 - `GET /api/attachments?entity_type=lesson&entity_id=123`
 - `DELETE /api/attachments/:id`
-- `GET /api/training/videos/:id` (normalized single-video view)
+- `GET /api/training/videos/:id` (normalized single-video view, YouTube/URL source)
 - `GET /uploads/...` (static serving from `/data/uploads` for persisted attachments/media)
 
 ### New DB schema (idempotent)
@@ -560,11 +560,9 @@ Tables:
 
 New columns (via `ensureColumn`):
 - `sessions.ended_at`
-- `training_videos.local_video_path`
-- `training_videos.thumbnail_path`
-- `training_videos.thumbnail_updated_at`
+- `video_playlists.parent_playlist_id`
 
-Persistent media paths:
+Persistent app columns:
 - `sessions.total_minutes`
 - `sessions.status`
 - `lessons.notes_md`

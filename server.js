@@ -1100,6 +1100,7 @@ apiRouter.get('/video-playlists', (req, res) => {
       items,
       video_count_rollup: rollupCount,
       video_count: rollupCount,
+      totalVideoCount: rollupCount,
     };
   });
   return res.json(payload);
@@ -1177,8 +1178,9 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
     order_index: Number.isFinite(requestedOrder) ? requestedOrder : 0,
   };
   try {
-    const saved = Store.addPlaylistItem(req.params.id, normalizedItem);
-    return res.status(201).json(saved);
+    Store.addPlaylistItem(req.params.id, normalizedItem);
+    const refreshed = playlistWithItems(req.params.id);
+    return res.status(201).json({ ok: true, items: refreshed?.items || [] });
   } catch (error) {
     return res.status(400).json({ error: error.message || 'unable to add item' });
   }
@@ -1194,7 +1196,8 @@ apiRouter.delete('/training/playlists/:id/items/:itemId', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   Store.deletePlaylistItem(req.params.id, req.params.itemId);
-  return res.json({ ok: true });
+  const refreshed = playlistWithItems(req.params.id);
+  return res.json({ ok: true, items: refreshed?.items || [] });
 });
 
 
