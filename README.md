@@ -222,6 +222,7 @@ curl -s http://localhost:3000/api/gear/EXAMPLE_ID/images | head
 # optional UI smoke check: Gear list should show items by default (All filters)
 # optional UI smoke check: Gear page filter buttons (All/Owned/Wishlist/Sold) should not change route from #/gear
 # optional UI smoke check: Gear page keeps filters/list unchanged and shows compact Gear Stats in right sidebar
+# optional UI smoke check: Resources page hero/filter row matches Gear-style layout, cards open on click, and Pin/Edit actions do not open external links
 # optional UI smoke check: Stats page (#/progress) title reads "Stats" and shows full Gear Stats section near top
 # optional UI smoke check: Session form supports Gear Used selection + "Use last gear" and session detail shows Used gear badges
 # optional UI smoke check: open Presets and confirm Vypyr X2 Inst/Stomp/Effects rows render inside the same dial card/box,
