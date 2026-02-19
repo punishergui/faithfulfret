@@ -2,7 +2,7 @@ window.Pages = window.Pages || {};
 
 function formatVideoDuration(seconds) {
   const total = Number(seconds);
-  if (!Number.isFinite(total) || total < 0) return '';
+  if (!Number.isFinite(total) || total <= 0) return '';
   const n = Math.floor(total);
   const h = Math.floor(n / 3600);
   const m = Math.floor((n % 3600) / 60);
