@@ -467,7 +467,6 @@ Pages.Dashboard = {
     return Utils.renderPageHero({
       title: greeting,
       subtitle: awayText,
-      image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80',
     });
   },
 

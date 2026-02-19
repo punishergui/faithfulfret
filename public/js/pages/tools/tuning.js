@@ -22,7 +22,7 @@ Pages.Tuning = {
     const tunings = window.FF_TUNINGS || [];
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">Tunings</div>
           <a href="#/tools" class="df-btn df-btn--outline" style="margin-bottom:4px;">← Tools</a>

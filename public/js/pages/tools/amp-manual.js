@@ -60,7 +60,7 @@ Pages.AmpManual = {
     const app = document.getElementById('app');
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div>
             <div class="page-title">Amp Wiki</div>

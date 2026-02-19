@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 500" preserveAspectRatio="xMidYMid slice">
+  <rect width="1600" height="500" fill="#0d1118"/>
+  <g opacity="0.3" stroke="#96b9ff" stroke-width="2">
+    <line x1="0" y1="70" x2="1600" y2="20"/>
+    <line x1="0" y1="130" x2="1600" y2="80"/>
+    <line x1="0" y1="190" x2="1600" y2="140"/>
+    <line x1="0" y1="250" x2="1600" y2="200"/>
+    <line x1="0" y1="310" x2="1600" y2="260"/>
+    <line x1="0" y1="370" x2="1600" y2="320"/>
+  </g>
+  <g opacity="0.26" stroke="#c8d7ff" stroke-width="12">
+    <line x1="180" y1="0" x2="180" y2="500"/>
+    <line x1="430" y1="0" x2="430" y2="500"/>
+    <line x1="690" y1="0" x2="690" y2="500"/>
+    <line x1="955" y1="0" x2="955" y2="500"/>
+    <line x1="1220" y1="0" x2="1220" y2="500"/>
+    <line x1="1460" y1="0" x2="1460" y2="500"/>
+  </g>
+  <rect width="1600" height="500" fill="url(#v)"/>
+  <defs>
+    <linearGradient id="v" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+</svg>

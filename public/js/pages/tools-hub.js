@@ -46,7 +46,7 @@ Pages.ToolsHub = {
     ];
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">Tools</div>
           <div style="font-size:16px;color:var(--text2);font-family:var(--f-body);margin-top:8px;font-weight:300;">Practical tools for daily practice.</div>

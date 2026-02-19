@@ -96,6 +96,7 @@ After deploy, verify strict one-level nesting UX/rules: nesting Playlist B under
 After deploy, verify nested playlists still allow **Add Video**: add a video from `#/training/playlists/:nestedId` and confirm API `POST /api/training/playlists/:id/items` succeeds for `item_type=video` while keeping nested-playlist (`item_type=playlist`) restrictions unchanged.
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 After deploy, verify `#/resources` shows the new hero + sticky search/filter chips + responsive card grid (1/2/3+ columns by breakpoint), and confirm Add/Open/Edit actions plus keyboard tab/focus still work.
+After deploy, verify hero bars use theme-driven background art (worship/djent/nu-metal/country families) on both `#/gear` and `#/resources`, and switching theme in `#/settings` updates hero imagery/tint without per-page hardcoded photos.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints

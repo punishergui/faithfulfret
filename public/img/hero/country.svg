@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 500" preserveAspectRatio="xMidYMid slice">
+  <rect width="1600" height="500" fill="#2b1f17"/>
+  <g opacity="0.23" stroke="#d6a36b" stroke-width="16">
+    <path d="M-50 80 C260 30 560 120 860 80 C1130 45 1380 120 1650 70"/>
+    <path d="M-50 170 C280 120 540 210 850 165 C1140 130 1400 220 1650 165"/>
+    <path d="M-50 260 C300 215 590 300 880 255 C1160 210 1410 305 1650 245"/>
+    <path d="M-50 355 C300 310 600 385 900 340 C1180 295 1430 380 1650 325"/>
+  </g>
+  <rect width="1600" height="500" fill="url(#fade)"/>
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2d1a3" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.32"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -167,7 +167,6 @@ Pages.Gear = {
     app.innerHTML = `
       ${Utils.renderPageHero({
         title: 'Gear',
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
         leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;">${filters.map((f) => `<button type="button" class="df-btn ${activeStatusFilter === f ? 'df-btn--primary' : 'df-btn--outline'}" data-status-filter="${f}">${f === 'all' ? 'All' : gearStatusLabel(f)}</button>`).join('')}</div>`,
         actions: '<a href="#/gear/add" class="df-btn df-btn--primary">+ Add Gear</a>',
       })}
@@ -558,7 +557,7 @@ Pages.GearForm = {
       : null;
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1568218234742-f0df6cd67c9a?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner"><div class="page-title">${isEdit ? 'Edit Gear' : 'Add Gear'}</div></div>
         <div class="fret-line"></div>
       </div>

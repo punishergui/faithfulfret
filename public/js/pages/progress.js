@@ -21,7 +21,6 @@ Pages.Progress = {
     app.innerHTML = `
       ${Utils.renderPageHero({
         title: 'Stats',
-        image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80',
         leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;">${this._renderTabs(activeTab)}</div>`,
       })}
 

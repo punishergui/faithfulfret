@@ -21,7 +21,7 @@ Pages.ChordChart = {
     const typeOrder = window.FF_CHORD_TYPES.map((type) => type.id);
 
     app.innerHTML = `
-      <div class="page-hero page-hero--img vert-texture" style="background-image:url('https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=1200&q=80');">
+      <div class="page-hero page-hero--img vert-texture">
         <div class="page-hero__inner">
           <div class="page-title">Chord Chart</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">

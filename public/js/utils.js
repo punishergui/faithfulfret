@@ -299,10 +299,9 @@ window.Utils = {
   },
 
   renderPageHero: ({ title = '', subtitle = '', leftExtra = '', actions = '', image = '', texture = true } = {}) => {
-    const heroClasses = `page-hero ${image ? 'page-hero--img' : ''} ${texture ? 'vert-texture' : ''}`.trim();
-    const bgStyle = image ? ` style="background-image:url('${image}');"` : '';
+    const heroClasses = `page-hero page-hero--img ${texture ? 'vert-texture' : ''}`.trim();
     return `
-      <div class="${heroClasses}"${bgStyle}>
+      <div class="${heroClasses}">
         <div class="page-hero__inner">
           <div class="ff-hero__layout">
             <div class="ff-hero__left">
