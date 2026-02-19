@@ -191,6 +191,7 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
 # UI polish deploy check: verify Dashboard, Sessions, Stats, and Settings headers render full-width with compact, uniform hero height.
 # UI polish deploy check: verify title/subtitle/filters/tabs stay left-aligned while hero action buttons stay right-aligned, and nav touches hero with no blank gap.
+# UI polish deploy check: verify `/#/gear` and `/#/resources` now share an identical hero/header layout (hero bar, action button alignment, search row, and filter pills), with only page text/content differing.
 # Dashboard layout deploy check: verify Recent Sessions + Recent Activity rows are fully clickable in the 70/30 layout, Quick Log remains the only fresh-start button, and mobile stacks into one column.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 

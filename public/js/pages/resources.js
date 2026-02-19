@@ -6,7 +6,7 @@ Pages.Resources = {
   activeFilter: 'All',
   searchTerm: '',
   sortBy: 'Pinned first',
-  filtersExpanded: true,
+  filtersExpanded: false,
   pinStorageKey: 'ff-resource-pins-v1',
 
   async render() {
@@ -17,35 +17,29 @@ Pages.Resources = {
     this.pinned = this._loadPins();
 
     app.innerHTML = `
-      <section class="resources-hero page-wrap">
-        <div class="resources-hero__intro">
-          <h1 class="resources-hero__title">RESOURCES</h1>
-          <p class="resources-hero__subtitle">Curated tools, channels, and lesson platforms for faster practice wins.</p>
-        </div>
-        <a href="#/resources/add" class="df-btn df-btn--primary resources-hero__add" aria-label="Add resource">+ Add Resource</a>
-      </section>
+      ${Utils.renderPageHero({
+        title: 'Resources',
+        subtitle: 'Curated tools, channels, and lesson platforms for faster practice wins.',
+        image: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80',
+        leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;" role="tablist" aria-label="Resource category filters">${this._filterList().map((filter) => `<button type="button" class="df-btn ${filter === this.activeFilter ? 'df-btn--primary' : 'df-btn--outline'}" data-filter="${filter}" role="tab" aria-selected="${filter === this.activeFilter}">${filter}</button>`).join('')}</div>`,
+        actions: '<a href="#/resources/add" class="df-btn df-btn--primary" aria-label="Add resource">+ Add Resource</a>',
+      })}
 
-      <div class="resources-filter-wrap">
-        <div class="page-wrap resources-filter">
-          <div class="resources-filter__top-row">
-            <input type="search" id="resource-search" class="df-input" placeholder="Quick search: title, author, notes, tags" aria-label="Search resources">
-            <button type="button" class="df-btn df-btn--outline" id="resources-filters-toggle">${this.filtersExpanded ? 'Hide' : 'Show'} filters</button>
-          </div>
-          <div class="resources-filter__chips" style="display:${this.filtersExpanded ? 'flex' : 'none'};" role="tablist" aria-label="Resource category filters">
-            ${this._filterList().map(filter => `
-              <button type="button" class="df-btn df-btn--outline resources-chip ${filter === this.activeFilter ? 'is-active' : ''}" data-filter="${filter}" role="tab" aria-selected="${filter === this.activeFilter}">${filter}</button>
-            `).join('')}
-          </div>
-          <div class="resources-filter__sort-row">
-            <label class="df-label" for="resource-sort">Sort</label>
-            <select id="resource-sort" class="df-input">
+      <div class="page-wrap" style="padding:24px 24px 60px;">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px;align-items:center;">
+          <input type="search" id="resource-search" class="df-input" placeholder="Quick search: title, author, notes, tags" aria-label="Search resources" value="${(this.searchTerm || '').replace(/"/g, '&quot;')}">
+          <button type="button" class="df-btn df-btn--outline" id="resources-filters-toggle">${this.filtersExpanded ? 'Hide' : 'Show'} filters</button>
+        </div>
+        <div id="resources-advanced" style="display:${this.filtersExpanded ? 'grid' : 'none'};grid-template-columns:1fr auto;gap:10px;margin-bottom:18px;align-items:center;">
+          <div></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end;">
+            <label class="df-label" for="resource-sort" style="margin:0;">Sort</label>
+            <select id="resource-sort" class="df-input" style="max-width:240px;">
               ${['Newest', 'Rating', 'Name A-Z', 'Pinned first'].map((opt) => `<option value="${opt}" ${this.sortBy === opt ? 'selected' : ''}>${opt}</option>`).join('')}
             </select>
           </div>
         </div>
-      </div>
 
-      <div class="page-wrap" style="padding:24px 24px 60px;">
         <div id="resources-grid-wrap">${this._renderGrid()}</div>
       </div>
     `;
@@ -161,6 +155,7 @@ Pages.Resources = {
   _bindEvents(app) {
     const search = app.querySelector('#resource-search');
     const chips = app.querySelectorAll('[data-filter]');
+    const advanced = app.querySelector('#resources-advanced');
 
     if (search) {
       search.value = this.searchTerm;
@@ -176,7 +171,8 @@ Pages.Resources = {
         this._updateGrid(app);
         chips.forEach((btn) => {
           const isActive = btn.dataset.filter === this.activeFilter;
-          btn.classList.toggle('is-active', isActive);
+          btn.classList.toggle('df-btn--primary', isActive);
+          btn.classList.toggle('df-btn--outline', !isActive);
           btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
       });
@@ -197,7 +193,8 @@ Pages.Resources = {
       const toggleBtn = e.target.closest('#resources-filters-toggle');
       if (toggleBtn) {
         this.filtersExpanded = !this.filtersExpanded;
-        this.render();
+        if (advanced) advanced.style.display = this.filtersExpanded ? 'grid' : 'none';
+        toggleBtn.textContent = `${this.filtersExpanded ? 'Hide' : 'Show'} filters`;
         return;
       }
 
