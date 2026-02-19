@@ -1089,16 +1089,20 @@ apiRouter.get('/video-playlists', (req, res) => {
   const scopeRaw = String(req.query.scope || 'all').toLowerCase();
   const scope = scopeRaw === 'top' || scopeRaw === 'nested' ? scopeRaw : 'all';
   const q = String(req.query.q || '').trim();
-  const playlists = Store.listVideoPlaylists({ scope, q }).map((playlist) => {
+  const playlists = Store.listVideoPlaylists({ scope, q });
+  const rollupCounts = Store.getVideoPlaylistRollupCounts(playlists.map((playlist) => playlist.id));
+  const payload = playlists.map((playlist) => {
     const items = Store.listPlaylistItems(playlist.id);
+    const rollupCount = Number(rollupCounts[Number(playlist.id)]) || 0;
     return {
       ...playlist,
       is_nested: Number(playlist.is_nested) ? 1 : 0,
       items,
-      video_count: Number(playlist.video_count) || items.length,
+      video_count_rollup: rollupCount,
+      video_count: rollupCount,
     };
   });
-  return res.json(playlists);
+  return res.json(payload);
 });
 
 apiRouter.get('/video-playlist-groups', (req, res) => {
