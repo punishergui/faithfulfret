@@ -1,5 +1,27 @@
 window.Pages = window.Pages || {};
 
+function parseDurationToSeconds(raw) {
+  const input = String(raw || '').trim();
+  if (!input) return null;
+  if (/^\d+$/.test(input)) return Number(input);
+  const parts = input.split(':').map((p) => p.trim());
+  if (parts.some((p) => !/^\d+$/.test(p))) return null;
+  if (parts.length === 2) return (Number(parts[0]) * 60) + Number(parts[1]);
+  if (parts.length === 3) return (Number(parts[0]) * 3600) + (Number(parts[1]) * 60) + Number(parts[2]);
+  return null;
+}
+
+function formatDurationInput(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n < 0) return '';
+  const total = Math.floor(n);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 const TRAINING_TEXT_COLORS = Object.freeze([
   { key: 'text', label: 'Text', value: 'var(--text)' },
   { key: 'muted', label: 'Muted', value: 'var(--text2)' },
@@ -194,7 +216,7 @@ window.TrainingDescription = window.TrainingDescription || {
 function renderVideoForm(video, options = {}) {
   const isEdit = !!options.isEdit;
   const attachments = Array.isArray(options.attachments) ? options.attachments : [];
-  const data = video || { youtube_url: '', url: '', title: '', author: '', thumbUrl: '', thumbnail_url: '', tags: '', category: 'general', difficulty_track: '', difficulty_level: '', notes: '' };
+  const data = video || { youtube_url: '', url: '', title: '', author: '', thumbUrl: '', thumbnail_url: '', tags: '', category: 'general', difficulty_track: '', difficulty_level: '', notes: '', duration_seconds: null };
   const colorButtons = TRAINING_TEXT_COLORS.map((item) => `<button type="button" class="training-rich-editor__btn training-rich-editor__color" data-rich-color="${item.key}" title="${item.label}"><span style="background:${item.value};"></span></button>`).join('');
 
   return `
@@ -214,6 +236,7 @@ function renderVideoForm(video, options = {}) {
       <div class="df-field"><label class="df-label">Category</label><select class="df-input" name="category"><option value="general" ${data.category === 'general' ? 'selected' : ''}>General</option><option value="skill" ${data.category === 'skill' ? 'selected' : ''}>Skill</option><option value="song" ${data.category === 'song' ? 'selected' : ''}>Song</option></select></div>
       <div class="df-field"><label class="df-label">Difficulty Track</label><select class="df-input" name="difficulty_track"><option value="">Select track</option>${['Beginner', 'Intermediate', 'Advanced'].map((item) => `<option value="${item}" ${data.difficulty_track === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
       <div class="df-field"><label class="df-label">Difficulty Level</label><select class="df-input" name="difficulty_level"><option value="">Select level</option>${[1,2,3].map((item) => `<option value="${item}" ${Number(data.difficulty_level) === item ? 'selected' : ''}>${item}</option>`).join('')}</select></div>
+      <div class="df-field"><label class="df-label">Duration (mm:ss or hh:mm:ss)</label><input name="duration_text" class="df-input" value="${escHtml(formatDurationInput(data.duration_seconds))}" placeholder="07:06"></div>
       <div class="df-field"><label class="df-label">Tags</label><input name="tags" class="df-input" value="${escHtml(data.tags || '')}" placeholder="technique,beginner,warmup"></div>
       <div class="df-field">
         <label class="df-label">Description</label>
@@ -766,6 +789,7 @@ Pages.ResourceVideosEdit = {
       const formData = new FormData(event.target);
       const payload = Object.fromEntries(formData.entries());
       payload.tags = String(payload.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).join(',');
+      payload.duration_seconds = parseDurationToSeconds(payload.duration_text);
       const html = sanitizeTrainingDescriptionHtml(editor?.innerHTML || '');
       payload.description_html = html;
       payload.description_text = stripHtmlToText(html);

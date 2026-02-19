@@ -246,6 +246,7 @@ function playlistWithItems(id) {
       const childPlaylistId = Number(item.child_playlist_id);
       const child = childPlaylistId ? Store.getVideoPlaylist(childPlaylistId) : null;
       const thumbnail = childPlaylistId ? Store.getPlaylistFirstThumbnail(childPlaylistId) : '';
+      const childStats = childPlaylistId ? Store.getPlaylistStatsDeep(childPlaylistId) : null;
       return {
         ...item,
         item_type: 'playlist',
@@ -254,6 +255,11 @@ function playlistWithItems(id) {
           name: child.name,
           description: child.description,
           thumbnail,
+        } : null,
+        deep_stats: childStats ? {
+          deepVideoCount: Number(childStats.deepVideoCount) || 0,
+          deepDurationSeconds: Number(childStats.deepDurationSeconds) || 0,
+          unknownDurationCount: Number(childStats.unknownDurationCount) || 0,
         } : null,
       };
     }
@@ -267,7 +273,17 @@ function playlistWithItems(id) {
       progress,
     };
   });
-  return { ...playlist, items: enriched };
+  const deepStats = Store.getPlaylistStatsDeep(id);
+  return {
+    ...playlist,
+    deep_stats: {
+      deepVideoCount: Number(deepStats.deepVideoCount) || 0,
+      deepDurationSeconds: Number(deepStats.deepDurationSeconds) || 0,
+      unknownDurationCount: Number(deepStats.unknownDurationCount) || 0,
+    },
+    deep_video_ids: Array.from(deepStats.deepVideoIds || []),
+    items: enriched,
+  };
 }
 
 function fetchJson(url, headers) {
@@ -1094,6 +1110,7 @@ apiRouter.get('/video-playlists', (req, res) => {
   const payload = playlists.map((playlist) => {
     const items = Store.listPlaylistItems(playlist.id);
     const rollupCount = Number(rollupCounts[Number(playlist.id)]) || 0;
+    const deepStats = Store.getPlaylistStatsDeep(playlist.id);
     return {
       ...playlist,
       is_nested: Number(playlist.is_nested) ? 1 : 0,
@@ -1101,6 +1118,8 @@ apiRouter.get('/video-playlists', (req, res) => {
       video_count_rollup: rollupCount,
       video_count: rollupCount,
       totalVideoCount: rollupCount,
+      deepDurationSeconds: Number(deepStats.deepDurationSeconds) || 0,
+      unknownDurationCount: Number(deepStats.unknownDurationCount) || 0,
     };
   });
   return res.json(payload);
