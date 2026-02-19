@@ -3,71 +3,178 @@
 window.Pages = window.Pages || {};
 
 Pages.Resources = {
+  activeFilter: 'All',
+  searchTerm: '',
+  pinStorageKey: 'ff-resource-pins-v1',
+
   async render() {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
-    const resources = await DB.getAllResources();
-
-    // Group by category
-    const byCategory = {};
-    resources.forEach(r => {
-      const cat = r.category || 'Other';
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(r);
-    });
+    this.resources = await DB.getAllResources();
+    this.pinned = this._loadPins();
 
     app.innerHTML = `
-      ${Utils.renderPageHero({
-        title: 'Resources',
-        image: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1200&q=80',
-        actions: '<a href="#/resources/add" class="df-btn df-btn--primary">+ Add Resource</a>',
-      })}
+      <section class="resources-hero page-wrap">
+        <div>
+          <h1 class="resources-hero__title">RESOURCES</h1>
+          <p class="resources-hero__subtitle">Curated tools & learning platforms</p>
+        </div>
+        <a href="#/resources/add" class="df-btn df-btn--primary resources-hero__add" aria-label="Add resource">+ Add Resource</a>
+      </section>
+
+      <div class="resources-filter-wrap">
+        <div class="page-wrap resources-filter">
+          <input type="search" id="resource-search" class="df-input" placeholder="Search resources…" aria-label="Search resources">
+          <div class="resources-chip-row" role="tablist" aria-label="Resource category filters">
+            ${this._filterList().map(filter => `
+              <button type="button" class="df-btn df-btn--outline resources-chip ${filter === this.activeFilter ? 'is-active' : ''}" data-filter="${filter}" role="tab" aria-selected="${filter === this.activeFilter}">${filter}</button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
 
       <div class="page-wrap" style="padding:24px 24px 60px;">
-        ${resources.length ? `<div class="df-panel df-panel--wide">${this._renderByCategory(byCategory)}</div>` : this._renderEmpty()}
+        <div id="resources-grid-wrap">${this._renderGrid()}</div>
       </div>
     `;
+
+    this._bindEvents(app);
   },
 
-  _renderByCategory(byCategory) {
-    return Object.entries(byCategory).map(([cat, items]) => `
-      <div class="cat-header">${cat} <span style="color:var(--text2);">(${items.length})</span></div>
-      <div style="margin-bottom:24px;">
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px 90px 130px;gap:14px;padding:8px 0;border-bottom:1px solid var(--line2);">
-          <span class="df-label">Resource</span>
-          <span class="df-label" style="text-align:center;">Level</span>
-          <span class="df-label" style="text-align:center;">Rating</span>
-          <span class="df-label" style="text-align:right;">Actions</span>
-        </div>
-        ${items.map(r => this._renderRow(r)).join('')}
-      </div>
-    `).join('');
+  _filterList() {
+    return ['All', 'Music Theory', 'Tabs', 'Metronome', 'YouTube', 'Apps', 'Other'];
   },
 
-  _renderRow(r) {
-    const stars = this._renderStars(r.rating || 0);
+  _renderGrid() {
+    const filtered = this._filteredResources();
+    if (!this.resources?.length) return this._renderEmpty();
+    if (!filtered.length) return '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No resources match this filter.</div>';
+    return `<div class="resources-grid">${filtered.map(r => this._renderCard(r)).join('')}</div>`;
+  },
+
+  _renderCard(r) {
+    const stars = this._renderStars(Number(r.rating) || 0);
     const tags = r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
     const openUrl = r.url ? Utils.normalizeUrl(r.url) : '';
+    const mappedCategory = this._mapCategory(r);
+    const isPinned = !!this.pinned[String(r.id)];
+    const cardTags = [mappedCategory, ...(isPinned ? ['Pinned'] : [])];
 
     return `
-      <div class="resource-row">
-        <div>
-          ${openUrl
-            ? `<a class="resource-row__name" href="${openUrl}" target="_blank" rel="noopener">${r.title}</a>`
-            : `<div class="resource-row__name" onclick="go('#/resources/edit/${r.id}')" style="cursor:pointer;">${r.title}</div>`}
-          ${r.author ? `<div class="resource-row__author">${r.author}</div>` : ''}
-          ${r.notes ? `<div class="resource-row__notes">${Utils.truncate(r.notes, 100)}</div>` : ''}
-          ${tags.length ? `<div class="resource-row__tags">${tags.map(t => `<span class="resource-row__tag">${t}</span>`).join('')}</div>` : ''}
+      <article class="resource-card" tabindex="0" aria-label="Resource ${r.title}">
+        <div class="resource-card__head">
+          <div class="resource-card__title-wrap">
+            <span class="resource-card__icon" aria-hidden="true">${this._categoryIcon(mappedCategory)}</span>
+            <div>
+              <div class="resource-card__title">${r.title}</div>
+              ${r.author ? `<div class="resource-card__author">${r.author}</div>` : ''}
+            </div>
+          </div>
+          <div class="resource-card__stars" aria-label="Rating ${Number(r.rating) || 0} out of 5">${stars}</div>
         </div>
-        <div class="resource-row__level">${r.level || ''}</div>
-        <div class="resource-row__stars">${stars}</div>
-        <div class="resource-row__link">
-          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" title="Open resource" class="resource-row__open-btn">Open</a>` : ''}
-          <button type="button" class="resource-row__edit" onclick="go('#/resources/edit/${r.id}')" title="Edit resource">✎</button>
+        <p class="resource-card__desc">${Utils.truncate(r.notes || tags.join(' • ') || 'No description added yet.', 95)}</p>
+        <div class="resource-card__chips">${cardTags.map(tag => `<span class="resource-card__chip">${tag}</span>`).join('')}</div>
+        <div class="resource-card__actions">
+          ${openUrl ? `<a href="${openUrl}" target="_blank" rel="noopener" class="df-btn df-btn--outline" aria-label="Open ${r.title}">Open</a>` : '<span></span>'}
+          <div class="resource-card__actions-right">
+            <button type="button" class="df-btn resource-card__pin ${isPinned ? 'is-active' : ''}" data-pin-id="${r.id}" aria-label="${isPinned ? 'Unpin' : 'Pin'} ${r.title}" title="${isPinned ? 'Unpin' : 'Pin'}">★</button>
+            <button type="button" class="df-btn resource-card__edit" onclick="go('#/resources/edit/${r.id}')" aria-label="Edit ${r.title}" title="Edit resource">Edit</button>
+          </div>
         </div>
-      </div>
+      </article>
     `;
+  },
+
+  _filteredResources() {
+    const q = this.searchTerm.trim().toLowerCase();
+    const filtered = (this.resources || []).filter((r) => {
+      const mappedCategory = this._mapCategory(r);
+      if (this.activeFilter !== 'All' && mappedCategory !== this.activeFilter) return false;
+      if (!q) return true;
+      const tags = r.tags ? r.tags.toLowerCase() : '';
+      const haystack = [r.title, r.notes, r.author, r.category, tags].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+
+    return filtered.sort((a, b) => {
+      if (this.activeFilter === 'All') {
+        const pinDelta = Number(!!this.pinned[String(b.id)]) - Number(!!this.pinned[String(a.id)]);
+        if (pinDelta) return pinDelta;
+      }
+      return String(a.title || '').localeCompare(String(b.title || ''));
+    });
+  },
+
+  _mapCategory(r) {
+    const raw = String(r.category || '').toLowerCase();
+    if (raw.includes('theory') || raw.includes('lesson') || raw.includes('book') || raw.includes('podcast')) return 'Music Theory';
+    if (raw.includes('tab')) return 'Tabs';
+    if (raw.includes('metro') || raw.includes('bpm') || raw.includes('tempo')) return 'Metronome';
+    if (raw.includes('youtube') || raw.includes('video')) return 'YouTube';
+    if (raw.includes('app') || raw.includes('software') || raw.includes('tool')) return 'Apps';
+    return 'Other';
+  },
+
+  _categoryIcon(cat) {
+    const icons = {
+      'Music Theory': '♫',
+      Tabs: '𝄞',
+      Metronome: '⏱',
+      YouTube: '▶',
+      Apps: '⌘',
+      Other: '◆',
+    };
+    return icons[cat] || icons.Other;
+  },
+
+  _bindEvents(app) {
+    const search = app.querySelector('#resource-search');
+    const chips = app.querySelectorAll('[data-filter]');
+
+    if (search) {
+      search.value = this.searchTerm;
+      search.addEventListener('input', (e) => {
+        this.searchTerm = e.target.value || '';
+        this._updateGrid(app);
+      });
+    }
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        this.activeFilter = chip.dataset.filter || 'All';
+        this._updateGrid(app);
+        chips.forEach((btn) => {
+          const isActive = btn.dataset.filter === this.activeFilter;
+          btn.classList.toggle('is-active', isActive);
+          btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+      });
+    });
+
+    app.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-pin-id]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-pin-id');
+      if (!id) return;
+      this.pinned[id] = !this.pinned[id];
+      if (!this.pinned[id]) delete this.pinned[id];
+      localStorage.setItem(this.pinStorageKey, JSON.stringify(this.pinned));
+      this._updateGrid(app);
+    });
+  },
+
+  _updateGrid(app) {
+    const wrap = app.querySelector('#resources-grid-wrap');
+    if (wrap) wrap.innerHTML = this._renderGrid();
+  },
+
+  _loadPins() {
+    try {
+      return JSON.parse(localStorage.getItem(this.pinStorageKey) || '{}') || {};
+    } catch {
+      return {};
+    }
   },
 
   _renderStars(rating) {
