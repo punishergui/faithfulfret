@@ -102,9 +102,4 @@
 
   applyThemeToRootAndBody();
   document.addEventListener('DOMContentLoaded', () => applyThemeToRootAndBody(), { once: true });
-
-  const observer = new MutationObserver(() => {
-    applyThemeToRootAndBody(document.documentElement.dataset.theme);
-  });
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
