@@ -404,6 +404,10 @@
       return api(`/api/training/playlists/${id}/items/${itemId}`, { method: 'DELETE' });
     },
 
+    async unnestTrainingPlaylist(parentId, childPlaylistId) {
+      return api(`/api/training/playlists/${parentId}/unnest`, { method: 'POST', body: JSON.stringify({ child_playlist_id: Number(childPlaylistId) || 0 }) });
+    },
+
     async getTrainingPlaylistDetail(id) {
       return api(`/api/training/playlists/${id}`);
     },

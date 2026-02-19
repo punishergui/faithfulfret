@@ -1298,6 +1298,7 @@ apiRouter.get('/training/playlists/video-assignments', (req, res) => {
 apiRouter.post('/training/playlists/:id/items', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
+  const parentId = Number(req.params.id);
   const item = req.body || {};
   const itemType = String(item.item_type || 'video');
   if (itemType !== 'video' && itemType !== 'playlist') return res.status(400).json({ error: 'invalid item_type' });
@@ -1307,6 +1308,27 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
   if (itemType === 'video' && !Number(item.video_id || item.videoId)) {
     return res.status(400).json({ error: 'video_id is required for item_type=video' });
   }
+
+  if (itemType === 'playlist') {
+    const childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
+    if (!Store.getVideoPlaylist(childPlaylistId)) {
+      return res.status(400).json({ error: 'child playlist not found' });
+    }
+    if (childPlaylistId === parentId) {
+      return res.status(400).json({ error: 'Playlist cannot contain itself' });
+    }
+    if (Store.wouldCreateCycle(parentId, childPlaylistId)) {
+      return res.status(400).json({ error: 'Adding this playlist would create a cycle' });
+    }
+    const existingParent = Store.getParentPlaylistId(childPlaylistId);
+    if (existingParent && existingParent !== parentId) {
+      return res.status(409).json({ error: 'Playlist already nested in another playlist', parent_playlist_id: Number(existingParent) || null });
+    }
+    if (existingParent === parentId) {
+      return res.status(409).json({ error: 'Playlist already nested in this playlist', parent_playlist_id: Number(existingParent) || null });
+    }
+  }
+
   const requestedOrder = Number(item.order_index);
   const normalizedItem = {
     ...item,
@@ -1321,8 +1343,27 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
     if (error?.code === 'VIDEO_ALREADY_ASSIGNED') {
       return res.status(409).json({ error: 'Video already assigned to another playlist', playlist_id: Number(error.playlistId) || null });
     }
+    if (error?.code === 'PLAYLIST_ALREADY_NESTED') {
+      return res.status(409).json({ error: error.message || 'Playlist already nested in another playlist', parent_playlist_id: Number(error.parentPlaylistId) || null });
+    }
     return res.status(400).json({ error: error.message || 'unable to add item' });
   }
+});
+
+apiRouter.post('/training/playlists/:id/unnest', (req, res) => {
+  const parent = Store.getVideoPlaylist(req.params.id);
+  if (!parent) return res.status(404).json({ error: 'not found' });
+  const childPlaylistId = Number(req.body?.child_playlist_id || req.body?.childPlaylistId);
+  if (!childPlaylistId) return res.status(400).json({ error: 'child_playlist_id is required' });
+  const child = Store.getVideoPlaylist(childPlaylistId);
+  if (!child) return res.status(404).json({ error: 'child playlist not found' });
+  const existingParentId = Store.getParentPlaylistId(childPlaylistId);
+  if (!existingParentId) return res.status(400).json({ error: 'Playlist is already top-level' });
+  if (existingParentId !== Number(req.params.id)) {
+    return res.status(409).json({ error: 'Playlist is nested under a different parent', parent_playlist_id: Number(existingParentId) || null });
+  }
+  Store.unnestPlaylist(childPlaylistId);
+  return res.json({ ok: true, child_playlist_id: childPlaylistId });
 });
 
 apiRouter.get('/training/playlists/:id', (req, res) => {
