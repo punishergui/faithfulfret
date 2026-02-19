@@ -65,7 +65,6 @@ After deploy, verify Training routes load: `#/training`, `#/training/videos`, an
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
 After deploy, verify Training videos remain URL-based: create/edit videos with YouTube URLs, metadata fetch works, and thumbnails render from oEmbed/URL values.
 After deploy, verify **Fetch Details** on `#/training/videos/new` auto-fills title, thumbnail, and duration (yt-dlp metadata), manual duration overrides save, and unknown durations render as `—` (never `00:00`).
-After deploy, verify container metadata tooling is present: run `yt-dlp --version` inside the app container (installed via Alpine apk, no pip system install).
 After deploy, verify Training Playlists list uses 70/30 layout (cards left, create/sort sidebar right), cards open on click, and each card thumbnail matches the first playlist video by position (or placeholder when empty).
 After deploy, verify Playlist detail thumbnails keep a fixed 16:9 size with object-fit cover and do not squish when reorder/remove controls are visible.
 After deploy, verify `#/training/videos` cards are fully clickable with keyboard Enter support, show subtle lift/glow hover states, and keep 16:9 thumbnails stable across theme switching.
