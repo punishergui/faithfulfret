@@ -408,6 +408,10 @@
       return api(`/api/training/playlists/${id}`);
     },
 
+    async getTrainingPlaylistVideoAssignments() {
+      return api('/api/training/playlists/video-assignments');
+    },
+
     async getVideoAttachments(videoId) {
       return api(`/api/videos/${videoId}/attachments`);
     },

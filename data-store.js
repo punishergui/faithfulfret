@@ -1686,11 +1686,39 @@ const listPlaylistsByVideo = (videoId) => db.prepare(`
     AND COALESCE(i.video_id, i.videoId) = ?
   ORDER BY p.name COLLATE NOCASE ASC
 `).all(Number(videoId));
+const getPlaylistIdForVideo = (videoId) => {
+  const row = one(`
+    SELECT COALESCE(playlist_id, playlistId) AS playlist_id
+    FROM video_playlist_items
+    WHERE COALESCE(item_type, 'video') = 'video'
+      AND COALESCE(video_id, videoId) = ?
+    ORDER BY id ASC
+    LIMIT 1
+  `, Number(videoId));
+  return row ? Number(row.playlist_id) : null;
+};
+const listVideoPlaylistAssignments = () => {
+  const rows = all(`
+    SELECT COALESCE(video_id, videoId) AS video_id, MIN(COALESCE(playlist_id, playlistId)) AS playlist_id
+    FROM video_playlist_items
+    WHERE COALESCE(item_type, 'video') = 'video'
+      AND COALESCE(video_id, videoId) IS NOT NULL
+    GROUP BY COALESCE(video_id, videoId)
+  `);
+  return rows.reduce((acc, row) => {
+    const videoId = Number(row.video_id);
+    const playlistId = Number(row.playlist_id);
+    if (!videoId || !playlistId) return acc;
+    acc[videoId] = playlistId;
+    return acc;
+  }, {});
+};
 const replacePlaylistItems = (playlistId, items = []) => {
   const tx = db.transaction((targetPlaylistId, nextItems) => {
     const previousChildren = db.prepare(`SELECT child_playlist_id FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ? AND item_type = 'playlist' AND child_playlist_id IS NOT NULL`).all(targetPlaylistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId);
     const insert = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)');
+    const seenVideoIds = new Set();
     nextItems.forEach((item, index) => {
       const itemType = String(item.item_type || item.itemType || 'video');
       const requestedOrder = Number(item.order_index ?? item.position);
@@ -1706,6 +1734,10 @@ const replacePlaylistItems = (playlistId, items = []) => {
       }
       const videoId = Number(item.video_id || item.videoId);
       if (!videoId) return;
+      if (seenVideoIds.has(videoId)) throw new Error('Video already assigned to another playlist');
+      const existingPlaylistId = getPlaylistIdForVideo(videoId);
+      if (existingPlaylistId && existingPlaylistId !== targetPlaylistId) throw new Error('Video already assigned to another playlist');
+      seenVideoIds.add(videoId);
       insert.run(targetPlaylistId, targetPlaylistId, 'video', videoId, videoId, null, orderIndex, orderIndex);
     });
     db.prepare('UPDATE video_playlists SET updatedAt = ? WHERE id = ?').run(Date.now(), targetPlaylistId);
@@ -1739,6 +1771,13 @@ const addPlaylistItem = (playlistId, item = {}) => {
     videoId = Number(item.video_id || item.videoId);
     if (!videoId) throw new Error('video_id is required');
     if (!getTrainingVideo(videoId)) throw new Error('video not found');
+    const existingPlaylistId = getPlaylistIdForVideo(videoId);
+    if (existingPlaylistId && existingPlaylistId !== targetPlaylistId) {
+      const conflict = new Error('Video already assigned to another playlist');
+      conflict.code = 'VIDEO_ALREADY_ASSIGNED';
+      conflict.playlistId = existingPlaylistId;
+      throw conflict;
+    }
   }
 
   const params = [
@@ -2019,4 +2058,4 @@ const assignSongLessons = (songId, lessonIds = []) => {
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

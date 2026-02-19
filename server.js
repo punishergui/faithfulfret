@@ -1283,8 +1283,16 @@ apiRouter.put('/video-playlists/:id/items', (req, res) => {
   const existing = Store.getVideoPlaylist(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
-  Store.replacePlaylistItems(req.params.id, items);
-  return res.json(playlistWithItems(req.params.id));
+  try {
+    Store.replacePlaylistItems(req.params.id, items);
+    return res.json(playlistWithItems(req.params.id));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'unable to update items' });
+  }
+});
+
+apiRouter.get('/training/playlists/video-assignments', (req, res) => {
+  return res.json(Store.listVideoPlaylistAssignments());
 });
 
 apiRouter.post('/training/playlists/:id/items', (req, res) => {
@@ -1310,6 +1318,9 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
     const refreshed = playlistWithItems(req.params.id);
     return res.status(201).json({ ok: true, items: refreshed?.items || [] });
   } catch (error) {
+    if (error?.code === 'VIDEO_ALREADY_ASSIGNED') {
+      return res.status(409).json({ error: 'Video already assigned to another playlist', playlist_id: Number(error.playlistId) || null });
+    }
     return res.status(400).json({ error: error.message || 'unable to add item' });
   }
 });
