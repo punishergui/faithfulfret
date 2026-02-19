@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v14';
+const CACHE_NAME = 'daily-fret-v15';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -63,4 +63,4 @@ self.addEventListener('fetch', e => {
     }))
   );
 });
-// cache-bust: 2026-02-19T00:00:00Z
+// cache-bust: 2026-02-19T12:00:00Z

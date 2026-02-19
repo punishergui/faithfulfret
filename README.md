@@ -16,8 +16,8 @@ cd daily-fret
 # 2. Generate icons (one time)
 node scripts/gen-icons.js
 
-# 3. Start with Docker Compose (mounts ./data -> /data)
-docker compose up -d
+# 3. Start with Docker Compose (mounts ./data -> /data and ./public -> /app/public read-only)
+docker compose up -d --force-recreate
 
 # 4. Open in browser
 # http://YOUR-VM-IP:3000
@@ -51,7 +51,7 @@ docker run --rm -d --name faithfulfret-local -p 3000:9999 -v "$PWD/data:/data" f
 ### Run via compose (dev)
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 ```
 
 ### Run via compose (prod / GHCR)
@@ -60,6 +60,14 @@ docker compose up -d --build
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
+
+For rewrite-app hotfixes that must persist local `public` asset edits, use local compose with forced recreate:
+
+```bash
+docker compose up -d --force-recreate
+```
+
+Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags when needed for instant rollback.
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.

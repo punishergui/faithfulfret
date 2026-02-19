@@ -1537,7 +1537,7 @@ select.df-input option {
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   background: var(--bg2);
-  background-image: none !important;
+  isolation: isolate;
   border-bottom: 1px solid var(--line2);
   overflow: hidden;
 }
