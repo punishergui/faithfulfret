@@ -1744,6 +1744,10 @@ const listVideoPlaylistAssignments = () => {
 };
 const replacePlaylistItems = (playlistId, items = []) => {
   const tx = db.transaction((targetPlaylistId, nextItems) => {
+    const hasNestedPlaylistItems = nextItems.some((item) => String(item.item_type || item.itemType || 'video') === 'playlist');
+    if (hasNestedPlaylistItems && getParentPlaylistId(targetPlaylistId) != null) {
+      throw new Error('Cannot nest playlists inside a nested playlist. Only top-level playlists can contain playlists.');
+    }
     const previousChildren = db.prepare(`SELECT child_playlist_id FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ? AND item_type = 'playlist' AND child_playlist_id IS NOT NULL`).all(targetPlaylistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId);
     const insert = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)');
@@ -1794,6 +1798,11 @@ const addPlaylistItem = (playlistId, item = {}) => {
   let videoId = null;
   let childPlaylistId = null;
   if (itemType === 'playlist') {
+    if (getParentPlaylistId(targetPlaylistId) != null) {
+      const conflict = new Error('Cannot nest playlists inside a nested playlist. Only top-level playlists can contain playlists.');
+      conflict.code = 'PARENT_PLAYLIST_NOT_TOP_LEVEL';
+      throw conflict;
+    }
     childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
     if (!childPlaylistId) throw new Error('child_playlist_id is required');
     if (!getVideoPlaylist(childPlaylistId)) throw new Error('child playlist not found');

@@ -1350,6 +1350,9 @@ apiRouter.post('/training/playlists/:id/items', (req, res) => {
     if (error?.code === 'PLAYLIST_ALREADY_NESTED') {
       return res.status(409).json({ error: error.message || 'Playlist already nested in another playlist', parent_playlist_id: Number(error.parentPlaylistId) || null });
     }
+    if (error?.code === 'PARENT_PLAYLIST_NOT_TOP_LEVEL') {
+      return res.status(409).json({ error: error.message || 'Cannot nest playlists inside a nested playlist. Only top-level playlists can contain playlists.' });
+    }
     return res.status(400).json({ error: error.message || 'unable to add item' });
   }
 });
