@@ -1301,16 +1301,28 @@ select.df-input option {
 /* ============================================================
    TOOL CARDS
    ============================================================ */
+.tools-wrap {
+  padding: 28px 24px 56px;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .tool-card {
   background: var(--bg2);
   border: 1px solid var(--line2);
-  padding: 32px;
+  border-radius: 12px;
+  min-height: 200px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   text-decoration: none;
   color: var(--text);
-  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  transition: border-color 0.16s, background 0.16s, transform 0.16s, box-shadow 0.16s;
   position: relative;
   overflow: hidden;
 }
@@ -1318,48 +1330,91 @@ select.df-input option {
 .tool-card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-  transform: scaleX(0);
-  transition: transform 0.2s;
-  transform-origin: left;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  opacity: 0;
+  transition: opacity 0.16s;
+  pointer-events: none;
 }
 
 .tool-card:hover {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line2));
   background: var(--bg3);
   transform: translateY(-2px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--glow) 28%, transparent);
 }
 
 .tool-card:hover::before {
-  transform: scaleX(1);
+  opacity: 1;
+}
+
+.tool-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .tool-card__icon {
-  font-size: 32px;
+  font-size: 28px;
+  line-height: 1;
 }
 
 .tool-card__title {
-  font-family: var(--f-hero);
-  font-size: 28px;
-  text-transform: uppercase;
-  color: #fff;
+  font-family: var(--f-body);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .tool-card__desc {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text2);
-  font-weight: 300;
+  font-weight: 400;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tool-card__arrow {
   font-family: var(--f-mono);
-  font-size: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--accent);
   margin-top: auto;
+}
+
+@media (max-width: 1199px) {
+  .tools-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 699px) {
+  .tools-wrap {
+    padding: 18px 14px 34px;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .tool-card {
+    min-height: 180px;
+    padding: 16px;
+    gap: 8px;
+  }
+
+  .tool-card__title {
+    font-size: 16px;
+  }
+
+  .tool-card__desc {
+    font-size: 12px;
+  }
 }
 
 /* ============================================================
