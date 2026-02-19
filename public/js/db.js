@@ -358,8 +358,12 @@
       return api(`/api/video-timestamps/${id}`, { method: 'DELETE' });
     },
 
-    async getVideoPlaylists() {
-      return api('/api/video-playlists');
+    async getVideoPlaylists(options = {}) {
+      const params = new URLSearchParams();
+      if (options.scope) params.set('scope', String(options.scope));
+      if (options.q) params.set('q', String(options.q));
+      const query = params.toString();
+      return api(`/api/video-playlists${query ? `?${query}` : ''}`);
     },
 
     async getVideoPlaylistGroups() {

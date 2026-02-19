@@ -1184,32 +1184,55 @@ const resolvePlaylistGroupId = (row) => {
   return Number(result.lastInsertRowid);
 };
 
-const listVideoPlaylists = () => all(`
-  SELECT
-    p.*,
-    gi.group_id,
-    gi.order_index,
-    g.name AS group_name,
-    g.description AS group_description,
-    g.order_index AS group_order_index,
-    (
-      SELECT COUNT(*)
-      FROM video_playlist_items i
-      WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
-    ) AS video_count,
-    (
-      SELECT COALESCE(v.thumbnail_url, v.thumb_url, v.thumbUrl, '')
-      FROM video_playlist_items i
-      JOIN training_videos v ON v.id = COALESCE(i.video_id, i.videoId)
-      WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
-      ORDER BY COALESCE(i.position, 0) ASC, i.id ASC
-      LIMIT 1
-    ) AS preview_thumbnail_url
-  FROM video_playlists p
-  LEFT JOIN playlist_group_items gi ON gi.playlist_id = p.id
-  LEFT JOIN playlist_groups g ON g.id = gi.group_id
-  ORDER BY COALESCE(g.order_index, 999999) ASC, COALESCE(gi.order_index, COALESCE(p.sort_order, 0)) ASC, p.name COLLATE NOCASE ASC
-`);
+const listVideoPlaylists = ({ scope = 'all', q = '' } = {}) => {
+  const query = String(q || '').trim();
+  const where = [];
+  const args = [];
+  const nestedSql = `EXISTS (
+    SELECT 1
+    FROM video_playlist_items ni
+    WHERE ni.item_type = 'playlist'
+      AND ni.child_playlist_id = p.id
+  )`;
+  if (query) {
+    where.push('(LOWER(COALESCE(p.name, "")) LIKE LOWER(?) OR LOWER(COALESCE(p.description, "")) LIKE LOWER(?))');
+    args.push(`%${query}%`, `%${query}%`);
+  } else if (scope === 'top') {
+    where.push(`NOT ${nestedSql}`);
+  } else if (scope === 'nested') {
+    where.push(nestedSql);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  return all(`
+    SELECT
+      p.*,
+      gi.group_id,
+      gi.order_index,
+      g.name AS group_name,
+      g.description AS group_description,
+      g.order_index AS group_order_index,
+      (
+        SELECT COUNT(*)
+        FROM video_playlist_items i
+        WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
+      ) AS video_count,
+      (
+        SELECT COALESCE(v.thumbnail_url, v.thumb_url, v.thumbUrl, '')
+        FROM video_playlist_items i
+        JOIN training_videos v ON v.id = COALESCE(i.video_id, i.videoId)
+        WHERE COALESCE(i.playlist_id, i.playlistId) = p.id
+        ORDER BY COALESCE(i.position, 0) ASC, i.id ASC
+        LIMIT 1
+      ) AS preview_thumbnail_url,
+      CASE WHEN ${nestedSql} THEN 1 ELSE 0 END AS is_nested
+    FROM video_playlists p
+    LEFT JOIN playlist_group_items gi ON gi.playlist_id = p.id
+    LEFT JOIN playlist_groups g ON g.id = gi.group_id
+    ${whereSql}
+    ORDER BY COALESCE(g.order_index, 999999) ASC, COALESCE(gi.order_index, COALESCE(p.sort_order, 0)) ASC, p.name COLLATE NOCASE ASC
+  `, ...args);
+};
 const getVideoPlaylist = (id) => one(`
   SELECT
     p.*,

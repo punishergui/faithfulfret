@@ -80,6 +80,7 @@ After deploy, verify `#/training/playlists/:id` right sidebar includes **Edit Pl
 After deploy, verify adding nested playlist/video items from `#/training/playlists/:id` succeeds without popup errors, and add/move/remove controls continue working (including removing nested playlist rows by playlist item id).
 After deploy, verify Training playlists support mixed nested items (videos + child playlists), breadcrumb trail updates when opening nested playlists, cycle-prevention blocks adding parent into descendants, and nested playlist thumbnails resolve from first depth-first video (or placeholder).
 After deploy, verify `#/training/playlists` renders one-level group cards with expand/collapse, grouped playlists sorted by order, and ungrouped playlists under **General**.
+After deploy, verify `#/training/playlists` defaults to **Top-level** view (nested playlists hidden), scope toggle supports **All/Nested**, search returns matches across all playlists regardless of scope, and nested results show a **Nested** badge while still opening normally.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
