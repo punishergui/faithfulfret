@@ -2,6 +2,21 @@ window.Pages = window.Pages || {};
 
 function esc(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function fmt(sec) { const n = Number(sec) || 0; return `${Math.floor(n / 60)}m`; }
+function formatDuration(seconds) {
+  const total = Number(seconds);
+  if (!Number.isFinite(total) || total < 0) return '';
+  const n = Math.floor(total);
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const s = n % 60;
+  if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+function formatDurationWithUnknown(seconds, unknownCount) {
+  const base = formatDuration(seconds);
+  if (!base) return unknownCount > 0 ? '— (partial)' : '—';
+  return unknownCount > 0 ? `${base} (+?)` : base;
+}
 function qv(name) { return new URLSearchParams(location.hash.split('?')[1] || '').get(name) || ''; }
 
 function trainingCrumbs(items) { return Utils.renderBreadcrumbs(items); }
@@ -193,6 +208,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     const name = esc(playlist.name || `Playlist ${playlist.id}`);
     const description = esc(playlist.description || '');
     const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
+    const durationLabel = formatDurationWithUnknown(playlist.deepDurationSeconds, Number(playlist.unknownDurationCount) || 0);
     const nested = Number(playlist.is_nested) === 1;
     return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
       <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
@@ -202,7 +218,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
           ${nested ? '<span class="df-btn df-btn--ghost" style="pointer-events:none;height:auto;padding:2px 8px;font-size:11px;">Nested</span>' : ''}
         </div>
         <div class="training-playlist-list-description">${description || '—'}</div>
-        <div style="color:var(--text2);font-size:12px;">${metaCount} · ${esc(playlist.playlist_type || 'General')} · ${esc(playlist.difficulty_label || 'No difficulty')}</div>
+        <div style="color:var(--text2);font-size:12px;">${metaCount} • ${durationLabel} · ${esc(playlist.playlist_type || 'General')} · ${esc(playlist.difficulty_label || 'No difficulty')}</div>
       </div>
     </a>`;
   };
@@ -354,6 +370,8 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       : [],
     saving: false,
     lastSavedAt: Number(playlist.updatedAt || playlist.updated_at || Date.now()),
+    deepVideoIds: new Set((playlist.deep_video_ids || []).map((id) => Number(id)).filter(Boolean)),
+    deepStats: playlist.deep_stats || { deepVideoCount: 0, deepDurationSeconds: 0, unknownDurationCount: 0 },
   };
   const videosMap = new Map(videos.map((v) => [Number(v.id), v]));
   const idToPlaylist = new Map(allPlaylists.map((p) => [Number(p.id), p]));
@@ -393,22 +411,35 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
             <button id="add-playlist" class="df-btn df-btn--outline" type="button">Add Playlist</button>
           </div>
         </div>
-        <aside class="training-playlists-sidebar"><div class="df-panel" style="padding:12px;display:grid;gap:8px;align-content:start;"><div style="font-weight:700;">Playlist</div><div style="color:var(--text2);font-size:12px;" id="playlist-video-count"></div><div style="color:var(--text2);font-size:12px;" id="playlist-nested-count"></div><div style="color:var(--text2);font-size:12px;">Type: ${esc(playlist.playlist_type || 'General')}</div><div style="color:var(--text2);font-size:12px;">Difficulty: ${esc(playlist.difficulty_label || 'No difficulty')}</div><div style="color:var(--text2);font-size:12px;">Group: ${esc(playlist.group_name || 'General')}</div><button id="edit-playlist" class="df-btn df-btn--primary" type="button">Edit Playlist</button></div></aside>
+        <aside class="training-playlists-sidebar"><div class="df-panel" style="padding:12px;display:grid;gap:8px;align-content:start;"><div style="font-weight:700;">Playlist</div><div style="color:var(--text2);font-size:12px;" id="playlist-video-count"></div><div style="color:var(--text2);font-size:12px;" id="playlist-total-time"></div><div style="color:var(--text2);font-size:12px;" id="playlist-nested-count"></div><div style="color:var(--text2);font-size:12px;">Type: ${esc(playlist.playlist_type || 'General')}</div><div style="color:var(--text2);font-size:12px;">Difficulty: ${esc(playlist.difficulty_label || 'No difficulty')}</div><div style="color:var(--text2);font-size:12px;">Group: ${esc(playlist.group_name || 'General')}</div><button id="edit-playlist" class="df-btn df-btn--primary" type="button">Edit Playlist</button></div></aside>
       </div>
     </div>`;
 
   const route = `#/training/playlists/${id}${parentId ? `?parentId=${parentId}` : ''}`;
+  const refreshDeepData = async () => {
+    const refreshed = await DB.getTrainingPlaylistDetail(id);
+    if (!refreshed) return;
+    state.deepVideoIds = new Set((refreshed.deep_video_ids || []).map((entryId) => Number(entryId)).filter(Boolean));
+    state.deepStats = refreshed.deep_stats || { deepVideoCount: 0, deepDurationSeconds: 0, unknownDurationCount: 0 };
+    state.items = Array.isArray(refreshed.items)
+      ? refreshed.items.slice().sort((a, b) => (Number(a.order_index ?? a.position) || 0) - (Number(b.order_index ?? b.position) || 0))
+      : state.items;
+  };
   const getLastSavedLabel = () => {
     const when = state.lastSavedAt ? new Date(Number(state.lastSavedAt)).toLocaleTimeString() : 'just now';
     return `Last saved: ${when}`;
   };
   const updateSidebarStats = () => {
-    const videoCount = state.items.filter((item) => String(item.item_type || 'video') === 'video').length;
     const nestedCount = state.items.filter((item) => String(item.item_type || 'video') === 'playlist').length;
+    const deepVideoCount = Number(state.deepStats?.deepVideoCount) || 0;
+    const deepDurationSeconds = Number(state.deepStats?.deepDurationSeconds) || 0;
+    const unknownDurationCount = Number(state.deepStats?.unknownDurationCount) || 0;
     const videoEl = app.querySelector('#playlist-video-count');
+    const totalTimeEl = app.querySelector('#playlist-total-time');
     const nestedEl = app.querySelector('#playlist-nested-count');
     const savedEl = app.querySelector('#playlist-last-saved');
-    if (videoEl) videoEl.textContent = `${videoCount} direct videos`;
+    if (videoEl) videoEl.textContent = `Videos: ${deepVideoCount}`;
+    if (totalTimeEl) totalTimeEl.textContent = `Total time: ${formatDurationWithUnknown(deepDurationSeconds, unknownDurationCount)}`;
     if (nestedEl) nestedEl.textContent = `${nestedCount} nested playlists`;
     if (savedEl) savedEl.textContent = getLastSavedLabel();
   };
@@ -421,7 +452,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       const thumb = child?.thumbnail || child?.preview_thumbnail_url || '';
       return `<div class="training-playlist-row" data-open-playlist="${childId}" data-item-id="${item.id}">
         ${thumb ? `<img src="${thumb}" alt="${esc(child?.name || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">📁</div>'}
-        <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(child?.name || `Playlist ${childId}`)}</div><div style="color:var(--text2);font-size:12px;margin-top:6px;">Nested playlist</div></div>
+        <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(child?.name || `Playlist ${childId}`)}</div><div style="color:var(--text2);font-size:12px;margin-top:6px;">${item.deep_stats ? `${Number(item.deep_stats.deepVideoCount) || 0} Videos` : 'Playlist'}</div></div>
         <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
       </div>`;
     }
@@ -432,7 +463,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const thumb = video?.thumbnail_url || video?.thumb_url || video?.thumbUrl || '';
     return `<div id="playlist-video-${videoId}" class="training-playlist-row" data-open-video="${videoId}" data-item-id="${item.id}">
       ${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">🎬</div>'}
-      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${video?.duration_sec ? `<span style="color:var(--text3);font-size:12px;">${fmt(video.duration_sec)}</span>` : ''}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
+      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${formatDuration(video?.duration_seconds) ? `<span style="color:var(--text3);font-size:12px;">${formatDuration(video.duration_seconds)}</span>` : ''}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
       <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
     </div>`;
   };
@@ -442,7 +473,10 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const addPlaylistSelect = app.querySelector('#playlist-add-child');
     if (!addVideoSelect || !addPlaylistSelect) return;
     const { existingVideoIds, existingPlaylistIds } = getSelectableIds();
-    const selectableVideos = videos.filter((video) => !existingVideoIds.has(Number(video.id)));
+    const selectableVideos = videos.filter((video) => {
+      const videoId = Number(video.id);
+      return videoId && !existingVideoIds.has(videoId) && !state.deepVideoIds.has(videoId);
+    });
     const selectablePlaylists = allPlaylists.filter((entry) => {
       const playlistId = Number(entry.id);
       return playlistId !== Number(id) && !existingPlaylistIds.has(playlistId);
@@ -478,6 +512,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
 
   const syncAfterMutation = async () => {
     state.lastSavedAt = Date.now();
+    await refreshDeepData();
     updateSidebarStats();
   };
 

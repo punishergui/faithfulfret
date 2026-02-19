@@ -1,5 +1,16 @@
 window.Pages = window.Pages || {};
 
+function formatVideoDuration(seconds) {
+  const total = Number(seconds);
+  if (!Number.isFinite(total) || total < 0) return '';
+  const n = Math.floor(total);
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const s = n % 60;
+  if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 Pages.ResourceVideosList = {
   viewMode: 'grid',
 
@@ -153,13 +164,14 @@ Pages.ResourceVideosList = {
     ].filter(Boolean).join('');
     const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${statusTags}`;
     const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" class="training-video-library-thumb">` : '<div class="training-thumb-fallback training-video-library-thumb-fallback">🎬</div>';
+    const duration = formatVideoDuration(video.duration_seconds);
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
         <div style="min-width:0;">
           <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
-          <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
+          <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
         </div>
       </div>`;
@@ -168,7 +180,7 @@ Pages.ResourceVideosList = {
     return `<div class="df-panel training-video-library-card" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
       <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
-      <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}</div>
+      <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
     </div>`;
   },

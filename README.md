@@ -85,6 +85,9 @@ After deploy, verify Training playlists support mixed nested items (videos + chi
 After deploy, verify `#/training/playlists` renders one-level group cards with expand/collapse, grouped playlists sorted by order, and ungrouped playlists under **General**.
 After deploy, verify `#/training/playlists` defaults to **Top-level** view (nested playlists hidden), scope toggle supports **All/Nested**, search returns matches across all playlists regardless of scope, and nested results show a **Nested** badge while still opening normally.
 After deploy, verify each playlist card’s **X videos** value is recursive + distinct (direct videos + nested playlist videos across all depths, no double-counting duplicates, and no infinite loops if bad cycle data exists), using backend `totalVideoCount`.
+After deploy, verify `#/training/playlists/:id` **Add Video** excludes videos already present anywhere in nested playlists (deep recursion), and that removing videos from nested playlists makes them re-appear without hard refresh.
+After deploy, verify nested playlist rows on playlist detail show deep labels like `12 Videos` (not generic nested labels), and cycles do not crash playlist detail stats.
+After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
