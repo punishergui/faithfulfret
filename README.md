@@ -95,6 +95,7 @@ After deploy, verify a nested playlist can have only one parent: if Playlist B i
 After deploy, verify strict one-level nesting UX/rules: nesting Playlist B under top-level A works, opening B hides **Add Nested Playlist** with an explanatory note, API `POST /api/training/playlists/:id/items` returns `409` when trying to nest any playlist under nested B, and nesting another top-level playlist C under A still works.
 After deploy, verify nested playlists still allow **Add Video**: add a video from `#/training/playlists/:nestedId` and confirm API `POST /api/training/playlists/:id/items` succeeds for `item_type=video` while keeping nested-playlist (`item_type=playlist`) restrictions unchanged.
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
+After deploy, verify `#/resources` shows the new hero + sticky search/filter chips + responsive card grid (1/2/3+ columns by breakpoint), and confirm Add/Open/Edit actions plus keyboard tab/focus still work.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
