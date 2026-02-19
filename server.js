@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { execSync, exec } = require('child_process');
+const { execSync, exec, execFile } = require('child_process');
 const crypto = require('crypto');
 const https = require('https');
 const JSZip = require('jszip');
@@ -234,6 +234,60 @@ function extractYouTubeId(value) {
     return '';
   }
   return '';
+}
+
+function runYtDlpJson(url, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    execFile('yt-dlp', ['-J', '--no-warnings', '--skip-download', url], { timeout: timeoutMs, maxBuffer: 1024 * 1024 * 4 }, (error, stdout) => {
+      if (error) {
+        if (error.code === 'ENOENT') {
+          error.missingBinary = true;
+        }
+        return reject(error);
+      }
+      try {
+        return resolve(JSON.parse(stdout || '{}'));
+      } catch (parseError) {
+        return reject(new Error('invalid metadata response'));
+      }
+    });
+  });
+}
+
+function pickBestThumbnail(meta = {}) {
+  if (meta.thumbnail) return String(meta.thumbnail);
+  const thumbs = Array.isArray(meta.thumbnails) ? meta.thumbnails : [];
+  const usable = thumbs
+    .map((item) => ({
+      url: String(item?.url || ''),
+      width: Number(item?.width) || 0,
+      height: Number(item?.height) || 0,
+    }))
+    .filter((item) => item.url);
+  if (!usable.length) return '';
+  usable.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  return usable[0].url;
+}
+
+function normalizeYtMetadata(meta = {}, fallbackUrl = '') {
+  const durationRaw = Number(meta.duration);
+  const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.floor(durationRaw) : null;
+  return {
+    title: String(meta.title || ''),
+    thumbnail_url: pickBestThumbnail(meta),
+    duration_seconds: duration,
+    source: 'youtube',
+    uploader: meta.uploader ? String(meta.uploader) : '',
+    webpage_url: String(meta.webpage_url || fallbackUrl || ''),
+  };
+}
+
+async function fetchYoutubeMetadata(url) {
+  const videoId = extractYouTubeId(url);
+  if (!videoId) throw new Error('only valid youtube URLs are supported');
+  const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const raw = await runYtDlpJson(canonicalUrl, 10000);
+  return normalizeYtMetadata(raw, canonicalUrl);
 }
 
 function playlistWithItems(id) {
@@ -710,6 +764,28 @@ apiRouter.get('/oembed', async (req, res) => {
 });
 
 
+
+apiRouter.post('/training/videos/metadata', async (req, res) => {
+  const rawUrl = String(req.body?.url || '').trim();
+  if (!rawUrl) return res.status(400).json({ error: 'url is required' });
+  try {
+    const meta = await fetchYoutubeMetadata(rawUrl);
+    return res.json(meta);
+  } catch (error) {
+    if (error?.missingBinary) return res.status(501).json({ error: 'Metadata fetch not available' });
+    const message = String(error?.message || 'failed to fetch metadata').toLowerCase();
+    if (message.includes('only valid youtube urls are supported')) return res.status(400).json({ error: 'only valid youtube URLs are supported' });
+    return res.json({
+      title: '',
+      thumbnail_url: '',
+      duration_seconds: null,
+      source: 'youtube',
+      uploader: '',
+      webpage_url: '',
+    });
+  }
+});
+
 apiRouter.get('/training/providers', (req, res) => res.json(Store.listTrainingProviders()));
 apiRouter.post('/training/providers', (req, res) => {
   if (!req.body?.name) return res.status(400).json({ error: 'name is required' });
@@ -1049,11 +1125,12 @@ apiRouter.post('/training-videos', async (req, res) => {
   const youtubeUrl = payload.youtube_url || payload.url;
   if (!youtubeUrl) return res.status(400).json({ error: 'url is required' });
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if (!payload.title || !(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url)) {
+  if (!payload.title || !(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) || payload.duration_seconds == null || payload.duration_seconds === '') {
     try {
-      const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
+      const meta = await fetchYoutubeMetadata(youtubeUrl || `https://www.youtube.com/watch?v=${videoId}`);
       payload.title = payload.title || meta.title || '';
       payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || meta.thumbnail_url || '';
+      if (payload.duration_seconds == null || payload.duration_seconds === '') payload.duration_seconds = meta.duration_seconds;
     } catch {}
   }
   const saved = Store.saveTrainingVideo({ ...payload, source_type: 'youtube', provider: payload.provider || 'youtube', videoId, youtube_url: youtubeUrl, url: youtubeUrl, thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || '' });
@@ -1067,11 +1144,12 @@ apiRouter.put('/training-videos/:id', async (req, res) => {
 
   const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.youtube_url || payload.url || existing.youtube_url || existing.url) || existing.videoId;
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if ((!payload.title && !existing.title) || (!(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) && !(existing.thumbUrl || existing.thumb_url || existing.thumbnail_url))) {
+  if ((!payload.title && !existing.title) || (!(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) && !(existing.thumbUrl || existing.thumb_url || existing.thumbnail_url)) || (payload.duration_seconds == null && existing.duration_seconds == null)) {
     try {
-      const meta = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`, { 'User-Agent': 'faithfulfret' });
+      const meta = await fetchYoutubeMetadata(payload.youtube_url || payload.url || existing.youtube_url || existing.url || `https://www.youtube.com/watch?v=${videoId}`);
       payload.title = payload.title || existing.title || meta.title || '';
       payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || existing.thumbUrl || existing.thumb_url || existing.thumbnail_url || meta.thumbnail_url || '';
+      if (payload.duration_seconds == null || payload.duration_seconds === '') payload.duration_seconds = existing.duration_seconds ?? meta.duration_seconds;
     } catch {}
   }
   const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), source_type: 'youtube', youtube_url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', videoId, provider: payload.provider || existing.provider || 'youtube', thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || existing.thumbnail_url || '' });
