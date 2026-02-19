@@ -231,6 +231,7 @@ window.Utils = {
     const value = window.Utils.getThemeMap()[themeId] ? themeId : fallback;
     localStorage.setItem('theme', value);
     document.documentElement.dataset.theme = value;
+    if (document.body) document.body.dataset.theme = value;
     window.Utils.applyThemeColorMeta(value);
     return value;
   },

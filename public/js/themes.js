@@ -85,4 +85,26 @@
 
   window.FF_THEMES = themes;
   window.FF_THEME_DEFAULT = 'backroom-amp';
+
+  const themeMap = Object.fromEntries(themes.map((theme) => [theme.id, theme]));
+  const fallbackTheme = window.FF_THEME_DEFAULT;
+
+  function resolveTheme(themeId) {
+    return themeMap[themeId] ? themeId : fallbackTheme;
+  }
+
+  function applyThemeToRootAndBody(themeId) {
+    const value = resolveTheme(themeId || localStorage.getItem('theme') || fallbackTheme);
+    document.documentElement.dataset.theme = value;
+    if (document.body) document.body.dataset.theme = value;
+    return value;
+  }
+
+  applyThemeToRootAndBody();
+  document.addEventListener('DOMContentLoaded', () => applyThemeToRootAndBody(), { once: true });
+
+  const observer = new MutationObserver(() => {
+    applyThemeToRootAndBody(document.documentElement.dataset.theme);
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
