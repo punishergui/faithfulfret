@@ -169,10 +169,43 @@ Pages.TrainingAdmin = { async render() { await renderWithError(async () => {
 
 Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   const app = document.getElementById('app');
-  const [playlists, groups] = await Promise.all([DB.getVideoPlaylists(), DB.getVideoPlaylistGroups()]);
   const status = sessionStorage.getItem('trainingPlaylistStatus') || '';
   sessionStorage.removeItem('trainingPlaylistStatus');
   const sort = qv('sort') || 'updated';
+  const scope = qv('scope') || 'top';
+  const q = (qv('q') || '').trim();
+  const activeScope = ['top', 'all', 'nested'].includes(scope) ? scope : 'top';
+
+  const [playlists, groups] = await Promise.all([
+    DB.getVideoPlaylists({ scope: activeScope, q }),
+    DB.getVideoPlaylistGroups(),
+  ]);
+
+  const sortRows = (rows = []) => rows.slice().sort((a, b) => {
+    if (sort === 'name') return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    if (sort === 'videos') return (Number(b.video_count) || 0) - (Number(a.video_count) || 0);
+    return (Number(a.order_index ?? a.sort_order) || 0) - (Number(b.order_index ?? b.sort_order) || 0);
+  });
+
+  const renderCard = (playlist) => {
+    const videoCount = Number(playlist.video_count) || 0;
+    const thumb = playlist.preview_thumbnail_url || '';
+    const name = esc(playlist.name || `Playlist ${playlist.id}`);
+    const description = esc(playlist.description || '');
+    const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
+    const nested = Number(playlist.is_nested) === 1;
+    return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
+      <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
+      <div class="training-playlist-list-copy">
+        <div class="training-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>${name}</span>
+          ${nested ? '<span class="df-btn df-btn--ghost" style="pointer-events:none;height:auto;padding:2px 8px;font-size:11px;">Nested</span>' : ''}
+        </div>
+        <div class="training-playlist-list-description">${description || '—'}</div>
+        <div style="color:var(--text2);font-size:12px;">${metaCount} · ${esc(playlist.playlist_type || 'General')} · ${esc(playlist.difficulty_label || 'No difficulty')}</div>
+      </div>
+    </a>`;
+  };
 
   const groupedPlaylists = new Map();
   playlists.forEach((playlist) => {
@@ -181,65 +214,58 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     groupedPlaylists.get(key).push(playlist);
   });
 
-  const sortRows = (rows = []) => rows.slice().sort((a, b) => {
-    if (sort === 'name') return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-    if (sort === 'videos') return (Number(b.video_count) || 0) - (Number(a.video_count) || 0);
-    return (Number(a.order_index ?? a.sort_order) || 0) - (Number(b.order_index ?? b.sort_order) || 0);
-  });
-
   const sections = [
     ...groups.map((group) => ({
       id: Number(group.id),
       title: group.name || 'Group',
       description: group.description || '',
       rows: sortRows(groupedPlaylists.get(Number(group.id)) || []),
-      isGeneral: false,
     })),
     {
       id: 0,
       title: 'General',
       description: 'Ungrouped playlists',
       rows: sortRows(groupedPlaylists.get(0) || []),
-      isGeneral: true,
     },
   ];
+
+  const filteredSections = sections.filter((section) => section.rows.length > 0);
 
   app.innerHTML = `${Utils.renderPageHero({ title: 'Video Playlists', leftExtra: trainingCrumbs([{ label: 'Training', href: '#/training' }, { label: 'Playlists' }]), actions: '<a href="#/training/videos" class="df-btn df-btn--outline">Videos</a>' })}
     <div class="page-wrap" style="padding:24px;display:grid;gap:12px;">
       <div id="playlist-status" class="df-panel" style="padding:10px;${status ? '' : 'display:none;'}">${esc(status)}</div>
+      <div class="df-panel" style="padding:12px;display:grid;gap:10px;">
+        <input id="playlist-search" class="df-input" value="${esc(q)}" placeholder="Search playlists...">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${[
+    { id: 'top', label: 'Top-level' },
+    { id: 'all', label: 'All' },
+    { id: 'nested', label: 'Nested' },
+  ].map((opt) => `<button type="button" class="df-btn ${activeScope === opt.id ? 'df-btn--primary' : 'df-btn--outline'}" data-scope="${opt.id}">${opt.label}</button>`).join('')}
+        </div>
+        ${q ? '<div style="color:var(--text2);font-size:12px;">Search is showing matches across all playlists.</div>' : ''}
+      </div>
       <div class="training-playlists-layout">
         <div class="training-playlists-main">
           <div style="display:grid;gap:10px;">
-            ${sections.map((section) => {
-              const collapseKey = `trainingPlaylistGroupCollapsed:${section.id}`;
-              const collapsed = readLocalJson(collapseKey, false);
-              return `<section class="df-panel training-playlist-group-card" style="padding:12px;display:grid;gap:10px;">
-                <button class="training-playlist-group-header" type="button" data-group-toggle="${section.id}" aria-expanded="${collapsed ? 'false' : 'true'}">
-                  <div>
-                    <div class="training-row-title">${esc(section.title)}</div>
-                    <div style="color:var(--text2);font-size:12px;">${esc(section.description || '')}</div>
-                  </div>
-                  <div style="color:var(--text2);font-size:12px;">${collapsed ? 'Expand' : 'Collapse'}</div>
-                </button>
-                <div data-group-content="${section.id}" style="display:${collapsed ? 'none' : 'grid'};gap:10px;">
-                  ${section.rows.map((p) => {
-                const videoCount = Number(p.video_count) || 0;
-                const thumb = p.preview_thumbnail_url || '';
-                const name = esc(p.name || `Playlist ${p.id}`);
-                const description = esc(p.description || '');
-                const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
-                return `<a class="training-playlist-list-card" href="#/training/playlists/${p.id}">
-                  <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
-                  <div class="training-playlist-list-copy">
-                    <div class="training-row-title">${name}</div>
-                    <div class="training-playlist-list-description">${description || '—'}</div>
-                    <div style="color:var(--text2);font-size:12px;">${metaCount} · ${esc(p.playlist_type || 'General')} · ${esc(p.difficulty_label || 'No difficulty')}</div>
-                  </div>
-                </a>`;
-                  }).join('') || '<div style="color:var(--text3);">No playlists yet.</div>'}
-                </div>
-              </section>`;
-            }).join('')}
+            ${q
+      ? (sortRows(playlists).map(renderCard).join('') || '<div class="df-panel" style="padding:12px;color:var(--text3);">No playlists match your search.</div>')
+      : (filteredSections.map((section) => {
+        const collapseKey = `trainingPlaylistGroupCollapsed:${section.id}`;
+        const collapsed = readLocalJson(collapseKey, false);
+        return `<section class="df-panel training-playlist-group-card" style="padding:12px;display:grid;gap:10px;">
+                    <button class="training-playlist-group-header" type="button" data-group-toggle="${section.id}" aria-expanded="${collapsed ? 'false' : 'true'}">
+                      <div>
+                        <div class="training-row-title">${esc(section.title)}</div>
+                        <div style="color:var(--text2);font-size:12px;">${esc(section.description || '')}</div>
+                      </div>
+                      <div style="color:var(--text2);font-size:12px;">${collapsed ? 'Expand' : 'Collapse'}</div>
+                    </button>
+                    <div data-group-content="${section.id}" style="display:${collapsed ? 'none' : 'grid'};gap:10px;">
+                      ${section.rows.map(renderCard).join('')}
+                    </div>
+                  </section>`;
+      }).join('') || '<div class="df-panel" style="padding:12px;color:var(--text3);">No playlists yet.</div>')}
           </div>
         </div>
 
@@ -263,11 +289,28 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
       </div>
     </div>`;
 
-  app.querySelector('#playlist-sort')?.addEventListener('change', (event) => {
+  const buildHash = ({ nextScope = activeScope, nextSort = sort, nextQ = q } = {}) => {
     const params = new URLSearchParams();
-    if (event.target.value && event.target.value !== 'updated') params.set('sort', event.target.value);
+    if (nextScope && nextScope !== 'top') params.set('scope', nextScope);
+    if (nextSort && nextSort !== 'updated') params.set('sort', nextSort);
+    if (nextQ) params.set('q', nextQ);
     const query = params.toString();
-    go(`#/training/playlists${query ? `?${query}` : ''}`);
+    return `#/training/playlists${query ? `?${query}` : ''}`;
+  };
+
+  app.querySelector('#playlist-sort')?.addEventListener('change', (event) => {
+    go(buildHash({ nextSort: event.target.value || 'updated' }));
+  });
+
+  app.querySelector('#playlist-search')?.addEventListener('input', (event) => {
+    const value = String(event.target.value || '').trim();
+    go(buildHash({ nextQ: value }));
+  });
+
+  app.querySelectorAll('[data-scope]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      go(buildHash({ nextScope: btn.dataset.scope || 'top' }));
+    });
   });
 
   app.querySelector('#playlist-create')?.addEventListener('submit', async (e)=>{
@@ -293,6 +336,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   });
 }); }};
 
+
 Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async () => {
   const app = document.getElementById('app');
   const parentId = Number(qv('parentId') || 0);
@@ -311,15 +355,12 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
   const resumeId = Number(qv('resumeVideoId') || 0) || Number(progress?.lastVideoId || 0);
   const canResume = Number(progress?.playlistId) === Number(id) && Number(progress?.lastVideoId);
 
-  const pathIds = [parentId, Number(id)].filter(Boolean);
   const idToPlaylist = new Map(allPlaylists.map((p) => [Number(p.id), p]));
-  const crumbs = [{ label: 'Training', href: '#/training' }, { label: 'Playlists', href: '#/training/playlists' }];
-  pathIds.forEach((pid, idx) => {
-    const p = pid === Number(id) ? playlist : idToPlaylist.get(pid);
-    if (!p) return;
-    const isLast = idx === pathIds.length - 1;
-    crumbs.push({ label: p.name || `Playlist ${pid}`, href: isLast ? '' : `#/training/playlists/${pid}` });
-  });
+  const crumbs = [
+    { label: 'Training', href: '#/training' },
+    { label: 'Playlists', href: '#/training/playlists' },
+    { label: playlist.name || `Playlist ${id}` },
+  ];
 
   pushRecentPlaylist(playlist);
 

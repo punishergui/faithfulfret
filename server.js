@@ -1086,10 +1086,14 @@ apiRouter.delete('/video-timestamps/:id', (req, res) => {
 });
 
 apiRouter.get('/video-playlists', (req, res) => {
-  const playlists = Store.listVideoPlaylists().map((playlist) => {
+  const scopeRaw = String(req.query.scope || 'all').toLowerCase();
+  const scope = scopeRaw === 'top' || scopeRaw === 'nested' ? scopeRaw : 'all';
+  const q = String(req.query.q || '').trim();
+  const playlists = Store.listVideoPlaylists({ scope, q }).map((playlist) => {
     const items = Store.listPlaylistItems(playlist.id);
     return {
       ...playlist,
+      is_nested: Number(playlist.is_nested) ? 1 : 0,
       items,
       video_count: Number(playlist.video_count) || items.length,
     };
