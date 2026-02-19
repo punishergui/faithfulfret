@@ -1579,26 +1579,42 @@ const addPlaylistItem = (playlistId, item = {}) => {
   const parent = getVideoPlaylist(targetPlaylistId);
   if (!parent) throw new Error('playlist not found');
   const itemType = String(item.item_type || item.itemType || 'video');
+  if (itemType !== 'video' && itemType !== 'playlist') throw new Error('invalid item_type');
   const now = Date.now();
-  const existingCount = Number(one('SELECT COUNT(1) AS c FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', targetPlaylistId)?.c || 0);
   const requestedOrder = Number(item.order_index);
-  const orderIndex = Number.isFinite(requestedOrder) ? requestedOrder : existingCount + 1;
+  const orderIndex = Number.isFinite(requestedOrder) ? requestedOrder : 0;
+  const insertSql = 'INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)';
+  const insertItem = db.prepare(insertSql);
+
+  let videoId = null;
+  let childPlaylistId = null;
   if (itemType === 'playlist') {
-    const childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
+    childPlaylistId = Number(item.child_playlist_id || item.childPlaylistId);
     if (!childPlaylistId) throw new Error('child_playlist_id is required');
     if (!getVideoPlaylist(childPlaylistId)) throw new Error('child playlist not found');
     if (childPlaylistId === targetPlaylistId) throw new Error('Playlist cannot contain itself');
     if (playlistContainsTarget(childPlaylistId, targetPlaylistId)) throw new Error('Adding this playlist would create a cycle');
-    const result = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)')
-      .run(targetPlaylistId, targetPlaylistId, 'playlist', null, null, childPlaylistId, orderIndex, orderIndex);
-    run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
-    return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
+  } else {
+    videoId = Number(item.video_id || item.videoId);
+    if (!videoId) throw new Error('video_id is required');
+    if (!getTrainingVideo(videoId)) throw new Error('video not found');
   }
-  const videoId = Number(item.video_id || item.videoId);
-  if (!videoId) throw new Error('video_id is required');
-  if (!getTrainingVideo(videoId)) throw new Error('video not found');
-  const result = db.prepare('INSERT INTO video_playlist_items (playlistId,playlist_id,item_type,videoId,video_id,child_playlist_id,position,order_index) VALUES (?,?,?,?,?,?,?,?)')
-    .run(targetPlaylistId, targetPlaylistId, 'video', videoId, videoId, null, orderIndex, orderIndex);
+
+  const params = [
+    targetPlaylistId,
+    targetPlaylistId,
+    itemType,
+    videoId,
+    videoId,
+    childPlaylistId,
+    orderIndex,
+    orderIndex,
+  ];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[addPlaylistItem] SQL', insertSql, 'params', params);
+  }
+
+  const result = insertItem.run(...params);
   run('UPDATE video_playlists SET updatedAt = ? WHERE id = ?', now, targetPlaylistId);
   return one('SELECT * FROM video_playlist_items WHERE id = ?', result.lastInsertRowid);
 };
