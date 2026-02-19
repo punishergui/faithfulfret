@@ -1178,7 +1178,7 @@ apiRouter.put('/training-videos/:id', async (req, res) => {
       const meta = await fetchYoutubeMetadata(payload.youtube_url || payload.url || existing.youtube_url || existing.url || `https://www.youtube.com/watch?v=${videoId}`);
       payload.title = payload.title || existing.title || meta.title || '';
       payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || existing.thumbUrl || existing.thumb_url || existing.thumbnail_url || meta.thumbnail_url || '';
-      if (missingDuration && !(Number(existing.duration_seconds) > 0)) {
+      if (missingDuration) {
         payload.duration_seconds = meta.duration_seconds;
       }
     } catch {}

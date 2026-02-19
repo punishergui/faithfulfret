@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-fret-v11';
+const CACHE_NAME = 'daily-fret-v12';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -63,5 +63,4 @@ self.addEventListener('fetch', e => {
     }))
   );
 });
-1771519097
-1771519136
+1772000000

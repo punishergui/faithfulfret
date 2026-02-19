@@ -65,6 +65,7 @@ After deploy, verify Training routes load: `#/training`, `#/training/videos`, an
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
 After deploy, verify Training videos remain URL-based: create/edit videos with YouTube URLs, metadata fetch works, and thumbnails render from oEmbed/URL values.
 After deploy, verify **Fetch Details** on `#/training/videos/new` auto-fills title, thumbnail, and duration (yt-dlp metadata), manual duration overrides save, and unknown durations render as `—` (never `00:00`).
+After deploy, verify default duration placeholders (`00:00`, `0:00`, `00:00:00`, `0:00:00`) are treated as empty for **Fetch Details** auto-fill, while manual non-zero values (e.g. `12:34`) are preserved.
 After deploy, verify Training Playlists list uses 70/30 layout (cards left, create/sort sidebar right), cards open on click, and each card thumbnail matches the first playlist video by position (or placeholder when empty).
 After deploy, verify Playlist detail thumbnails keep a fixed 16:9 size with object-fit cover and do not squish when reorder/remove controls are visible.
 After deploy, verify `#/training/videos` cards are fully clickable with keyboard Enter support, show subtle lift/glow hover states, and keep 16:9 thumbnails stable across theme switching.
@@ -88,6 +89,7 @@ After deploy, verify `#/training/playlists` defaults to **Top-level** view (nest
 After deploy, verify each playlist card’s **X videos** value is recursive + distinct (direct videos + nested playlist videos across all depths, no double-counting duplicates, and no infinite loops if bad cycle data exists), using backend `totalVideoCount`.
 After deploy, verify `#/training/playlists/:id` **Add Video** excludes videos already present anywhere in nested playlists (deep recursion), and that removing videos from nested playlists makes them re-appear without hard refresh.
 After deploy, verify nested playlist rows on playlist detail show deep labels like `12 Videos` (not generic nested labels), and cycles do not crash playlist detail stats.
+After deploy, verify nested playlist rows show `X videos • duration` using deep stats (with partial marker when unknown durations exist), consistent with top-level playlist duration totals.
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
