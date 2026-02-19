@@ -91,6 +91,7 @@ After deploy, verify `#/training/playlists/:id` **Add Video** excludes videos al
 After deploy, verify a video can be assigned to only one playlist globally: add a video in Playlist B, confirm it is hidden from Playlist A’s **Add Video** list, API `POST /api/training/playlists/:id/items` returns `409` for duplicates, then remove it from Playlist B and confirm it becomes addable again.
 After deploy, verify nested playlist rows on playlist detail show deep labels like `12 Videos` (not generic nested labels), and cycles do not crash playlist detail stats.
 After deploy, verify nested playlist rows show `X videos • duration` using deep stats (with partial marker when unknown durations exist), consistent with top-level playlist duration totals.
+After deploy, verify a nested playlist can have only one parent: if Playlist B is nested under A, Add Playlist in C must exclude B and API `POST /api/training/playlists/:id/items` returns `409` when forced; then use **Unnest** to move B back to top-level and confirm it can be nested under C.
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
