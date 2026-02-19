@@ -938,6 +938,10 @@ apiRouter.get('/lessons/:id', (req, res) => {
 
 apiRouter.post('/lessons', async (req, res) => {
   const payload = req.body || {};
+
+  const dur = Number(payload.duration_seconds);
+  const missingDuration = payload.duration_seconds == null || payload.duration_seconds === '' || !Number.isFinite(dur) || dur <= 0;
+
   if (!payload.module_id) return res.status(400).json({ error: 'module_id is required' });
   if (!payload.title && !payload.video_url) return res.status(400).json({ error: 'title is required' });
   if (payload.video_url) {
@@ -1125,15 +1129,18 @@ apiRouter.post('/training-videos', async (req, res) => {
   const youtubeUrl = payload.youtube_url || payload.url;
   if (!youtubeUrl) return res.status(400).json({ error: 'url is required' });
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if (!payload.title || !(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) || payload.duration_seconds == null || payload.duration_seconds === '') {
+  const dur = Number(payload.duration_seconds);
+  const missingDuration = payload.duration_seconds == null || payload.duration_seconds === '' || !Number.isFinite(dur) || dur <= 0;
+
+  if (!payload.title || !(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) || missingDuration) {
     try {
       const meta = await fetchYoutubeMetadata(youtubeUrl || `https://www.youtube.com/watch?v=${videoId}`);
       payload.title = payload.title || meta.title || '';
       payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || meta.thumbnail_url || '';
-      if (payload.duration_seconds == null || payload.duration_seconds === '') payload.duration_seconds = meta.duration_seconds;
+      if (missingDuration) payload.duration_seconds = meta.duration_seconds;
     } catch {}
   }
-  const saved = Store.saveTrainingVideo({ ...payload, source_type: 'youtube', provider: payload.provider || 'youtube', videoId, youtube_url: youtubeUrl, url: youtubeUrl, thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || '' });
+const saved = Store.saveTrainingVideo({ ...payload, source_type: 'youtube', provider: payload.provider || 'youtube', videoId, youtube_url: youtubeUrl, url: youtubeUrl, thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || '' });
   return res.status(201).json(saved);
 });
 
@@ -1144,12 +1151,12 @@ apiRouter.put('/training-videos/:id', async (req, res) => {
 
   const videoId = payload.videoId || payload.video_id || extractYouTubeId(payload.youtube_url || payload.url || existing.youtube_url || existing.url) || existing.videoId;
   if (!videoId) return res.status(400).json({ error: 'valid youtube videoId is required' });
-  if ((!payload.title && !existing.title) || (!(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) && !(existing.thumbUrl || existing.thumb_url || existing.thumbnail_url)) || (payload.duration_seconds == null && existing.duration_seconds == null)) {
+  if ((!payload.title && !existing.title) || (!(payload.thumbUrl || payload.thumb_url || payload.thumbnail_url) && !(existing.thumbUrl || existing.thumb_url || existing.thumbnail_url)) || (missingDuration && (existing.duration_seconds == null || Number(existing.duration_seconds) <= 0))) {
     try {
       const meta = await fetchYoutubeMetadata(payload.youtube_url || payload.url || existing.youtube_url || existing.url || `https://www.youtube.com/watch?v=${videoId}`);
       payload.title = payload.title || existing.title || meta.title || '';
       payload.thumbUrl = payload.thumbUrl || payload.thumb_url || payload.thumbnail_url || existing.thumbUrl || existing.thumb_url || existing.thumbnail_url || meta.thumbnail_url || '';
-      if (payload.duration_seconds == null || payload.duration_seconds === '') payload.duration_seconds = existing.duration_seconds ?? meta.duration_seconds;
+      if (missingDuration) payload.duration_seconds = (Number(existing.duration_seconds) > 0 ? existing.duration_seconds : meta.duration_seconds);
     } catch {}
   }
   const saved = Store.saveTrainingVideo({ ...existing, ...payload, id: Number(req.params.id), source_type: 'youtube', youtube_url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', url: payload.youtube_url || payload.url || existing.youtube_url || existing.url || '', videoId, provider: payload.provider || existing.provider || 'youtube', thumbnail_url: payload.thumbnail_url || payload.thumbUrl || payload.thumb_url || existing.thumbnail_url || '' });
