@@ -3672,6 +3672,34 @@ body.print-view .chord-chart-row {
   align-content: start;
 }
 
+.training-playlist-group-card {
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.training-playlist-group-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line) 65%);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--bg) 72%, var(--text) 28%);
+}
+
+.training-playlist-group-header {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.training-playlist-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr);
+  gap: 12px;
+}
+
 .training-video-detail-layout {
   overflow: hidden;
 }
@@ -3699,6 +3727,10 @@ body.print-view .chord-chart-row {
 
 @media (max-width: 900px) {
   .training-playlists-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .training-playlist-detail-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -362,6 +362,10 @@
       return api('/api/video-playlists');
     },
 
+    async getVideoPlaylistGroups() {
+      return api('/api/video-playlist-groups');
+    },
+
     async getVideoPlaylist(id) {
       return api(`/api/video-playlists/${id}`);
     },
@@ -370,6 +374,10 @@
       return data.id
         ? api(`/api/video-playlists/${data.id}`, { method: 'PUT', body: JSON.stringify(data) })
         : api('/api/video-playlists', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async patchTrainingPlaylist(id, data) {
+      return api(`/api/training/playlists/${id}`, { method: 'PATCH', body: JSON.stringify(data || {}) });
     },
 
     async deleteVideoPlaylist(id) {
