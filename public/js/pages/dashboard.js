@@ -11,14 +11,16 @@ Pages.Dashboard = {
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
 
     let stats;
+    let streak;
     let sessions;
     let heatmapDays;
 
     try {
-      [stats, sessions, heatmapDays] = await Promise.all([
+      [stats, sessions, heatmapDays, streak] = await Promise.all([
         DB.getStats(),
         DB.getAllSess(),
         DB.getSessionHeatmap(),
+        DB.getStreakStats(),
       ]);
     } catch (error) {
       app.innerHTML = `
@@ -74,7 +76,7 @@ Pages.Dashboard = {
     const timelineItems = feedItems.length ? feedItems : fallbackFeedItems;
 
     app.innerHTML = `
-      ${this._renderHero(stats)}
+      ${this._renderHero(stats, streak)}
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
         <div class="dashboard-grid dash-grid" style="align-items:start;">
           <div class="dashboard-main-col timeline">
@@ -94,6 +96,7 @@ Pages.Dashboard = {
     this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed, initialFeedTotal);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
+    this._runRegressionChecks(app);
     // Smoke checklist:
     // 1) Dashboard loads 10 feed items by default.
     // 2) Show More appends 10 without duplicates.
@@ -101,6 +104,14 @@ Pages.Dashboard = {
     // 4) Stats panel shows metrics, not a primary Start Practice CTA.
     // 5) Empty DB shows no-practice message with zeros and no crash.
     this._bindDataChanged();
+  },
+
+  _runRegressionChecks(app) {
+    const statsPanel = app.querySelector('.dashboard-panel--stats');
+    const hasStatsRows = statsPanel?.querySelectorAll('[style*="justify-content:space-between"]').length;
+    if (!hasStatsRows) console.warn('[dashboard regression] stats rows missing');
+    const duplicateStartPractice = app.querySelectorAll('.dashboard-panel--stats #start-practice-card, .dashboard-panel--stats [data-action="continue-last-video"]').length;
+    if (duplicateStartPractice > 0) console.warn('[dashboard regression] unexpected Start Practice CTA in stats panel');
   },
 
   _bindDataChanged() {
@@ -115,7 +126,7 @@ Pages.Dashboard = {
   },
 
   _countByType(items = []) {
-    const counts = { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 };
+    const counts = { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0, song: 0, badge: 0, system: 0 };
     items.forEach((item) => {
       if (counts[item?.type] != null) counts[item.type] += 1;
     });
@@ -209,6 +220,9 @@ Pages.Dashboard = {
       { key: 'playlist', label: 'Playlists', count: counts.playlist || 0 },
       { key: 'resource', label: 'Resources', count: counts.resource || 0 },
       { key: 'preset', label: 'Presets', count: counts.preset || 0 },
+      { key: 'song', label: 'Songs', count: counts.song || 0 },
+      { key: 'badge', label: 'Badges', count: counts.badge || 0 },
+      { key: 'system', label: 'System', count: counts.system || 0 },
     ];
     return `
       <section id="dashboard-timeline" data-feed='${JSON.stringify(items).replace(/'/g, '&#39;')}' data-facets='${JSON.stringify(counts).replace(/'/g, '&#39;')}' data-feed-failed="${feedFailed ? '1' : '0'}" data-feed-total="${Number(totalItems) || items.length}">
@@ -371,6 +385,9 @@ Pages.Dashboard = {
       link: '🔗',
       preset: '🎛',
       knob: '🎛',
+      song: '🎼',
+      badge: '🏅',
+      system: '⚙️',
     };
     return iconMap[String(type || '').toLowerCase()] || '♪';
   },
@@ -697,7 +714,7 @@ Pages.Dashboard = {
   },
 
 
-  _renderHero(stats) {
+  _renderHero(stats, streak = {}) {
     const greeting = Utils.greeting();
     const awayText = stats.daysSinceLastSession == null
       ? 'No sessions logged yet.'
@@ -705,9 +722,30 @@ Pages.Dashboard = {
         ? 'Practiced today.'
         : `${stats.daysSinceLastSession} day${stats.daysSinceLastSession === 1 ? '' : 's'} since last session.`;
 
+    const d = Number(streak?.currentStreak) || 0;
+    const tone = d >= 7 ? 'var(--bad)' : d >= 3 ? 'var(--warn)' : 'var(--text2)';
+    const streakChip = `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);padding:6px 10px;border-radius:999px;font-family:var(--f-mono);font-size:12px;color:${tone};background:rgba(0,0,0,.2);">${d >= 7 ? '🔥' : ''} Streak: ${d}d</span>`;
+    const warning = streak?.warning
+      ? `<div style="margin-top:8px;color:var(--warn);font-family:var(--f-mono);font-size:12px;">Don’t break the chain · <a href="#/log" style="color:var(--warn);text-decoration:underline;">Log a session</a></div>`
+      : '';
+    const restore = streak?.canRestore
+      ? `<button type="button" class="df-btn df-btn--outline" id="streak-restore-btn">Streak Restore</button>`
+      : '';
+
+    setTimeout(() => {
+      const btn = document.getElementById('streak-restore-btn');
+      if (!btn) return;
+      btn.onclick = async () => {
+        if (!confirm(`Use 1 restore? Cooldown: ${Number(streak?.restoreCooldownDays) || 7} days`)) return;
+        await DB.restoreStreak();
+        this.render();
+      };
+    }, 0);
+
     return Utils.renderPageHero({
       title: greeting,
-      subtitle: awayText,
+      subtitle: `${awayText}<br>${streakChip}${warning}`,
+      actions: restore,
     });
   },
 

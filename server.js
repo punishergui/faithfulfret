@@ -628,6 +628,101 @@ function buildStats() {
   };
 }
 
+function getTodayYmd() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getStreakSummary() {
+  const stats = buildStats();
+  const settings = Store.getUserSettings();
+  const state = Store.getStreakState();
+  const sessions = Store.listSessions();
+  const today = getTodayYmd();
+  const loggedToday = sessions.some((row) => row.date === today);
+  const [hours = 19, minutes = 0] = String(settings.usual_practice_time || '19:00').split(':').map((v) => Number(v) || 0);
+  const now = new Date();
+  const nudgeAt = new Date(now);
+  nudgeAt.setHours(hours, minutes, 0, 0);
+  const warning = !loggedToday && now.getTime() >= nudgeAt.getTime();
+  const currentStreak = Number(stats.currentStreak) || 0;
+  const previousStreak = Number(state.previous_streak) || 0;
+  const broken = previousStreak > 0 && currentStreak === 0;
+  const cooldownDays = Number(settings.streak_restore_cooldown_days) || 7;
+  const maxUses = Number(settings.streak_restore_max_uses_per_30_days) || 1;
+  const restoreUsedAt = Number(state.streak_restore_used_at) || 0;
+  const usesIn30Days = restoreUsedAt && (Date.now() - restoreUsedAt) <= 30 * 86400000 ? 1 : 0;
+  const cooldownReady = !restoreUsedAt || (Date.now() - restoreUsedAt) >= cooldownDays * 86400000;
+  const canRestore = Boolean(Number(settings.allow_streak_restore)) && broken && cooldownReady && usesIn30Days < maxUses;
+  return {
+    currentStreak,
+    longestStreak: Number(stats.longestStreak) || 0,
+    loggedToday,
+    warning,
+    warningLabel: warning ? 'Don\'t break the chain' : '',
+    nudgeTime: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+    canRestore,
+    previousStreak,
+    restoreCooldownDays: cooldownDays,
+    restoreUsedAt: restoreUsedAt || null,
+  };
+}
+
+function evaluateMilestonesForSession() {
+  const stats = buildStats();
+  const milestones = [3, 7, 14, 30, 60, 90];
+  milestones.forEach((value) => {
+    if ((Number(stats.currentStreak) || 0) === value) {
+      Store.addTimelineEvent({
+        event_type: 'streak_milestone',
+        title: `Streak milestone: ${value} days`,
+        subtitle: 'Chain is holding strong.',
+        entity_id: `streak:${value}`,
+        payload: { streak: value },
+      });
+    }
+  });
+}
+
+function evaluateBadges() {
+  const sessions = Store.listSessions();
+  const stats = buildStats();
+  const totalHours = Number(stats.totalHours) || 0;
+  const trainingVideos = Store.listTrainingVideos({ includeProgress: 1 });
+  const hasCompletedTraining = trainingVideos.some((video) => Number(video.mastered_at) > 0);
+  const definitions = [
+    { key: 'first_session', title: 'First Session', description: 'You started your practice journey.', test: () => sessions.length >= 1 },
+    { key: 'sessions_10', title: '10 Sessions', description: 'Steady and faithful.', test: () => sessions.length >= 10 },
+    { key: 'sessions_25', title: '25 Sessions', description: 'Your routine is growing.', test: () => sessions.length >= 25 },
+    { key: 'sessions_50', title: '50 Sessions', description: 'Halfway to 100 sessions.', test: () => sessions.length >= 50 },
+    { key: 'sessions_100', title: '100 Sessions', description: 'Centurion session milestone.', test: () => sessions.length >= 100 },
+    { key: 'hours_10', title: '10 Practice Hours', description: 'Time under tension pays off.', test: () => totalHours >= 10 },
+    { key: 'hours_50', title: '50 Practice Hours', description: 'Deep work is compounding.', test: () => totalHours >= 50 },
+    { key: 'hours_100', title: '100 Practice Hours', description: 'Big consistency win.', test: () => totalHours >= 100 },
+    { key: 'bpm_personal_best', title: 'BPM Personal Best', description: 'New peak BPM logged.', test: () => Number(stats.maxBPM) > 0 },
+    { key: 'training_first_complete', title: 'Training Finisher', description: 'First completed training module/video.', test: () => hasCompletedTraining },
+  ];
+  const unlocked = [];
+  definitions.forEach((badge) => {
+    if (!badge.test()) return;
+    const row = Store.unlockBadge({
+      badge_key: badge.key,
+      title: badge.title,
+      description: badge.description,
+      encouragement: 'Well done—keep showing up.',
+    });
+    if (row && row.badge_key === badge.key && Number(row.unlocked_at) > Date.now() - 5000) {
+      Store.addTimelineEvent({
+        event_type: 'badge_unlocked',
+        title: `Badge unlocked: ${badge.title}`,
+        subtitle: badge.description,
+        entity_id: `badge:${badge.key}`,
+      });
+      unlocked.push(row);
+    }
+  });
+  return unlocked;
+}
+
 // Data API
 apiRouter.get('/health', (req, res) => {
   res.json({ ok: true, db: Store.dbPath });
@@ -638,7 +733,46 @@ apiRouter.get('/db-info', (req, res) => {
 });
 
 apiRouter.get('/stats', (req, res) => {
-  res.json(buildStats());
+  const base = buildStats();
+  const streak = getStreakSummary();
+  const settings = Store.getUserSettings();
+  const badges = Store.listBadgeUnlocks().slice(0, 5);
+  res.json({ ...base, streakDetail: streak, motivation: { streak, badges, settings } });
+});
+
+apiRouter.get('/stats/streak', (req, res) => {
+  res.json(getStreakSummary());
+});
+
+apiRouter.post('/streak/restore', (req, res) => {
+  const summary = getStreakSummary();
+  if (!summary.canRestore) return res.status(400).json({ error: 'restore not available' });
+  const sessions = Store.listSessions();
+  const today = getTodayYmd();
+  if (!sessions.some((row) => row.date === today)) {
+    const restored = Store.saveSession({ date: today, title: 'Streak Restore Session', durationMinutes: 1, focus: 'Recovery', notes: 'Streak restore placeholder session.' });
+    Store.addTimelineEvent({ event_type: 'session', title: 'Session logged', subtitle: restored.title || 'Practice session', entity_id: restored.id, payload: { restored: true } });
+  }
+  Store.saveStreakState({ streak_restore_used_at: Date.now() });
+  Store.addTimelineEvent({
+    event_type: 'streak_restored',
+    title: 'Streak restored',
+    subtitle: `Restored to ${summary.previousStreak || 1} days`,
+    entity_id: 'streak:restore',
+  });
+  return res.json(getStreakSummary());
+});
+
+apiRouter.get('/motivation/settings', (req, res) => {
+  res.json(Store.getUserSettings());
+});
+
+apiRouter.put('/motivation/settings', (req, res) => {
+  res.json(Store.saveUserSettings(req.body || {}));
+});
+
+apiRouter.get('/badges', (req, res) => {
+  res.json(Store.listBadgeUnlocks());
 });
 
 apiRouter.get('/sessions', (req, res) => {
@@ -687,6 +821,9 @@ apiRouter.get('/feed', (req, res) => {
       playlist: 0,
       resource: 0,
       preset: 0,
+      song: 0,
+      badge: 0,
+      system: 0,
     };
     const items = [];
     const pushItem = (item) => {
@@ -787,6 +924,10 @@ apiRouter.get('/feed', (req, res) => {
     });
 
     Store.listResources().forEach((resource) => {
+      const ytThumb = (() => {
+        const id = extractYouTubeId(resource.url || '');
+        return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : '';
+      })();
       pushItem({
         id: `resource:${resource.id}`,
         type: 'resource',
@@ -794,7 +935,7 @@ apiRouter.get('/feed', (req, res) => {
         title: String(resource.title || `Resource ${resource.id}`).trim(),
         subtitle: String(resource.category || 'Reference').trim(),
         href: `#/resources/edit/${resource.id}`,
-        thumb: makeIconThumb('link'),
+        thumb: ytThumb ? { kind: 'image', src: ytThumb } : makeIconThumb('link'),
         accent: 'neutral',
       });
     });
@@ -822,6 +963,58 @@ apiRouter.get('/feed', (req, res) => {
       });
     });
 
+    Store.listRepertoireSongs({}).forEach((song) => {
+      pushItem({
+        id: `song:${song.id}`,
+        type: 'song',
+        ts: toTs(song.updated_at, song.created_at, song.last_practiced_at),
+        title: String(song.title || `Song ${song.id}`).trim(),
+        subtitle: String(song.status || 'learning').replace(/_/g, ' '),
+        href: '#/repertoire',
+        thumb: makeIconThumb('song'),
+        meta: {
+          tags: [song.artist, song.difficulty].filter(Boolean),
+          bpm: Number(song.current_bpm) || null,
+        },
+        accent: song.status === 'performance_ready' ? 'red' : 'accent',
+      });
+    });
+
+    Store.listBadgeUnlocks().forEach((badge) => {
+      pushItem({
+        id: `badge:${badge.badge_key}`,
+        type: 'badge',
+        ts: toTs(badge.unlocked_at),
+        title: `Badge: ${badge.title}`,
+        subtitle: badge.description || 'Achievement unlocked',
+        href: '#/dashboard',
+        thumb: makeIconThumb('badge'),
+        accent: 'yellow',
+      });
+    });
+
+    Store.listTimelineEvents({ limit: 500, offset: 0 }).forEach((event) => {
+      const map = {
+        badge_unlocked: 'badge',
+        song_added: 'song',
+        song_practiced: 'song',
+        song_status_changed: 'song',
+        streak_restored: 'system',
+        streak_milestone: 'system',
+      };
+      const type = map[event.event_type] || 'system';
+      pushItem({
+        id: `evt:${event.id}`,
+        type,
+        ts: toTs(event.created_at),
+        title: event.title,
+        subtitle: event.subtitle || 'System activity',
+        href: type === 'song' ? '#/repertoire' : '#/dashboard',
+        thumb: makeIconThumb(type),
+        accent: type === 'system' ? 'neutral' : 'accent',
+      });
+    });
+
     const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
     const filteredItems = hasTypeFilter ? sortedItems.filter((item) => item.type === typeFilter) : sortedItems;
     const total = filteredItems.length;
@@ -830,7 +1023,7 @@ apiRouter.get('/feed', (req, res) => {
     return res.json({ items: pagedItems, total, facets: { countsByType } });
   } catch (error) {
     console.error('feed route failed', error);
-    return res.json({ items: [], total: 0, facets: { countsByType: { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 } } });
+    return res.json({ items: [], total: 0, facets: { countsByType: { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0, song: 0, badge: 0, system: 0 } } });
   }
 });
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
@@ -839,7 +1032,17 @@ apiRouter.post('/sessions', (req, res) => {
     const session = Store.createDraftSession(req.body || {});
     return res.status(201).json({ id: session.id, ...session });
   }
-  return res.json(Store.saveSession(req.body));
+  const saved = Store.saveSession(req.body);
+  Store.addTimelineEvent({ event_type: 'session', title: 'Session logged', subtitle: saved.title || 'Practice session', entity_id: saved.id, payload: { minutes: Number(saved.durationMinutes) || null } });
+  const streakBefore = Store.getStreakState();
+  const streakNow = buildStats().currentStreak;
+  if ((Number(streakBefore.previous_streak) || 0) > Number(streakNow || 0)) {
+    Store.saveStreakState({ last_break_at: Date.now() });
+  }
+  Store.saveStreakState({ previous_streak: Number(streakNow) || 0 });
+  evaluateMilestonesForSession();
+  evaluateBadges();
+  return res.json(saved);
 });
 apiRouter.get('/sessions/:id', (req, res) => {
   const row = Store.getSessionWithItems(req.params.id);
@@ -918,6 +1121,47 @@ apiRouter.delete('/gear-items/:id/links/:linkId', (req, res) => {
 apiRouter.put('/sessions/:id/gear', (req, res) => {
   const gearIds = Array.isArray(req.body?.gearIds) ? req.body.gearIds : [];
   res.json(Store.saveSessionGear(req.params.id, gearIds));
+});
+apiRouter.get('/sessions/:id/songs', (req, res) => {
+  res.json(Store.listSessionSongs(req.params.id));
+});
+apiRouter.put('/sessions/:id/songs', (req, res) => {
+  const songs = Array.isArray(req.body?.songs) ? req.body.songs : [];
+  songs.forEach((row) => {
+    const sid = Number(row.song_id || row.id);
+    if (!sid) return;
+    const song = Store.getRepertoireSong(sid);
+    if (song) {
+      Store.saveRepertoireSong({ ...song, id: sid, last_practiced_at: Date.now() });
+      Store.addTimelineEvent({ event_type: 'song_practiced', title: `Practiced: ${song.title}`, subtitle: 'Linked to session', entity_id: String(sid) });
+    }
+  });
+  return res.json(Store.replaceSessionSongs(req.params.id, songs));
+});
+
+apiRouter.get('/repertoire/songs', (req, res) => {
+  const status = String(req.query.status || '').trim();
+  const sort = String(req.query.sort || 'last_practiced').trim();
+  res.json(Store.listRepertoireSongs({ status, sort }));
+});
+apiRouter.post('/repertoire/songs', (req, res) => {
+  if (!req.body?.title) return res.status(400).json({ error: 'title is required' });
+  const saved = Store.saveRepertoireSong(req.body || {});
+  Store.addTimelineEvent({ event_type: 'song_added', title: `Added song: ${saved.title}`, subtitle: saved.artist || 'Repertoire', entity_id: String(saved.id) });
+  return res.status(201).json(saved);
+});
+apiRouter.put('/repertoire/songs/:id', (req, res) => {
+  const before = Store.getRepertoireSong(req.params.id);
+  if (!before) return res.status(404).json({ error: 'not found' });
+  const saved = Store.saveRepertoireSong({ ...req.body, id: Number(req.params.id) });
+  if (before.status !== saved.status) {
+    Store.addTimelineEvent({ event_type: 'song_status_changed', title: `${saved.title}: ${saved.status.replace(/_/g, ' ')}`, subtitle: 'Song status updated', entity_id: String(saved.id) });
+  }
+  return res.json(saved);
+});
+apiRouter.delete('/repertoire/songs/:id', (req, res) => {
+  Store.deleteRepertoireSong(req.params.id);
+  return res.json({ ok: true });
 });
 apiRouter.get('/sessions/:id/gear', (req, res) => res.json(Store.listSessionGear(req.params.id)));
 apiRouter.get('/gear-usage', (req, res) => res.json(Store.getGearUsage()));
@@ -1512,12 +1756,15 @@ apiRouter.get('/training/videos/:id/progress', (req, res) => {
 apiRouter.put('/training/videos/:id/progress', (req, res) => {
   const video = Store.getTrainingVideo(req.params.id);
   if (!video) return res.status(404).json({ error: 'video not found' });
+  const before = Store.getTrainingVideoProgress(req.params.id) || {};
   const payload = req.body || {};
   const changes = {};
   if (Object.prototype.hasOwnProperty.call(payload, 'watched')) changes.watched = Boolean(payload.watched);
   if (Object.prototype.hasOwnProperty.call(payload, 'mastered')) changes.mastered = Boolean(payload.mastered);
   if (Object.prototype.hasOwnProperty.call(payload, 'notes')) changes.notes = String(payload.notes ?? '');
-  return res.json(Store.saveTrainingVideoProgress(req.params.id, changes));
+  const saved = Store.saveTrainingVideoProgress(req.params.id, changes);
+  if (!Number(before.mastered_at) && Number(saved.mastered_at)) evaluateBadges();
+  return res.json(saved);
 });
 
 apiRouter.post('/training-videos', async (req, res) => {

@@ -13,6 +13,10 @@ Pages.SessionForm = {
     }
 
     const ownedGear = (await DB.getAllGear(false)).filter((item) => ['Owned', 'Own it', 'owned'].includes(item.status));
+    const repertoireSongs = await DB.getRepertoireSongs({}).catch(() => []);
+    const sessionSongs = isEdit ? await DB.getSessionSongs(id).catch(() => []) : [];
+    const songParam = Number(new URLSearchParams(location.hash.split('?')[1] || '').get('song')) || 0;
+    const selectedSongId = Number(sessionSongs?.[0]?.song_id || songParam || 0);
     const selectedGearIds = new Set(Array.isArray(session.gear) ? session.gear.map((row) => row.id) : []);
 
     const title = isEdit ? 'Edit Session' : 'Log Session';
@@ -82,6 +86,13 @@ Pages.SessionForm = {
             <div class="df-field full-width">
               <label class="df-label" for="f-links">Session Links</label>
               <textarea id="f-links" name="links" class="df-input" rows="3" placeholder="Label | https://url (one per line)&#10;e.g. JustinGuitar Lesson | https://justinguitar.com/...">${session.links || ''}</textarea>
+            </div>
+            <div class="df-field full-width">
+              <label class="df-label" for="f-song-id">Song (optional)</label>
+              <select id="f-song-id" class="df-input">
+                <option value="">— None —</option>
+                ${repertoireSongs.map((song) => `<option value="${song.id}" ${selectedSongId === Number(song.id) ? 'selected' : ''}>${song.title}${song.artist ? ` — ${song.artist}` : ''}</option>`).join('')}
+              </select>
             </div>
             <div class="df-field full-width">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -251,6 +262,8 @@ Pages.SessionForm = {
       const saved = await DB.saveSess(data);
       const nextGearIds = [...selectedGearIds];
       await DB.saveSessionGear(saved.id, nextGearIds);
+      const songId = Number(container.querySelector('#f-song-id')?.value || 0);
+      await DB.saveSessionSongs(saved.id, songId ? [{ song_id: songId, minutes: data.minutes || null }] : []);
       try { localStorage.setItem(lastGearKey, JSON.stringify(nextGearIds)); } catch (e) {}
       if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
       Utils.toast?.('Saved session ✅');

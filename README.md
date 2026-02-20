@@ -214,6 +214,10 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # Dashboard timeline deploy check: verify the dashboard shows unified Timeline cards from `/api/feed?limit=10&offset=0` (sessions/gear/training/videos/playlists/resources/presets), thumbnails/icons render correctly, filters update client-side instantly with counts, and fallback empty state appears safely when feed is unavailable.
 # Dashboard pagination deploy check: verify Timeline starts with 10 items, Show More appends 10 without duplicates, filter changes reset pagination, and no full-page reload/scroll jump occurs.
 # Dashboard stats panel deploy check: verify Progress Memory/Practice Summary metrics render in the right column (streak/minutes/sessions totals), and no unexpected Start Practice CTA appears in the stats panel.
+# Motivation deploy check: verify Dashboard hero streak chip shows neutral/warm/fire states, warning appears after usual practice time with no session, and Streak Restore confirmation works when eligible.
+# Badges deploy check: verify `/api/badges` returns unlocked milestones and badge unlocks appear in Timeline (Badges filter).
+# Repertoire deploy check: verify `#/repertoire` supports add/edit/status advance/log-practice flows, and Timeline Songs filter shows song_added/song_practiced/song_status_changed activity.
+# Settings deploy check: verify Settings → Motivation saves usual practice time, restore cooldown/limits, restore toggle, and daily reminder toggle.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 
 # Verify DB path after deploy

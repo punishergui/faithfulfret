@@ -434,6 +434,59 @@ db.exec(`CREATE TABLE IF NOT EXISTS song_lessons (
   lesson_id INTEGER NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS user_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  usual_practice_time TEXT DEFAULT '19:00',
+  streak_restore_cooldown_days INTEGER DEFAULT 7,
+  allow_streak_restore INTEGER DEFAULT 1,
+  streak_restore_max_uses_per_30_days INTEGER DEFAULT 1,
+  daily_practice_reminder INTEGER DEFAULT 0
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS streak_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  previous_streak INTEGER DEFAULT 0,
+  streak_restore_used_at INTEGER,
+  last_break_at INTEGER
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS badge_unlocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  badge_key TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  description TEXT,
+  encouragement TEXT,
+  unlocked_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS timeline_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  entity_id TEXT,
+  payload TEXT,
+  created_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS repertoire_songs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  artist TEXT,
+  tuning TEXT,
+  difficulty TEXT CHECK(difficulty IN ('easy','medium','hard')),
+  status TEXT NOT NULL DEFAULT 'learning' CHECK(status IN ('learning','can_play_slowly','performance_ready')),
+  notes TEXT,
+  target_bpm INTEGER,
+  current_bpm INTEGER,
+  tags TEXT,
+  last_practiced_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS session_song (
+  session_id TEXT NOT NULL,
+  song_id INTEGER NOT NULL,
+  minutes INTEGER,
+  notes TEXT,
+  PRIMARY KEY (session_id, song_id)
+)`);
 ensureColumn('modules', 'level_id', 'INTEGER');
 ensureColumn('modules', 'module_num', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('modules', 'thumb_url', 'TEXT');
@@ -448,6 +501,14 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_lesson_skills_lesson ON lesson_skills(le
 db.exec('CREATE INDEX IF NOT EXISTS idx_lesson_skills_skill ON lesson_skills(skill_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_skills_group_slug ON skills(group_id, slug)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_song_lessons_song_sort ON song_lessons(song_id, sort_order)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_timeline_events_created_at ON timeline_events(created_at DESC)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_repertoire_songs_status ON repertoire_songs(status)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_repertoire_songs_last_practiced ON repertoire_songs(last_practiced_at DESC)');
+
+db.prepare(`INSERT INTO user_settings (id)
+  SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE id = 1)`).run();
+db.prepare(`INSERT INTO streak_state (id)
+  SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM streak_state WHERE id = 1)`).run();
 
 }
 
@@ -2117,7 +2178,152 @@ const assignSongLessons = (songId, lessonIds = []) => {
   return getSong(songId);
 };
 
+const getUserSettings = () => {
+  const row = one('SELECT * FROM user_settings WHERE id = 1') || {};
+  return {
+    usual_practice_time: row.usual_practice_time || '19:00',
+    streak_restore_cooldown_days: Number(row.streak_restore_cooldown_days) || 7,
+    allow_streak_restore: Number(row.allow_streak_restore) ? 1 : 0,
+    streak_restore_max_uses_per_30_days: Number(row.streak_restore_max_uses_per_30_days) || 1,
+    daily_practice_reminder: Number(row.daily_practice_reminder) ? 1 : 0,
+  };
+};
+
+const saveUserSettings = (input = {}) => {
+  const current = getUserSettings();
+  const next = {
+    usual_practice_time: String(input.usual_practice_time || current.usual_practice_time || '19:00').slice(0, 5),
+    streak_restore_cooldown_days: Number(input.streak_restore_cooldown_days ?? current.streak_restore_cooldown_days) || 7,
+    allow_streak_restore: Number(input.allow_streak_restore ?? current.allow_streak_restore) ? 1 : 0,
+    streak_restore_max_uses_per_30_days: Number(input.streak_restore_max_uses_per_30_days ?? current.streak_restore_max_uses_per_30_days) || 1,
+    daily_practice_reminder: Number(input.daily_practice_reminder ?? current.daily_practice_reminder) ? 1 : 0,
+  };
+  run(`UPDATE user_settings SET
+    usual_practice_time=@usual_practice_time,
+    streak_restore_cooldown_days=@streak_restore_cooldown_days,
+    allow_streak_restore=@allow_streak_restore,
+    streak_restore_max_uses_per_30_days=@streak_restore_max_uses_per_30_days,
+    daily_practice_reminder=@daily_practice_reminder
+    WHERE id = 1`, next);
+  return getUserSettings();
+};
+
+const getStreakState = () => one('SELECT * FROM streak_state WHERE id = 1') || { id: 1, previous_streak: 0, streak_restore_used_at: null, last_break_at: null };
+const saveStreakState = (patch = {}) => {
+  const now = getStreakState();
+  const next = {
+    previous_streak: Number(patch.previous_streak ?? now.previous_streak) || 0,
+    streak_restore_used_at: patch.streak_restore_used_at == null ? now.streak_restore_used_at : Number(patch.streak_restore_used_at),
+    last_break_at: patch.last_break_at == null ? now.last_break_at : Number(patch.last_break_at),
+  };
+  run('UPDATE streak_state SET previous_streak=@previous_streak, streak_restore_used_at=@streak_restore_used_at, last_break_at=@last_break_at WHERE id = 1', next);
+  return getStreakState();
+};
+
+const addTimelineEvent = ({ event_type, title, subtitle = '', entity_id = '', payload = null, created_at = Date.now() }) => {
+  if (!event_type || !title) return null;
+  const res = db.prepare('INSERT INTO timeline_events (event_type,title,subtitle,entity_id,payload,created_at) VALUES (?,?,?,?,?,?)')
+    .run(String(event_type), String(title), String(subtitle || ''), String(entity_id || ''), payload ? JSON.stringify(payload) : null, Number(created_at) || Date.now());
+  return one('SELECT * FROM timeline_events WHERE id = ?', Number(res.lastInsertRowid));
+};
+
+const listTimelineEvents = ({ limit = 50, offset = 0, eventType = '' } = {}) => {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 200));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const where = [];
+  const vals = [];
+  if (eventType) {
+    where.push('event_type = ?');
+    vals.push(String(eventType));
+  }
+  return db.prepare(`SELECT * FROM timeline_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`)
+    .all(...vals, safeLimit, safeOffset)
+    .map((row) => ({ ...row, payload: row.payload ? (() => { try { return JSON.parse(row.payload); } catch { return null; } })() : null }));
+};
+
+const countTimelineEvents = ({ eventType = '' } = {}) => {
+  if (!eventType) return Number(one('SELECT COUNT(*) AS c FROM timeline_events')?.c) || 0;
+  return Number(one('SELECT COUNT(*) AS c FROM timeline_events WHERE event_type = ?', String(eventType))?.c) || 0;
+};
+
+const listBadgeUnlocks = () => all('SELECT * FROM badge_unlocks ORDER BY unlocked_at DESC, id DESC');
+const getBadgeUnlockByKey = (key) => one('SELECT * FROM badge_unlocks WHERE badge_key = ?', String(key));
+const unlockBadge = ({ badge_key, title, description = '', encouragement = '' }) => {
+  if (!badge_key || !title) return null;
+  const existing = getBadgeUnlockByKey(badge_key);
+  if (existing) return existing;
+  const now = Date.now();
+  const res = db.prepare('INSERT INTO badge_unlocks (badge_key,title,description,encouragement,unlocked_at) VALUES (?,?,?,?,?)')
+    .run(String(badge_key), String(title), String(description || ''), String(encouragement || ''), now);
+  return one('SELECT * FROM badge_unlocks WHERE id = ?', Number(res.lastInsertRowid));
+};
+
+const listRepertoireSongs = ({ status = '', sort = 'last_practiced' } = {}) => {
+  const where = [];
+  const vals = [];
+  if (status) {
+    where.push('status = ?');
+    vals.push(String(status));
+  }
+  const orderBy = {
+    last_practiced: 'COALESCE(last_practiced_at, 0) DESC, updated_at DESC',
+    status: 'status ASC, title COLLATE NOCASE ASC',
+    created: 'created_at DESC',
+  }[String(sort)] || 'COALESCE(last_practiced_at, 0) DESC, updated_at DESC';
+  return db.prepare(`SELECT * FROM repertoire_songs ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderBy}`).all(...vals);
+};
+const getRepertoireSong = (id) => one('SELECT * FROM repertoire_songs WHERE id = ?', Number(id));
+const saveRepertoireSong = (data = {}) => {
+  const now = Date.now();
+  const row = {
+    title: String(data.title || '').trim(),
+    artist: String(data.artist || '').trim(),
+    tuning: String(data.tuning || '').trim(),
+    difficulty: data.difficulty || null,
+    status: data.status || 'learning',
+    notes: String(data.notes || ''),
+    target_bpm: n(data.target_bpm),
+    current_bpm: n(data.current_bpm),
+    tags: String(data.tags || ''),
+    last_practiced_at: data.last_practiced_at == null ? null : Number(data.last_practiced_at),
+    updated_at: now,
+  };
+  if (data.id) {
+    run(`UPDATE repertoire_songs SET
+      title=@title,artist=@artist,tuning=@tuning,difficulty=@difficulty,status=@status,notes=@notes,
+      target_bpm=@target_bpm,current_bpm=@current_bpm,tags=@tags,last_practiced_at=@last_practiced_at,updated_at=@updated_at
+      WHERE id=@id`, { ...row, id: Number(data.id) });
+    return getRepertoireSong(data.id);
+  }
+  const res = db.prepare(`INSERT INTO repertoire_songs (title,artist,tuning,difficulty,status,notes,target_bpm,current_bpm,tags,last_practiced_at,created_at,updated_at)
+    VALUES (@title,@artist,@tuning,@difficulty,@status,@notes,@target_bpm,@current_bpm,@tags,@last_practiced_at,@created_at,@updated_at)`)
+    .run({ ...row, created_at: now, updated_at: now });
+  return getRepertoireSong(res.lastInsertRowid);
+};
+const deleteRepertoireSong = (id) => {
+  run('DELETE FROM session_song WHERE song_id = ?', Number(id));
+  run('DELETE FROM repertoire_songs WHERE id = ?', Number(id));
+};
+const replaceSessionSongs = (sessionId, songs = []) => {
+  const tx = db.transaction(() => {
+    run('DELETE FROM session_song WHERE session_id = ?', sessionId);
+    const st = db.prepare('INSERT INTO session_song (session_id,song_id,minutes,notes) VALUES (?,?,?,?)');
+    songs.forEach((song) => {
+      const songId = Number(song.song_id || song.id);
+      if (!songId) return;
+      st.run(sessionId, songId, n(song.minutes), String(song.notes || ''));
+    });
+  });
+  tx();
+  return db.prepare('SELECT * FROM session_song WHERE session_id = ?').all(sessionId);
+};
+const listSessionSongs = (sessionId) => db.prepare(`SELECT ss.*, rs.title, rs.artist, rs.status
+  FROM session_song ss
+  JOIN repertoire_songs rs ON rs.id = ss.song_id
+  WHERE ss.session_id = ?
+  ORDER BY rs.title COLLATE NOCASE ASC`).all(sessionId);
+
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, unlockBadge, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
