@@ -2,6 +2,58 @@
 // Exposes window.Utils
 
 window.Utils = {
+
+  HERO_IMG_OPACITY_KEY: 'ff.heroImgOpacity',
+  HERO_OVERLAY_ALPHA_KEY: 'ff.heroOverlayAlpha',
+  HERO_IMG_OPACITY_DEFAULT: 0.55,
+  HERO_OVERLAY_ALPHA_DEFAULT: 0.52,
+
+  clampNumber: (value, min, max, fallback) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  },
+
+  getHeroSettings: () => {
+    const img = window.Utils.clampNumber(
+      localStorage.getItem(window.Utils.HERO_IMG_OPACITY_KEY),
+      0.15,
+      0.85,
+      window.Utils.HERO_IMG_OPACITY_DEFAULT
+    );
+    const overlay = window.Utils.clampNumber(
+      localStorage.getItem(window.Utils.HERO_OVERLAY_ALPHA_KEY),
+      0.10,
+      0.85,
+      window.Utils.HERO_OVERLAY_ALPHA_DEFAULT
+    );
+    return { img, overlay };
+  },
+
+  applyHeroSettings: () => {
+    const { img, overlay } = window.Utils.getHeroSettings();
+    document.documentElement.style.setProperty('--hero-img-opacity', String(img));
+    document.documentElement.style.setProperty('--hero-overlay-alpha', String(overlay));
+    return { img, overlay };
+  },
+
+  setHeroSettings: ({ img, overlay }) => {
+    const nextImg = window.Utils.clampNumber(img, 0.15, 0.85, window.Utils.HERO_IMG_OPACITY_DEFAULT);
+    const nextOverlay = window.Utils.clampNumber(overlay, 0.10, 0.85, window.Utils.HERO_OVERLAY_ALPHA_DEFAULT);
+    localStorage.setItem(window.Utils.HERO_IMG_OPACITY_KEY, String(nextImg));
+    localStorage.setItem(window.Utils.HERO_OVERLAY_ALPHA_KEY, String(nextOverlay));
+    document.documentElement.style.setProperty('--hero-img-opacity', String(nextImg));
+    document.documentElement.style.setProperty('--hero-overlay-alpha', String(nextOverlay));
+    return { img: nextImg, overlay: nextOverlay };
+  },
+
+  resetHeroSettings: () => {
+    localStorage.removeItem(window.Utils.HERO_IMG_OPACITY_KEY);
+    localStorage.removeItem(window.Utils.HERO_OVERLAY_ALPHA_KEY);
+    document.documentElement.style.setProperty('--hero-img-opacity', String(window.Utils.HERO_IMG_OPACITY_DEFAULT));
+    document.documentElement.style.setProperty('--hero-overlay-alpha', String(window.Utils.HERO_OVERLAY_ALPHA_DEFAULT));
+    return { img: window.Utils.HERO_IMG_OPACITY_DEFAULT, overlay: window.Utils.HERO_OVERLAY_ALPHA_DEFAULT };
+  },
   getThemes: () => Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [],
   getThemeMap: () => Object.fromEntries((window.Utils.getThemes()).map((theme) => [theme.id, theme])),
   uuid: () => (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
@@ -233,6 +285,7 @@ window.Utils = {
     document.documentElement.dataset.theme = value;
     if (document.body) document.body.dataset.theme = value;
     window.Utils.applyThemeColorMeta(value);
+    window.Utils.applyHeroSettings();
     return value;
   },
 

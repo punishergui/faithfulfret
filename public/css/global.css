@@ -27,6 +27,8 @@
   --heroBg: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 65%);
   --heroGlow: color-mix(in srgb, var(--accent) 30%, transparent);
   --hero-bg-image: url('/img/hero/djent.jpg');
+  --hero-img-opacity: 0.55;
+  --hero-overlay-alpha: 0.52;
   --hero-bg-opacity: 0;
   --hero-overlay: linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0.28));
   --hero-overlay-opacity: 1;
@@ -1563,8 +1565,7 @@ select.df-input option {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: var(--hero-bg-opacity);
-  mix-blend-mode: var(--hero-bg-blend);
+  opacity: var(--hero-img-opacity);
   z-index: 0;
   pointer-events: none;
 }
@@ -1579,23 +1580,22 @@ select.df-input option {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    var(--hero-overlay),
-    linear-gradient(0deg, color-mix(in srgb, var(--hero-bg-tint) 60%, transparent), color-mix(in srgb, var(--hero-bg-tint) 60%, transparent));
-  opacity: var(--hero-overlay-opacity, 1);
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,var(--hero-overlay-alpha)) 0%,
+    rgba(0,0,0,calc(var(--hero-overlay-alpha) * 0.75)) 55%,
+    rgba(0,0,0,calc(var(--hero-overlay-alpha) * 0.45)) 100%
+  );
   z-index: 1;
   pointer-events: none;
 }
-.page-hero .page-hero__inner,
-.page-hero .fret-line,
-.df-hero .page-hero__inner,
-.df-hero .fret-line,
-.session-hero .session-hero__inner,
-.resources-hero .resources-hero__intro,
-.training-hero .training-hero__inner,
-.presets-hero .presets-hero__inner,
-.gear-hero .gear-hero__inner {
-
+.page-hero > *,
+.df-hero > *,
+.session-hero > *,
+.resources-hero > *,
+.training-hero > *,
+.presets-hero > *,
+.gear-hero > * {
   position: relative;
   z-index: 2;
 }

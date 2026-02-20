@@ -108,6 +108,7 @@ After deploy, verify nested playlists still allow **Add Video**: add a video fro
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 After deploy, verify `#/resources` shows the new hero + sticky search/filter chips + responsive card grid (1/2/3+ columns by breakpoint), and confirm Add/Open/Edit actions plus keyboard tab/focus still work.
 After deploy, verify hero bars on `#/gear` and `#/resources` use only `/img/hero/djent.jpg`, and switching themes updates overlay intensity/tint without changing the underlying image.
+After deploy, verify Settings → Theme Picker → Hero sliders change only hero image strength/overlay darkness, persist across refresh via localStorage (`ff.heroImgOpacity`, `ff.heroOverlayAlpha`), and Reset restores `0.55 / 0.52`.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
