@@ -291,9 +291,11 @@ Pages.Dashboard = {
     const moreBtn = timeline.querySelector('[data-timeline-more]');
     const PAGE_SIZE = 10;
     const allTypes = ['session', 'gear', 'training', 'video', 'playlist', 'resource', 'preset', 'song', 'badge', 'system'];
-    const defaultTypes = Array.isArray(settings?.feed_default_types) && settings.feed_default_types.length
-      ? settings.feed_default_types.filter((value) => allTypes.includes(value))
-      : allTypes;
+    const settingDefaults = this._normalizeFeedTypes(settings?.feed_default_types, allTypes);
+    const localDefaults = this._readTimelineDefaults(allTypes);
+    const defaultTypes = localDefaults?.length
+      ? localDefaults
+      : (settingDefaults.length ? settingDefaults : allTypes);
     let selectedTypes = new Set(defaultTypes);
     let loadingMore = false;
     let feedItems = Array.isArray(items) ? [...items] : [];
@@ -402,8 +404,9 @@ Pages.Dashboard = {
     });
     timeline.querySelector('[data-save-filter-default]')?.addEventListener('click', async () => {
       try {
+        const normalizedDefaults = this._writeTimelineDefaults([...selectedTypes], allTypes);
         const settings = await DB.getMotivationSettings();
-        await DB.saveMotivationSettings({ ...settings, feed_default_types: [...selectedTypes] });
+        await DB.saveMotivationSettings({ ...settings, feed_default_types: normalizedDefaults });
         Utils.toast?.('Saved timeline default filters');
       } catch (error) {
         Utils.toast?.('Could not save timeline defaults', 'error');
@@ -418,7 +421,7 @@ Pages.Dashboard = {
     const counts = feedFacets?.countsByType || this._countByType(items);
     if (window.DF_DEBUG_FEED) console.log('[DF dashboard filters]', counts);
     syncChips();
-    renderList();
+    loadFeedPage(true);
   },
 
 
@@ -802,11 +805,48 @@ Pages.Dashboard = {
           <div style="font-size:11px;color:var(--text2);">${this._formatTimelineTime(latestBadge.unlocked_at)}</div>
         </div>`
       : '';
+    const heroRight = [restore, latestBadgeHtml].filter(Boolean).join('');
     return Utils.renderPageHero({
       title: greeting,
-      subtitle: `${awayText}<br>${streakChip}${warning}${latestBadgeHtml}`,
-      actions: restore,
+      subtitle: `${awayText}<br>${streakChip}${warning}`,
+      actions: heroRight,
+      extraClasses: 'dashboard-hero',
     });
+  },
+
+  _timelineDefaultStorageKey: 'df:dashboard:feedDefaultTypes',
+
+  _normalizeFeedTypes(values = [], allTypes = []) {
+    const allowed = new Set(allTypes);
+    const list = Array.isArray(values)
+      ? values
+      : String(values || '').split(',');
+    const normalized = list
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter((value) => allowed.has(value));
+    return [...new Set(normalized)];
+  },
+
+  _readTimelineDefaults(allTypes = []) {
+    try {
+      const raw = localStorage.getItem(this._timelineDefaultStorageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const normalized = this._normalizeFeedTypes(parsed, allTypes);
+      return normalized.length ? normalized : null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  _writeTimelineDefaults(types = [], allTypes = []) {
+    const normalized = this._normalizeFeedTypes(types, allTypes);
+    try {
+      localStorage.setItem(this._timelineDefaultStorageKey, JSON.stringify(normalized));
+    } catch (error) {
+      // Ignore storage failures.
+    }
+    return normalized;
   },
 
   _renderRecentSessions(sessions, today) {
