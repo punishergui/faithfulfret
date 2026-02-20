@@ -232,6 +232,8 @@ Pages.SessionForm = {
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn?.dataset?.busy === '1') return;
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
 
@@ -259,15 +261,29 @@ Pages.SessionForm = {
         data.createdAt = session.createdAt;
       }
 
-      const saved = await DB.saveSess(data);
-      const nextGearIds = [...selectedGearIds];
-      await DB.saveSessionGear(saved.id, nextGearIds);
-      const songId = Number(container.querySelector('#f-song-id')?.value || 0);
-      await DB.saveSessionSongs(saved.id, songId ? [{ song_id: songId, minutes: data.minutes || null }] : []);
-      try { localStorage.setItem(lastGearKey, JSON.stringify(nextGearIds)); } catch (e) {}
-      if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
-      Utils.toast?.('Saved session ✅');
-      go(`#/session/${saved.id}`);
+      try {
+        if (submitBtn) {
+          submitBtn.dataset.busy = '1';
+          submitBtn.disabled = true;
+        }
+        const saved = await DB.saveSess(data);
+        const nextGearIds = [...selectedGearIds];
+        await DB.saveSessionGear(saved.id, nextGearIds);
+        const songId = Number(container.querySelector('#f-song-id')?.value || 0);
+        await DB.saveSessionSongs(saved.id, songId ? [{ song_id: songId, minutes: data.minutes || null }] : []);
+        try { localStorage.setItem(lastGearKey, JSON.stringify(nextGearIds)); } catch (e) {}
+        if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }
+        Utils.toast?.('Saved session ✅');
+        go(`#/session/${saved.id}`);
+      } catch (error) {
+        console.error(error);
+        showError(error?.message || 'Failed to save session.');
+      } finally {
+        if (submitBtn) {
+          delete submitBtn.dataset.busy;
+          submitBtn.disabled = false;
+        }
+      }
     });
 
     // Delete

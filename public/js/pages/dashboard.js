@@ -73,7 +73,7 @@ Pages.Dashboard = {
       accent: 'accent',
     }));
 
-    const timelineItems = feedItems.length ? feedItems : fallbackFeedItems;
+    const timelineItems = this._dedupeTimelineItems(feedItems.length ? feedItems : fallbackFeedItems);
     const latestBadge = Array.isArray(stats?.motivation?.badges) && stats.motivation.badges.length ? stats.motivation.badges[0] : null;
 
     app.innerHTML = `
@@ -132,6 +132,32 @@ Pages.Dashboard = {
       if (counts[item?.type] != null) counts[item.type] += 1;
     });
     return counts;
+  },
+
+  _timelineEntityKey(item = {}) {
+    const entityId = String(item?.entity_id || '').trim();
+    if (entityId) return entityId;
+    const type = String(item?.type || '').trim();
+    const id = String(item?.id || '').trim();
+    if (type && id) {
+      if (id.startsWith(`${type}:`)) return id;
+      if (type === 'session' && id.startsWith('evt:')) {
+        const payloadId = String(item?.payload?.session_id || item?.payload?.sessionId || '').trim();
+        if (payloadId) return `session:${payloadId}`;
+      }
+      return `${type}:${id}`;
+    }
+    return `${type || 'unknown'}:${String(item?.ts || '')}`;
+  },
+
+  _dedupeTimelineItems(items = []) {
+    const known = new Set();
+    return (Array.isArray(items) ? items : []).filter((item) => {
+      const key = this._timelineEntityKey(item);
+      if (!key || known.has(key)) return false;
+      known.add(key);
+      return true;
+    });
   },
 
   _readJson(key, fallback) {
@@ -298,16 +324,17 @@ Pages.Dashboard = {
       : (settingDefaults.length ? settingDefaults : allTypes);
     let selectedTypes = new Set(defaultTypes);
     let loadingMore = false;
-    let feedItems = Array.isArray(items) ? [...items] : [];
+    let feedItems = this._dedupeTimelineItems(Array.isArray(items) ? [...items] : []);
     let currentOffset = feedItems.length;
     let total = Number(initialTotal) || feedItems.length;
 
     const dedupe = (rows = []) => {
-      const known = new Set(feedItems.map((item) => item.id));
+      const known = new Set(feedItems.map((item) => this._timelineEntityKey(item)));
       const fresh = [];
       rows.forEach((row) => {
-        if (!row?.id || known.has(row.id)) return;
-        known.add(row.id);
+        const key = this._timelineEntityKey(row);
+        if (!key || known.has(key)) return;
+        known.add(key);
         fresh.push(row);
       });
       return fresh;
@@ -967,7 +994,9 @@ Pages.Dashboard = {
       });
     });
 
-    root.querySelector('#ql-save')?.addEventListener('click', async () => {
+    root.querySelector('#ql-save')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      if (button?.dataset?.busy === '1') return;
       const minutes = parseInt((minutesEl?.value || '0'), 10) || 0;
       if (!minutes) return Utils.toast?.('Pick minutes first', 'error');
 
@@ -983,6 +1012,10 @@ Pages.Dashboard = {
       }
 
       try {
+        if (button) {
+          button.dataset.busy = '1';
+          button.disabled = true;
+        }
         const saved = await DB.saveSess(data);
         if (focus) { try { localStorage.setItem('df:lastFocus', focus); } catch(e) {} }
         Utils.toast?.('Saved quick session ✅');
@@ -994,6 +1027,11 @@ Pages.Dashboard = {
       } catch (e) {
         console.error(e);
         Utils.toast?.('Failed to save quick session', 'error');
+      } finally {
+        if (button) {
+          delete button.dataset.busy;
+          button.disabled = false;
+        }
       }
     });
   },

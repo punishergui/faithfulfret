@@ -1079,6 +1079,7 @@ apiRouter.get('/feed', (req, res) => {
       };
       const type = map[event.event_type] || 'system';
       const ref = parseEntityRef(event.event_type, event.entity_id);
+      if (type === 'session' && ref.entityType === 'session') return;
       if (!timelineEntityExists(ref.entityType, ref.entityId)) return;
       pushItem({
         id: `evt:${event.id}`,
@@ -1110,7 +1111,6 @@ apiRouter.post('/sessions', (req, res) => {
     return res.status(201).json({ id: session.id, ...session });
   }
   const saved = Store.saveSession(req.body);
-  Store.addTimelineEvent({ event_type: 'session', title: 'Session logged', subtitle: saved.title || 'Practice session', entity_id: saved.id, payload: { minutes: Number(saved.durationMinutes) || null } });
   const streakBefore = Store.getStreakState();
   const streakNow = buildStats().currentStreak;
   if ((Number(streakBefore.previous_streak) || 0) > Number(streakNow || 0)) {
