@@ -1723,15 +1723,36 @@ select.df-input option {
 }
 
 .dashboard-latest-badge {
-  margin-top: 10px;
-  margin-left: 100px;
+  margin-top: 0;
   padding: 10px;
   border: 1px solid var(--line2);
   border-radius: 10px;
   background: rgba(0,0,0,.25);
   display: grid;
   gap: 4px;
-  max-width: 340px;
+  width: min(340px, 100%);
+}
+
+.dashboard-hero .page-hero__inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.dashboard-hero .ff-hero__layout {
+  align-items: flex-start;
+}
+
+.dashboard-hero .ff-hero__left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dashboard-hero .ff-hero__right {
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-items: flex-end;
+  flex-direction: column;
 }
 
 .two-col {
@@ -3197,9 +3218,13 @@ select.df-input option {
     justify-content: flex-end;
   }
 
+  .dashboard-hero .ff-hero__right {
+    width: 100%;
+    align-items: stretch;
+  }
+
   .dashboard-latest-badge {
-    margin-left: 0;
-    max-width: 100%;
+    width: 100%;
   }
 
   .session-hero__inner {
