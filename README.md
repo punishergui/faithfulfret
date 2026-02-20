@@ -197,8 +197,9 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 # Smoke-check API on host port 3000 (must map to container 9999)
 curl -fsS http://127.0.0.1:3000/api/health | jq -e ' .ok == true '
-# Backup API smoke (full DB + local settings restore path)
-curl -s http://127.0.0.1:3000/api/backup/export | jq '{schemaVersion, createdAt, counts}'
+# Backup API smoke (zip export + last-snapshot restore endpoint)
+curl -I http://127.0.0.1:3000/api/backup/export
+curl -s -X POST http://127.0.0.1:3000/api/backup/restore-last
 # Theme smoke (confirm 10 music themes registry is bundled)
 docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/public/js/themes.js\");console.log(window.FF_THEMES.length)'"
 
@@ -352,22 +353,26 @@ The Docker VM is at `10.0.10.246` — access via `http://10.0.10.246:3000` when 
 
 ### Backup & Restore (ZIP + JSON)
 
-Stats page (`#/progress`) now supports:
-- **Export All Data** → downloads `faithfulfret-backup-YYYY-MM-DD.zip` from `GET /api/export/zip`
-- **Import Backup ZIP** → uploads ZIP to `POST /api/import/zip`
-- **Import JSON** (legacy portable import) → uploads JSON to `POST /api/import`
+Settings page (`#/settings`) now includes **Backup & Restore** with:
+- **Download Backup (.zip)** → `GET /api/backup/export`
+- **Import Backup** (zip upload) → `POST /api/backup/import`
+- **Restore Last Safety Backup** → `POST /api/backup/restore-last`
+
+Legacy routes still work for compatibility:
+- `GET /api/export/zip` (alias to `/api/backup/export`)
+- `POST /api/import/zip` (alias to `/api/backup/import`)
+- `POST /api/import` JSON import
 
 ZIP backup contents:
-- `faithfulfret.sqlite` (safe checkpointed backup copy)
-- `gear/` media folder (if present)
-- `presets/` media folder (if present)
-- `export.json` (reference JSON export)
+- `manifest.json` (export metadata + checksum manifest)
+- `faithfulfret.sqlite` (consistent SQLite snapshot)
+- all persistent `/data/*` user directories (for example `uploads/`, `presets/`, `gear/`; backup skips missing folders safely)
 
-Restore behavior:
-- App enters temporary maintenance mode during ZIP restore.
-- Current DB + media are moved to `/data/_restore_backup/<timestamp>/` before replacement.
-- Default media policy is **replace** from uploaded ZIP.
-- After restore, verify counts from `GET /api/db-info`.
+Restore safeguards:
+- Import validates `manifest.json`, required SQLite file, and checksums before apply.
+- App creates an automatic pre-import snapshot at `/data/_restore_backup/<timestamp>/`.
+- Import applies under maintenance lock and runs SQLite integrity checks.
+- On any failure, import auto-rolls back from the snapshot and returns an error.
 
 Rollback path:
 1. Publish immutable image tags (`vX.Y.Z`) for each release.

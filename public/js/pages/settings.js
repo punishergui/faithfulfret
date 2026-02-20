@@ -82,6 +82,21 @@ Pages.Settings = {
 
           <div style="height:1px;background:var(--line2);"></div>
 
+          <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
+            <div class="df-label">Backup &amp; Restore</div>
+            <div style="font-size:13px;color:var(--text2);">Create a full data backup zip or import one to restore all sessions, gear, presets, uploads, and training history.</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button id="settings-backup-download" type="button" class="df-btn df-btn--outline">Download Backup (.zip)</button>
+              <label class="df-btn df-btn--outline" style="position:relative;overflow:hidden;cursor:pointer;">
+                Select Backup (.zip)
+                <input id="settings-backup-import-file" type="file" accept=".zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+              </label>
+              <button id="settings-backup-import" type="button" class="df-btn df-btn--danger" disabled>Import Backup</button>
+              <button id="settings-backup-restore-last" type="button" class="df-btn df-btn--outline">Restore Last Safety Backup</button>
+            </div>
+            <div id="settings-backup-status" style="font-size:12px;color:var(--text2);"></div>
+          </div>
+
           <div style="display:grid;gap:14px;">
             <div>
               <div class="df-label">Playing Hand</div>
@@ -370,6 +385,64 @@ Pages.Settings = {
     app.querySelector('#settings-reset-phase0')?.addEventListener('click', () => {
       ['theme', 'handedness', 'bpmStep', 'defaultSessionMinutes', 'displayName', 'ff.heroImgOpacity', 'ff.heroOverlayAlpha'].forEach((key) => localStorage.removeItem(key));
       location.reload();
+    });
+
+    const backupStatus = app.querySelector('#settings-backup-status');
+    const backupFileInput = app.querySelector('#settings-backup-import-file');
+    const backupImportBtn = app.querySelector('#settings-backup-import');
+    const setBackupStatus = (text, ok = true) => {
+      if (!backupStatus) return;
+      backupStatus.textContent = text;
+      backupStatus.style.color = ok ? 'var(--green)' : 'var(--red)';
+    };
+
+    app.querySelector('#settings-backup-download')?.addEventListener('click', async () => {
+      try {
+        setBackupStatus('Preparing backup download...', true);
+        const blob = await DB.exportAllZip();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `faithfulfret-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setBackupStatus(`Backup downloaded at ${new Date().toLocaleString()}.`, true);
+      } catch (error) {
+        setBackupStatus(`Backup export failed: ${error.message}`, false);
+      }
+    });
+
+    backupFileInput?.addEventListener('change', () => {
+      const file = backupFileInput.files?.[0];
+      backupImportBtn.disabled = !file;
+      if (file) setBackupStatus(`Selected backup file: ${file.name}`, true);
+    });
+
+    backupImportBtn?.addEventListener('click', async () => {
+      const file = backupFileInput?.files?.[0];
+      if (!file) return;
+      const warning = 'Importing a backup REPLACES current data. A safety backup will be created first. Continue?';
+      if (!window.confirm(warning)) return;
+      try {
+        setBackupStatus('Import started: creating safety backup first...', true);
+        const result = await DB.importZip(file);
+        setBackupStatus(`Import complete at ${new Date().toLocaleString()}. Rollback ready: ${result?.rollbackReady ? 'yes' : 'unknown'}.`, true);
+        backupFileInput.value = '';
+        backupImportBtn.disabled = true;
+      } catch (error) {
+        setBackupStatus(`Import failed: ${error.message}`, false);
+      }
+    });
+
+    app.querySelector('#settings-backup-restore-last')?.addEventListener('click', async () => {
+      if (!window.confirm('Restore the most recent safety backup now? This will replace current data.')) return;
+      try {
+        setBackupStatus('Restoring last safety backup...', true);
+        const result = await DB.restoreLastBackup();
+        setBackupStatus(`Restored safety backup ${result?.restoredSnapshot || ''} at ${new Date().toLocaleString()}.`, true);
+      } catch (error) {
+        setBackupStatus(`Restore failed: ${error.message}`, false);
+      }
     });
   },
 };

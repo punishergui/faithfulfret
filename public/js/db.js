@@ -454,13 +454,13 @@
     },
 
     async exportAll() {
-      const payload = await api('/api/backup/export');
+      const payload = await api('/api/export');
       payload.localSettings = readLocalSettings();
       return payload;
     },
 
     async exportAllZip() {
-      const res = await fetch('/api/export/zip');
+      const res = await fetch('/api/backup/export');
       if (!res.ok) throw new Error(await res.text() || `Request failed: ${res.status}`);
       return res.blob();
     },
@@ -468,10 +468,14 @@
     async importZip(file) {
       const form = new FormData();
       form.append('backupZip', file);
-      const res = await fetch('/api/import/zip', { method: 'POST', body: form });
+      const res = await fetch('/api/backup/import', { method: 'POST', body: form });
       const text = await res.text();
       if (!res.ok) throw new Error(text || `Request failed: ${res.status}`);
-      try { return JSON.parse(text); } catch { throw new Error('Invalid JSON response from /api/import/zip'); }
+      try { return JSON.parse(text); } catch { throw new Error('Invalid JSON response from /api/backup/import'); }
+    },
+
+    async restoreLastBackup() {
+      return api('/api/backup/restore-last', { method: 'POST' });
     },
 
     async getDbInfo() {
