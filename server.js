@@ -34,6 +34,7 @@ const attachmentUpload = multer({
   },
 });
 let isMaintenanceMode = false;
+let backupQueue = Promise.resolve();
 
 app.use(express.json({ limit: '20mb' }));
 app.use('/api', (req, res, next) => {
@@ -153,6 +154,196 @@ function copyTreeFromTemp(sourceDir, targetDir, replace = true) {
       return;
     }
     fs.copyFileSync(src, dst);
+  });
+}
+
+function withBackupLock(task) {
+  const run = backupQueue.then(() => task());
+  backupQueue = run.catch(() => {});
+  return run;
+}
+
+function backupStamp() {
+  return new Date().toISOString().replace(/[:.]/g, '-');
+}
+
+function listPersistentDataDirs() {
+  const ignore = new Set(['_export_tmp', '_import_tmp', '_restore_backup']);
+  if (!fs.existsSync('/data')) return [];
+  return fs.readdirSync('/data', { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !ignore.has(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+function sha256File(filePath) {
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+function walkFiles(rootDir, relPrefix = '') {
+  if (!fs.existsSync(rootDir)) return [];
+  const out = [];
+  const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const abs = path.join(rootDir, entry.name);
+    const rel = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...walkFiles(abs, rel));
+      continue;
+    }
+    const stat = fs.statSync(abs);
+    out.push({ abs, rel, size: stat.size });
+  }
+  return out;
+}
+
+function mkdirIfMissing(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function createSafeSqliteBackup(destPath) {
+  Store.checkpointWal();
+  if (typeof Store.backupToFile === 'function') {
+    Store.backupToFile(destPath);
+    return destPath;
+  }
+  fs.copyFileSync(Store.dbPath, destPath);
+  return destPath;
+}
+
+async function buildBackupStagingDir() {
+  const stamp = backupStamp();
+  const stageRoot = path.join('/data/_export_tmp', stamp);
+  mkdirIfMissing(stageRoot);
+  mkdirIfMissing(path.join('/data/_export_tmp'));
+
+  const sqliteFileName = 'faithfulfret.sqlite';
+  const dbSnapshotPath = path.join(stageRoot, sqliteFileName);
+  createSafeSqliteBackup(dbSnapshotPath);
+
+  const dataDirs = listPersistentDataDirs();
+  dataDirs.forEach((dirName) => {
+    const src = path.join('/data', dirName);
+    const dst = path.join(stageRoot, dirName);
+    if (!fs.existsSync(src)) return;
+    fs.cpSync(src, dst, { recursive: true, force: true });
+  });
+
+  const files = walkFiles(stageRoot);
+  const checksums = {};
+  files.forEach((entry) => {
+    checksums[entry.rel] = { sha256: sha256File(entry.abs), size: entry.size };
+  });
+  const schemaVersion = typeof Store.getSchemaVersion === 'function' ? Store.getSchemaVersion() : null;
+  const manifest = {
+    exportVersion: 1,
+    appVersion: process.env.npm_package_version || null,
+    buildHash: gitExec('git rev-parse --short HEAD') || null,
+    createdAt: new Date().toISOString(),
+    schemaVersion,
+    sqliteFileName,
+    dataDirectories: dataDirs,
+    counts: { files: files.length, bytes: files.reduce((sum, f) => sum + f.size, 0) },
+    checksums,
+  };
+  fs.writeFileSync(path.join(stageRoot, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  return { stamp, stageRoot, manifest };
+}
+
+async function zipStagingToResponse(stageRoot, res, fileName) {
+  const zip = new JSZip();
+  walkFiles(stageRoot).forEach((entry) => {
+    zip.file(entry.rel, fs.readFileSync(entry.abs));
+  });
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  await new Promise((resolve, reject) => {
+    const stream = zip.generateNodeStream({ streamFiles: true, compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    stream.on('error', reject);
+    res.on('close', resolve);
+    stream.pipe(res);
+  });
+}
+
+function verifyManifestChecksums(stageRoot, manifest) {
+  const checksums = manifest?.checksums;
+  if (!checksums || typeof checksums !== 'object') throw new Error('manifest checksums are missing');
+  Object.entries(checksums).forEach(([rel, expected]) => {
+    const abs = path.join(stageRoot, rel);
+    if (!abs.startsWith(stageRoot)) throw new Error(`invalid checksum path: ${rel}`);
+    if (!fs.existsSync(abs)) throw new Error(`missing file from backup: ${rel}`);
+    const actual = sha256File(abs);
+    if (actual !== expected.sha256) throw new Error(`checksum mismatch: ${rel}`);
+  });
+}
+
+function createRestoreSnapshot(snapshotDir) {
+  mkdirIfMissing(snapshotDir);
+  const dbBackupPath = path.join(snapshotDir, 'faithfulfret.sqlite');
+  createSafeSqliteBackup(dbBackupPath);
+  ['-wal', '-shm'].forEach((suffix) => {
+    const src = `${Store.dbPath}${suffix}`;
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(snapshotDir, `faithfulfret.sqlite${suffix}`));
+  });
+  listPersistentDataDirs().forEach((dirName) => {
+    const src = path.join('/data', dirName);
+    if (fs.existsSync(src)) fs.cpSync(src, path.join(snapshotDir, dirName), { recursive: true, force: true });
+  });
+}
+
+function applySnapshot(snapshotDir) {
+  const dbPath = Store.dbPath;
+  Store.close();
+  ['','-wal','-shm'].forEach((suffix) => {
+    const src = path.join(snapshotDir, `faithfulfret.sqlite${suffix}`);
+    const dst = `${dbPath}${suffix}`;
+    if (fs.existsSync(src)) fs.copyFileSync(src, dst);
+    else if (fs.existsSync(dst)) fs.rmSync(dst, { force: true });
+  });
+
+  const backupDirs = fs.readdirSync(snapshotDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  listPersistentDataDirs().forEach((dirName) => {
+    const full = path.join('/data', dirName);
+    if (!backupDirs.includes(dirName) && fs.existsSync(full)) fs.rmSync(full, { recursive: true, force: true });
+  });
+  backupDirs.forEach((dirName) => {
+    const src = path.join(snapshotDir, dirName);
+    const dst = path.join('/data', dirName);
+    if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true, force: true });
+    fs.cpSync(src, dst, { recursive: true, force: true });
+  });
+  Store.reopen();
+}
+
+function applyImportedStage(importStage, manifest) {
+  const sqlitePath = path.join(importStage, manifest.sqliteFileName || 'faithfulfret.sqlite');
+  if (!fs.existsSync(sqlitePath)) throw new Error('sqlite file missing from backup');
+  Store.close();
+  fs.copyFileSync(sqlitePath, Store.dbPath);
+
+  const importedDirs = Array.isArray(manifest.dataDirectories) ? manifest.dataDirectories : [];
+  listPersistentDataDirs().forEach((dirName) => {
+    if (!importedDirs.includes(dirName)) {
+      const target = path.join('/data', dirName);
+      if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
+    }
+  });
+  importedDirs.forEach((dirName) => {
+    const src = path.join(importStage, dirName);
+    const dst = path.join('/data', dirName);
+    if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true, force: true });
+    if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true });
+  });
+
+  Store.reopen();
+  const integrity = typeof Store.runIntegrityCheck === 'function' ? Store.runIntegrityCheck() : 'ok';
+  if (!String(integrity).toLowerCase().includes('ok')) throw new Error(`integrity check failed: ${integrity}`);
+  const required = ['sessions', 'gear_items', 'presets', 'resources'];
+  const tables = typeof Store.listUserTables === 'function' ? Store.listUserTables() : [];
+  required.forEach((name) => {
+    if (!tables.includes(name)) throw new Error(`required table missing after import: ${name}`);
   });
 }
 
@@ -1669,57 +1860,22 @@ apiRouter.get('/export', (req, res) => {
 });
 
 apiRouter.get('/backup/export', (req, res) => {
-  res.json(withExportMeta(buildJsonExport()));
+  withBackupLock(async () => {
+    const { stageRoot } = await buildBackupStagingDir();
+    try {
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 13);
+      await zipStagingToResponse(stageRoot, res, `faithfulfret-backup-${stamp}.zip`);
+    } finally {
+      fs.rmSync(stageRoot, { recursive: true, force: true });
+    }
+  }).catch((error) => {
+    if (!res.headersSent) res.status(500).json({ error: error.message || 'failed to export backup' });
+  });
 });
 
-
-
-function createSafeSqliteBackup() {
-  Store.checkpointWal();
-  const source = Store.dbPath;
-  const tmpPath = path.join(os.tmpdir(), `faithfulfret-sqlite-backup-${Date.now()}.sqlite`);
-
-  if (typeof Store.backupToFile === 'function') {
-    try {
-      Store.backupToFile(tmpPath);
-      return tmpPath;
-    } catch (error) {
-      console.warn('[EXPORT ZIP] sqlite backup API failed, trying sqlite3 shell:', error.message);
-    }
-  }
-
-  try {
-    execSync(`sqlite3 ${JSON.stringify(source)} ".backup ${tmpPath}"`, { stdio: 'ignore' });
-    return tmpPath;
-  } catch (error) {
-    console.warn('[EXPORT ZIP] sqlite3 backup failed, using file copy fallback:', error.message);
-  }
-
-  fs.copyFileSync(source, tmpPath);
-  return tmpPath;
-}
-
-apiRouter.get('/export/zip', async (req, res) => {
-  let backupPath = null;
-  try {
-    backupPath = createSafeSqliteBackup();
-    const zip = new JSZip();
-    zip.file('faithfulfret.sqlite', fs.readFileSync(backupPath));
-    zip.file('export.json', JSON.stringify(withExportMeta(buildJsonExport()), null, 2));
-    copyTreeIntoZip(zip, gearMediaDir, 'gear');
-    copyTreeIntoZip(zip, presetMediaDir, 'presets');
-
-    const payload = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `faithfulfret-backup-${dateStr}.zip`;
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(payload);
-  } catch (e) {
-    res.status(500).json({ error: e.message || 'failed to export zip backup' });
-  } finally {
-    if (backupPath && fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
-  }
+apiRouter.get('/export/zip', (req, res, next) => {
+  req.url = '/backup/export';
+  return apiRouter.handle(req, res, next);
 });
 
 apiRouter.post('/import', (req, res) => {
@@ -1732,78 +1888,88 @@ apiRouter.post('/import', (req, res) => {
   }
 });
 
-apiRouter.post('/backup/import', (req, res) => {
-  try {
-    const payload = req.body || {};
-    const counts = restoreFromPayload(payload);
-    res.json({ ok: true, counts, schemaVersion: payload.schemaVersion || 1, localSettings: payload.localSettings || {} });
-  } catch (e) {
-    res.status(400).json({ error: e.message || 'invalid import payload' });
-  }
-});
-
-
-
-apiRouter.post('/import/zip', upload.single('backupZip'), async (req, res) => {
-  if (!req.file?.buffer?.length) return res.status(400).json({ error: 'backup zip file is required' });
-
-  const timestamp = Date.now();
-  const stamp = new Date(timestamp).toISOString().replace(/[:.]/g, '-');
-  const tempRoot = path.join(os.tmpdir(), `faithfulfret-restore-${timestamp}`);
-  const tempExtract = path.join(tempRoot, 'extract');
-  const backupStampDir = path.join(restoreBackupDir, stamp);
-
-  isMaintenanceMode = true;
-  try {
-    fs.mkdirSync(tempExtract, { recursive: true });
-    fs.mkdirSync(backupStampDir, { recursive: true });
-
-    const zip = await JSZip.loadAsync(req.file.buffer);
-    const files = Object.values(zip.files);
-    for (const file of files) {
-      if (file.dir) continue;
-      const rel = file.name.replace(/^\/+/, '');
-      const outPath = path.join(tempExtract, rel);
-      if (!outPath.startsWith(tempExtract)) throw new Error('invalid zip path');
-      fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      const content = await file.async('nodebuffer');
-      fs.writeFileSync(outPath, content);
-    }
-
-    const dbFromZip = path.join(tempExtract, 'faithfulfret.sqlite');
-    const oldDbPath = Store.dbPath;
-
-    if (fs.existsSync(oldDbPath)) {
-      fs.copyFileSync(oldDbPath, path.join(backupStampDir, `faithfulfret.sqlite.${stamp}.bak`));
-    }
-
-    if (fs.existsSync(gearMediaDir)) fs.cpSync(gearMediaDir, path.join(backupStampDir, 'gear'), { recursive: true });
-    if (fs.existsSync(presetMediaDir)) fs.cpSync(presetMediaDir, path.join(backupStampDir, 'presets'), { recursive: true });
-
-    if (fs.existsSync(dbFromZip)) {
-      Store.close();
-      fs.copyFileSync(dbFromZip, oldDbPath);
-      Store.reopen();
-    }
-
-    copyTreeFromTemp(path.join(tempExtract, 'gear'), gearMediaDir, true);
-    copyTreeFromTemp(path.join(tempExtract, 'presets'), presetMediaDir, true);
-
-    if (!fs.existsSync(dbFromZip) && fs.existsSync(path.join(tempExtract, 'export.json'))) {
-      const payload = JSON.parse(fs.readFileSync(path.join(tempExtract, 'export.json'), 'utf8'));
-      restoreFromPayload(payload);
-    }
-
-    res.json({ ok: true, dbInfo: Store.getDbInfo() });
-  } catch (e) {
+const handleBackupImport = async (req, res) => {
+  if (!req.file?.buffer?.length) {
     try {
-      Store.reopen();
-    } catch (ignored) {}
-    res.status(400).json({ error: e.message || 'failed to import zip backup' });
-  } finally {
-    isMaintenanceMode = false;
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+      const payload = req.body || {};
+      const counts = restoreFromPayload(payload);
+      return res.json({ ok: true, counts, schemaVersion: payload.schemaVersion || 1, localSettings: payload.localSettings || {} });
+    } catch (e) {
+      return res.status(400).json({ error: e.message || 'invalid import payload' });
+    }
   }
+
+  const stamp = backupStamp();
+  const importRoot = path.join('/data/_import_tmp', stamp);
+  const extractRoot = path.join(importRoot, 'extract');
+  const snapshotRoot = path.join(restoreBackupDir, stamp);
+  mkdirIfMissing(extractRoot);
+
+  await withBackupLock(async () => {
+    isMaintenanceMode = true;
+    try {
+      const zip = await JSZip.loadAsync(req.file.buffer);
+      const files = Object.values(zip.files);
+      for (const file of files) {
+        if (file.dir) continue;
+        const rel = file.name.replace(/^\/+/, '');
+        const outPath = path.join(extractRoot, rel);
+        if (!outPath.startsWith(extractRoot)) throw new Error('invalid zip path');
+        mkdirIfMissing(path.dirname(outPath));
+        fs.writeFileSync(outPath, await file.async('nodebuffer'));
+      }
+
+      const manifestPath = path.join(extractRoot, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) throw new Error('manifest.json is required');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const sqlitePath = path.join(extractRoot, manifest.sqliteFileName || 'faithfulfret.sqlite');
+      if (!fs.existsSync(sqlitePath)) throw new Error('sqlite file missing from backup');
+      verifyManifestChecksums(extractRoot, manifest);
+
+      createRestoreSnapshot(snapshotRoot);
+      let rollbackOk = false;
+      try {
+        applyImportedStage(extractRoot, manifest);
+        rollbackOk = true;
+      } catch (error) {
+        applySnapshot(snapshotRoot);
+        throw new Error(`${error.message}. rollback applied from ${stamp}`);
+      }
+
+      return res.json({ ok: true, restoredAt: new Date().toISOString(), rollbackReady: rollbackOk, dbInfo: Store.getDbInfo() });
+    } finally {
+      isMaintenanceMode = false;
+      fs.rmSync(importRoot, { recursive: true, force: true });
+    }
+  }).catch((error) => {
+    if (!res.headersSent) res.status(400).json({ error: error.message || 'failed to import backup zip' });
+  });
+};
+
+apiRouter.post('/backup/import', upload.single('backupZip'), handleBackupImport);
+
+
+
+apiRouter.post('/import/zip', upload.single('backupZip'), handleBackupImport);
+
+apiRouter.post('/backup/restore-last', async (req, res) => {
+  const dirs = fs.existsSync(restoreBackupDir)
+    ? fs.readdirSync(restoreBackupDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+    : [];
+  const latest = dirs[dirs.length - 1];
+  if (!latest) return res.status(404).json({ error: 'no restore snapshot available' });
+  const snapshotPath = path.join(restoreBackupDir, latest);
+  await withBackupLock(async () => {
+    isMaintenanceMode = true;
+    try {
+      applySnapshot(snapshotPath);
+      res.json({ ok: true, restoredSnapshot: latest, dbInfo: Store.getDbInfo() });
+    } finally {
+      isMaintenanceMode = false;
+    }
+  }).catch((error) => {
+    if (!res.headersSent) res.status(500).json({ error: error.message || 'failed to restore snapshot' });
+  });
 });
 
 // GET /api/version
