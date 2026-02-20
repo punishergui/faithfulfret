@@ -22,7 +22,6 @@ Pages.Resources = {
         subtitle: 'Curated tools, channels, and lesson platforms for faster practice wins.',
         leftExtra: `<div style="display:flex;gap:8px;flex-wrap:wrap;" role="tablist" aria-label="Resource category filters">${this._filterList().map((filter) => `<button type="button" class="df-btn ${filter === this.activeFilter ? 'df-btn--primary' : 'df-btn--outline'}" data-filter="${filter}" role="tab" aria-selected="${filter === this.activeFilter}">${filter}</button>`).join('')}</div>`,
         actions: '<a href="#/resources/add" class="df-btn df-btn--primary" aria-label="Add resource">+ Add Resource</a>',
-        extraClasses: 'resources-hero',
       })}
 
       <div class="page-wrap" style="padding:24px 24px 60px;">

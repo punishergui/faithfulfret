@@ -95,8 +95,12 @@
 
   function applyThemeToRootAndBody(themeId) {
     const value = resolveTheme(themeId || localStorage.getItem('theme') || fallbackTheme);
-    document.documentElement.dataset.theme = value;
-    if (document.body) document.body.dataset.theme = value;
+    if (document.documentElement.dataset.theme !== value) {
+      document.documentElement.dataset.theme = value;
+    }
+    if (document.body && document.body.dataset.theme !== value) {
+      document.body.dataset.theme = value;
+    }
     return value;
   }
 
