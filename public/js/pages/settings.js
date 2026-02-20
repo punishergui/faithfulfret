@@ -108,8 +108,9 @@ Pages.Settings = {
               <label style="display:flex;align-items:center;gap:8px;"><input id="mot-allow-restore" type="checkbox" checked> Allow streak restore</label>
               <label style="display:flex;align-items:center;gap:8px;"><input id="mot-reminder" type="checkbox"> Daily practice reminder</label>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
+              <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
               <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
             </div>
           </div>
@@ -489,6 +490,18 @@ Pages.Settings = {
         setMotStatus('Saved.', true);
       } catch (error) {
         setMotStatus(`Save failed: ${error.message}`, false);
+      }
+    });
+
+    app.querySelector('#mot-reset-badges')?.addEventListener('click', async () => {
+      if (!window.confirm('Delete all earned badges? This cannot be undone.')) return;
+      try {
+        await DB.resetBadges();
+        Utils.toast?.('All earned badges deleted.');
+        setMotStatus('All badges removed.', true);
+        window.dispatchEvent(new Event('ff:data-changed'));
+      } catch (error) {
+        setMotStatus(`Reset failed: ${error.message}`, false);
       }
     });
   },

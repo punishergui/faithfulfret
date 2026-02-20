@@ -8,7 +8,7 @@ Pages.Repertoire = {
 
     app.innerHTML = `
       ${Utils.renderPageHero({
-        title: 'Repertoire',
+        title: 'Songs',
         subtitle: 'Track songs you are learning, polishing, and performance-ready.',
         actions: '<button class="df-btn df-btn--primary" id="rep-add-song">Add Song</button>',
       })}
@@ -69,7 +69,7 @@ Pages.Repertoire = {
     const q = new URLSearchParams();
     if (next.status) q.set('status', next.status);
     if (next.sort) q.set('sort', next.sort);
-    location.hash = `#/repertoire${q.toString() ? `?${q.toString()}` : ''}`;
+    location.hash = `#/songs${q.toString() ? `?${q.toString()}` : ''}`;
   },
 
   _statusPill(status) {
@@ -100,6 +100,7 @@ Pages.Repertoire = {
           <button class="df-btn df-btn--outline" data-advance-song="${song.id}">Advance status</button>
           <button class="df-btn df-btn--outline" data-log-song="${song.id}">Log practice</button>
           <button class="df-btn" data-edit-song="${song.id}">Edit</button>
+          <button class="df-btn df-btn--danger" data-delete-song="${song.id}">Delete</button>
         </div>
       </article>
     `;
@@ -167,6 +168,16 @@ Pages.Repertoire = {
       if (!song) return;
       await DB.saveRepertoireSong({ ...song, id, last_practiced_at: Date.now() });
       location.hash = `#/log?song=${id}`;
+    }));
+
+    app.querySelectorAll('[data-delete-song]').forEach((btn) => btn.addEventListener('click', async () => {
+      const id = Number(btn.getAttribute('data-delete-song'));
+      const song = (songs || []).find((s) => Number(s.id) === id);
+      if (!song) return;
+      if (!window.confirm(`Delete song "${song.title}"?`)) return;
+      await DB.deleteSong(id);
+      Utils.toast?.('Song deleted.');
+      this.render();
     }));
   },
 };
