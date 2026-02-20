@@ -453,6 +453,51 @@
       return api('/api/stats');
     },
 
+    async getStreakStats() {
+      return api('/api/stats/streak');
+    },
+
+    async restoreStreak() {
+      return api('/api/streak/restore', { method: 'POST' });
+    },
+
+    async getMotivationSettings() {
+      return api('/api/motivation/settings');
+    },
+
+    async saveMotivationSettings(data = {}) {
+      return api('/api/motivation/settings', { method: 'PUT', body: JSON.stringify(data) });
+    },
+
+    async getBadges() {
+      return api('/api/badges');
+    },
+
+    async getRepertoireSongs(filters = {}) {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', String(filters.status));
+      if (filters.sort) params.set('sort', String(filters.sort));
+      const q = params.toString();
+      return api(`/api/repertoire/songs${q ? `?${q}` : ''}`);
+    },
+
+    async saveRepertoireSong(data = {}) {
+      if (data.id) return api(`/api/repertoire/songs/${data.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      return api('/api/repertoire/songs', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async deleteRepertoireSong(id) {
+      return api(`/api/repertoire/songs/${id}`, { method: 'DELETE' });
+    },
+
+    async getSessionSongs(sessionId) {
+      return api(`/api/sessions/${sessionId}/songs`);
+    },
+
+    async saveSessionSongs(sessionId, songs = []) {
+      return api(`/api/sessions/${sessionId}/songs`, { method: 'PUT', body: JSON.stringify({ songs }) });
+    },
+
     async exportAll() {
       const payload = await api('/api/export');
       payload.localSettings = readLocalSettings();

@@ -97,6 +97,23 @@ Pages.Settings = {
             <div id="settings-backup-status" style="font-size:12px;color:var(--text2);"></div>
           </div>
 
+          <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
+            <div class="df-label">Motivation</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+              <div class="df-field"><label class="df-label" for="mot-usual-time">Usual practice time</label><input id="mot-usual-time" class="df-input" type="time" value="19:00"></div>
+              <div class="df-field"><label class="df-label" for="mot-cooldown">Restore cooldown days</label><input id="mot-cooldown" class="df-input" type="number" min="1" value="7"></div>
+              <div class="df-field"><label class="df-label" for="mot-max-uses">Max restore uses / 30 days</label><input id="mot-max-uses" class="df-input" type="number" min="1" value="1"></div>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:8px;"><input id="mot-allow-restore" type="checkbox" checked> Allow streak restore</label>
+              <label style="display:flex;align-items:center;gap:8px;"><input id="mot-reminder" type="checkbox"> Daily practice reminder</label>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
+              <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
+            </div>
+          </div>
+
           <div style="display:grid;gap:14px;">
             <div>
               <div class="df-label">Playing Hand</div>
@@ -442,6 +459,36 @@ Pages.Settings = {
         setBackupStatus(`Restored safety backup ${result?.restoredSnapshot || ''} at ${new Date().toLocaleString()}.`, true);
       } catch (error) {
         setBackupStatus(`Restore failed: ${error.message}`, false);
+      }
+    });
+
+    const motStatus = app.querySelector('#mot-status');
+    const setMotStatus = (text, ok = true) => {
+      if (!motStatus) return;
+      motStatus.textContent = text;
+      motStatus.style.color = ok ? 'var(--green)' : 'var(--red)';
+    };
+    DB.getMotivationSettings().then((settings) => {
+      const get = (id) => app.querySelector(id);
+      get('#mot-usual-time').value = settings.usual_practice_time || '19:00';
+      get('#mot-cooldown').value = String(Number(settings.streak_restore_cooldown_days) || 7);
+      get('#mot-max-uses').value = String(Number(settings.streak_restore_max_uses_per_30_days) || 1);
+      get('#mot-allow-restore').checked = Boolean(Number(settings.allow_streak_restore));
+      get('#mot-reminder').checked = Boolean(Number(settings.daily_practice_reminder));
+    }).catch(() => setMotStatus('Could not load motivation settings.', false));
+
+    app.querySelector('#mot-save')?.addEventListener('click', async () => {
+      try {
+        await DB.saveMotivationSettings({
+          usual_practice_time: app.querySelector('#mot-usual-time')?.value || '19:00',
+          streak_restore_cooldown_days: Number(app.querySelector('#mot-cooldown')?.value || 7),
+          streak_restore_max_uses_per_30_days: Number(app.querySelector('#mot-max-uses')?.value || 1),
+          allow_streak_restore: app.querySelector('#mot-allow-restore')?.checked ? 1 : 0,
+          daily_practice_reminder: app.querySelector('#mot-reminder')?.checked ? 1 : 0,
+        });
+        setMotStatus('Saved.', true);
+      } catch (error) {
+        setMotStatus(`Save failed: ${error.message}`, false);
       }
     });
   },
