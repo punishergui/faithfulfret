@@ -299,8 +299,8 @@ window.Utils = {
     return next;
   },
 
-  renderPageHero: ({ title = '', subtitle = '', leftExtra = '', actions = '', image = '', texture = true } = {}) => {
-    const heroClasses = `page-hero page-hero--img ${texture ? 'vert-texture' : ''}`.trim();
+  renderPageHero: ({ title = '', subtitle = '', leftExtra = '', actions = '', image = '', texture = true, extraClasses = '' } = {}) => {
+    const heroClasses = `page-hero page-hero--img ${texture ? 'vert-texture' : ''} ${extraClasses}`.trim();
     return `
       <div class="${heroClasses}">
         <div class="page-hero__inner">
