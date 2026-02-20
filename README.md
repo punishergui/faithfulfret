@@ -104,7 +104,7 @@ After deploy, verify strict one-level nesting UX/rules: nesting Playlist B under
 After deploy, verify nested playlists still allow **Add Video**: add a video from `#/training/playlists/:nestedId` and confirm API `POST /api/training/playlists/:id/items` succeeds for `item_type=video` while keeping nested-playlist (`item_type=playlist`) restrictions unchanged.
 After deploy, verify video cards on both `#/training/videos` and `#/training/playlists/:id` display duration (`mm:ss`/`hh:mm:ss`), playlist list cards show deep total time, and partial totals display `(+?)` when some durations are unknown.
 After deploy, verify `#/resources` shows the new hero + sticky search/filter chips + responsive card grid (1/2/3+ columns by breakpoint), and confirm Add/Open/Edit actions plus keyboard tab/focus still work.
-After deploy, verify hero bars use theme-driven background art (worship/djent/nu-metal/country families) on both `#/gear` and `#/resources`, and switching theme in `#/settings` updates hero imagery/tint without per-page hardcoded photos.
+After deploy, verify hero bars on `#/gear` and `#/resources` use only `/img/hero/djent.jpg`, and switching themes updates overlay intensity/tint without changing the underlying image.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
@@ -202,8 +202,8 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # UI polish deploy check: verify title/subtitle/filters/tabs stay left-aligned while hero action buttons stay right-aligned, and nav touches hero with no blank gap.
 # UI polish deploy check: verify `/#/gear` and `/#/resources` now share an identical hero/header layout (hero bar, action button alignment, search row, and filter pills), with only page text/content differing.
 # Hero theme deploy check: verify hero background art renders on headers using .page-hero/.df-hero/.session-hero and follows theme when data-theme is on either <html> or <body>.
-# Hero wrapper deploy check: verify `#/dashboard`, `#/sessions`, `#/settings`, and `#/resources` render a `.page-hero` wrapper (resources includes `.resources-hero` too), and `#/session/:id` renders `.session-hero`, each with the themed SVG background visible.
-# Asset routing deploy check: `curl -I http://127.0.0.1:3000/img/hero/djent.svg` should be `200 image/svg+xml`, and missing files like `/img/hero/djent.webp` must return `404` (never SPA HTML).
+# Hero wrapper deploy check: verify `#/dashboard`, `#/sessions`, `#/settings`, and `#/resources` render a `.page-hero` wrapper (resources includes `.resources-hero` too), and `#/session/:id` renders `.session-hero`, each with the themed hero background visible.
+# Asset routing deploy check: `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` should be `200 image/jpeg` (never SPA HTML).
 # Dashboard layout deploy check: verify Recent Sessions + Recent Activity rows are fully clickable in the 70/30 layout, Quick Log remains the only fresh-start button, and mobile stacks into one column.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 
@@ -656,7 +656,9 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 4e) on #/training/playlists/<id>, hover a video row and verify card lift/shadow/accent border/thumbnail brighten effects are subtle and fast, click anywhere in row opens the video, and reorder/remove buttons still work without triggering navigation.
 # 4f) open #/training and verify Video Library + Playlists are full-tile links (no side buttons), hover lift/glow is subtle, and keyboard Tab+Enter opens each tile.
 # 4g) verify breadcrumbs render under page titles on #/training, #/training/videos, #/training/videos/<id>, #/training/playlists, and #/training/playlists/<id>; only the last crumb is non-clickable.
-# 4g1) open #/dashboard, #/sessions, #/gear, #/resources, #/training, #/presets, and #/settings; verify hero SVG backgrounds render (theme image visible under title content).
+# 4g1) open #/dashboard, #/sessions, #/gear, #/resources, #/training, #/presets, and #/settings; verify hero background uses /img/hero/djent.jpg with text/buttons above the overlay.
+# 4g1b) run the hero asset guard script and confirm no forbidden hero references remain.
+./scripts/check-hero.sh
 # 4g2) verify nav-to-hero junction has no blank band (especially #/resources); if stale CSS persists after GHCR pull, do a hard refresh (Ctrl/Cmd+Shift+R).
 # 4h) on video add/edit, verify Description rich-text toolbar supports bold/italic/underline/strikethrough, h2/h3, lists, quote, inline+block code, links, hr, undo/redo, clear formatting, palette-only text colors + reset, and 😀 emoji popover with caret insert.
 # 4i) verify long words/URLs wrap in editor + video detail display (no bleed behind sidebar), Enter creates paragraphs, Shift+Enter inserts line breaks, and save+refresh keeps formatted Description (including emoji).
