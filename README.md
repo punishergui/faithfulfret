@@ -210,7 +210,8 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # Hero wrapper deploy check: verify `#/dashboard`, `#/sessions`, `#/settings`, and `#/resources` render a `.page-hero` wrapper (resources includes `.resources-hero` too), and `#/session/:id` renders `.session-hero`, each with the themed hero background visible.
 # Asset routing deploy check: `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` should be `200 image/jpeg` (never SPA HTML).
 # Dashboard layout deploy check: verify Recent Sessions + Recent Activity rows are fully clickable in the 70/30 layout, Quick Log remains the only fresh-start button, and mobile stacks into one column.
-# Dashboard timeline deploy check: verify the dashboard shows unified Timeline cards from `/api/feed?limit=50` (sessions/gear/training/videos/playlists/resources/presets), thumbnails/icons render correctly, filters update client-side instantly with counts, and fallback empty state appears safely when feed is unavailable.
+# Dashboard timeline deploy check: verify the dashboard shows unified Timeline cards from `/api/feed?limit=10&offset=0` (sessions/gear/training/videos/playlists/resources/presets), thumbnails/icons render correctly, filters update client-side instantly with counts, and fallback empty state appears safely when feed is unavailable.
+# Dashboard pagination deploy check: verify Timeline starts with 10 items, Show More appends 10 without duplicates, filter changes reset pagination, and no full-page reload/scroll jump occurs.
 # Dashboard stats panel deploy check: verify Progress Memory/Practice Summary metrics render in the right column (streak/minutes/sessions totals), and no unexpected Start Practice CTA appears in the stats panel.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 

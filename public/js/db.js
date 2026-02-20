@@ -92,9 +92,12 @@
       return rows.map(normalizeSession);
     },
 
-    async getFeed(limit = 50) {
-      const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(Number(limit), 200)) : 50;
-      return api(`/api/feed?limit=${safeLimit}`);
+    async getFeed(limit = 10, offset = 0, type = null) {
+      const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(Number(limit), 200)) : 10;
+      const safeOffset = Number.isFinite(Number(offset)) ? Math.max(0, Number(offset)) : 0;
+      const query = new URLSearchParams({ limit: String(safeLimit), offset: String(safeOffset) });
+      if (type) query.set('type', String(type));
+      return api(`/api/feed?${query.toString()}`);
     },
 
     async getSessionHeatmap() {

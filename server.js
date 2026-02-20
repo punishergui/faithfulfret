@@ -370,7 +370,25 @@ function buildStats() {
   const uniqueDatesAsc = [...uniqueDatesDesc].reverse();
   const toDate = (ymd) => new Date(`${ymd}T12:00:00`);
   const dayDiff = (a, b) => Math.round((toDate(a) - toDate(b)) / 86400000);
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  const day = weekStart.getDay();
+  const diffToMonday = (day + 6) % 7;
+  weekStart.setDate(weekStart.getDate() - diffToMonday);
+
+  let sessionsThisWeek = 0;
+  let minutesThisWeek = 0;
+  sessions.forEach((row) => {
+    const dateVal = row?.date ? new Date(`${row.date}T12:00:00`) : null;
+    if (!dateVal || Number.isNaN(dateVal.getTime())) return;
+    if (dateVal >= weekStart) {
+      sessionsThisWeek += 1;
+      minutesThisWeek += Number(row.durationMinutes) || 0;
+    }
+  });
 
   let currentStreak = 0;
   if (uniqueDatesDesc.length) {
@@ -400,7 +418,9 @@ function buildStats() {
 
   return {
     count,
+    totalSessions: count,
     totalMinutes,
+    totalPracticeMinutes: totalMinutes,
     totalHours,
     maxBPM,
     avgBPM,
@@ -408,9 +428,12 @@ function buildStats() {
     currentStreak,
     longestStreak,
     lastSessionDate,
+    lastPracticeDate: lastSessionDate,
     daysSinceLastSession,
     allDates,
     sessionsPerWeek,
+    sessionsThisWeek,
+    minutesThisWeek,
   };
 }
 
@@ -440,7 +463,11 @@ apiRouter.get('/sessions', (req, res) => {
 apiRouter.get('/feed', (req, res) => {
   try {
     const limitRaw = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 50;
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 10;
+    const offsetRaw = Number.parseInt(req.query.offset, 10);
+    const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
+    const typeFilter = String(req.query.type || '').trim().toLowerCase();
+    const hasTypeFilter = !!typeFilter;
 
     const toTs = (...values) => {
       for (const value of values) {
@@ -604,11 +631,15 @@ apiRouter.get('/feed', (req, res) => {
       });
     });
 
-    const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, limit);
-    return res.json({ items: sortedItems, facets: { countsByType } });
+    const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+    const filteredItems = hasTypeFilter ? sortedItems.filter((item) => item.type === typeFilter) : sortedItems;
+    const total = filteredItems.length;
+    if (offset >= total) return res.json({ items: [], total, facets: { countsByType } });
+    const pagedItems = filteredItems.slice(offset, offset + limit);
+    return res.json({ items: pagedItems, total, facets: { countsByType } });
   } catch (error) {
     console.error('feed route failed', error);
-    return res.json({ items: [], facets: { countsByType: { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 } } });
+    return res.json({ items: [], total: 0, facets: { countsByType: { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 } } });
   }
 });
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));

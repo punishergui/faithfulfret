@@ -40,10 +40,12 @@ Pages.Dashboard = {
     let feedItems = [];
     let feedFacets = null;
     let feedFailed = false;
+    let initialFeedTotal = 0;
     try {
-      const feedResponse = await DB.getFeed(50);
+      const feedResponse = await DB.getFeed(10, 0, null);
       feedItems = Array.isArray(feedResponse?.items) ? feedResponse.items : [];
       feedFacets = feedResponse?.facets || null;
+      initialFeedTotal = Number(feedResponse?.total) || feedItems.length;
       if (window.DF_DEBUG_FEED) {
         console.log('[DF feed]', feedItems);
         console.log('[DF feed countsByType]', feedFacets?.countsByType || this._countByType(feedItems));
@@ -76,7 +78,7 @@ Pages.Dashboard = {
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
         <div class="dashboard-grid dash-grid" style="align-items:start;">
           <div class="dashboard-main-col timeline">
-            ${this._renderTimeline(timelineItems, feedFacets, feedFailed)}
+            ${this._renderTimeline(timelineItems, feedFacets, feedFailed, initialFeedTotal)}
             ${!timelineItems.length ? this._renderRecentSessions(recent, today) : ''}
           </div>
           <aside class="dashboard-side-col dash-side">
@@ -89,9 +91,15 @@ Pages.Dashboard = {
     `;
 
     this._initStatCounters(app, stats);
-    this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed);
+    this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed, initialFeedTotal);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
+    // Smoke checklist:
+    // 1) Dashboard loads 10 feed items by default.
+    // 2) Show More appends 10 without duplicates.
+    // 3) Filters reset to first page and Show More keeps filter.
+    // 4) Stats panel shows metrics, not a primary Start Practice CTA.
+    // 5) Empty DB shows no-practice message with zeros and no crash.
     this._bindDataChanged();
   },
 
@@ -190,10 +198,10 @@ Pages.Dashboard = {
     return Number(dateValue) || Number(session?.createdAt) || 0;
   },
 
-  _renderTimeline(items = [], feedFacets = null, feedFailed = false) {
+  _renderTimeline(items = [], feedFacets = null, feedFailed = false, totalItems = 0) {
     const counts = feedFacets?.countsByType || this._countByType(items);
     const filters = [
-      { key: 'all', label: 'All', count: items.length },
+      { key: 'all', label: 'All', count: Number(totalItems) || items.length },
       { key: 'session', label: 'Sessions', count: counts.session || 0 },
       { key: 'gear', label: 'Gear', count: counts.gear || 0 },
       { key: 'training', label: 'Training', count: counts.training || 0 },
@@ -203,7 +211,7 @@ Pages.Dashboard = {
       { key: 'preset', label: 'Presets', count: counts.preset || 0 },
     ];
     return `
-      <section id="dashboard-timeline" data-feed='${JSON.stringify(items).replace(/'/g, '&#39;')}' data-facets='${JSON.stringify(counts).replace(/'/g, '&#39;')}' data-feed-failed="${feedFailed ? '1' : '0'}">
+      <section id="dashboard-timeline" data-feed='${JSON.stringify(items).replace(/'/g, '&#39;')}' data-facets='${JSON.stringify(counts).replace(/'/g, '&#39;')}' data-feed-failed="${feedFailed ? '1' : '0'}" data-feed-total="${Number(totalItems) || items.length}">
         <div class="timeline-header">
           <div class="section-header">
             <span class="section-header__label">Timeline</span>
@@ -216,6 +224,9 @@ Pages.Dashboard = {
           ${items.length
             ? items.map((item) => this._renderTimelineCard(item)).join('')
             : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity yet</div><div class="empty-state__text">Log your first session.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable, showing fallback modules below.</div>' : ''}</div>`}
+        </div>
+        <div class="timeline-more" data-timeline-more-wrap style="display:${items.length < (Number(totalItems) || items.length) ? 'flex' : 'none'};">
+          <button type="button" class="df-btn timeline-more__btn" data-timeline-more>Show More</button>
         </div>
       </section>
     `;
@@ -253,28 +264,97 @@ Pages.Dashboard = {
     `;
   },
 
-  _initTimelineFilters(container, items = [], feedFacets = null, feedFailed = false) {
+  _initTimelineFilters(container, items = [], feedFacets = null, feedFailed = false, initialTotal = 0) {
     const timeline = container.querySelector('#dashboard-timeline');
     if (!timeline) return;
     const list = timeline.querySelector('[data-timeline-list]');
     if (!list) return;
+
+    const moreWrap = timeline.querySelector('[data-timeline-more-wrap]');
+    const moreBtn = timeline.querySelector('[data-timeline-more]');
+    const PAGE_SIZE = 10;
     let activeFilter = 'all';
+    let loadingMore = false;
+    let feedItems = Array.isArray(items) ? [...items] : [];
+    let currentOffset = feedItems.length;
+    let total = Number(initialTotal) || feedItems.length;
+
+    const dedupe = (rows = []) => {
+      const known = new Set(feedItems.map((item) => item.id));
+      const fresh = [];
+      rows.forEach((row) => {
+        if (!row?.id || known.has(row.id)) return;
+        known.add(row.id);
+        fresh.push(row);
+      });
+      return fresh;
+    };
+
+    const setMoreState = () => {
+      if (!moreWrap || !moreBtn) return;
+      const hasMore = currentOffset < total;
+      moreWrap.style.display = hasMore ? 'flex' : 'none';
+      moreBtn.disabled = loadingMore || !hasMore;
+      moreBtn.textContent = loadingMore ? 'Loading…' : 'Show More';
+    };
+
     const renderList = () => {
-      const filtered = activeFilter === 'all' ? items : items.filter((item) => item?.type === activeFilter);
+      const filtered = activeFilter === 'all' ? feedItems : feedItems.filter((item) => item?.type === activeFilter);
       list.innerHTML = filtered.length
         ? filtered.map((item) => this._renderTimelineCard(item)).join('')
         : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity for this filter</div><div class="empty-state__text">Try a different feed type.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable.</div>' : ''}</div>`;
+      setMoreState();
     };
+
+    const loadFeedPage = async (reset = false) => {
+      if (loadingMore) return;
+      if (reset) {
+        feedItems = [];
+        currentOffset = 0;
+        total = 0;
+      }
+      loadingMore = true;
+      setMoreState();
+      try {
+        const type = activeFilter === 'all' ? null : activeFilter;
+        const response = await DB.getFeed(PAGE_SIZE, currentOffset, type);
+        const received = Array.isArray(response?.items) ? response.items : [];
+        total = Number(response?.total) || 0;
+        const fresh = dedupe(received);
+        if (reset) {
+          feedItems = fresh;
+        } else {
+          feedItems.push(...fresh);
+        }
+        currentOffset += received.length;
+      } catch (error) {
+        console.error('timeline page load failed', error);
+      } finally {
+        loadingMore = false;
+        renderList();
+      }
+    };
+
     timeline.querySelectorAll('[data-filter]').forEach((button) => {
       button.addEventListener('click', () => {
-        activeFilter = button.dataset.filter || 'all';
+        const next = button.dataset.filter || 'all';
+        if (next === activeFilter && feedItems.length) return;
+        activeFilter = next;
         timeline.querySelectorAll('[data-filter]').forEach((chip) => chip.classList.toggle('is-active', chip === button));
-        renderList();
+        loadFeedPage(true);
       });
     });
+
+    moreBtn?.addEventListener('click', () => {
+      if (loadingMore) return;
+      loadFeedPage(false);
+    });
+
     const counts = feedFacets?.countsByType || this._countByType(items);
     if (window.DF_DEBUG_FEED) console.log('[DF dashboard filters]', counts);
+    renderList();
   },
+
 
   _iconForType(type) {
     const iconMap = {
@@ -306,32 +386,31 @@ Pages.Dashboard = {
   },
 
   _renderProgressMemory(summary, stats) {
-    const hasData = summary && (summary.weekMinutes > 0 || summary.totalMinutes > 0 || summary.streak.current > 0);
+    const hasStatsData = Number(stats?.count || 0) > 0 || Number(stats?.totalMinutes || 0) > 0;
     const topKey = summary?.topKeyWeek?.name || '—';
     const topProg = summary?.topProgWeek?.name ? this._formatProgId(summary.topProgWeek.name) : '—';
-    const practiceSummaryRows = [
-      { label: 'Sessions/week', value: stats?.sessionsPerWeek || 0 },
-      { label: 'Total sessions', value: stats?.count || 0 },
-      { label: 'Total hours', value: stats?.totalHours || 0 },
+    const rows = [
+      { label: 'Current streak', value: `${Number(stats?.currentStreak) || 0} day${(Number(stats?.currentStreak) || 0) === 1 ? '' : 's'}` },
+      { label: 'Longest streak', value: Number(stats?.longestStreak) || 0 },
+      { label: 'Minutes this week', value: Number(stats?.minutesThisWeek) || 0 },
+      { label: 'Sessions this week', value: Number(stats?.sessionsThisWeek) || 0 },
+      { label: 'Total sessions', value: Number(stats?.count) || 0 },
+      { label: 'Total practice minutes', value: Number(stats?.totalMinutes) || 0 },
     ];
+
     return `
-      <div class="df-panel df-panel--wide" style="padding:14px;margin-bottom:16px;">
+      <div class="df-panel df-panel--wide dashboard-panel dashboard-panel--stats" style="padding:14px;margin-bottom:16px;">
         <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Progress Memory</div>
         <div style="display:grid;gap:8px;">
-          ${this._renderMetricRow('Streak', `${summary?.streak?.current || 0} day${(summary?.streak?.current || 0) === 1 ? '' : 's'} (Best: ${summary?.streak?.best || 0})`)}
-          ${this._renderMetricRow('Minutes this week', `${summary?.weekMinutes || 0}`)}
-          ${this._renderMetricRow('Top key', topKey)}
-          ${this._renderMetricRow('Top progression', topProg)}
+          ${rows.map((row) => this._renderMetricRow(row.label, row.value)).join('')}
+          ${this._renderMetricRow('Top key (week)', topKey)}
+          ${this._renderMetricRow('Top progression (week)', topProg)}
         </div>
-        <div style="height:1px;background:var(--line2);margin:12px 0;"></div>
-        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Practice Summary</div>
-        <div style="display:grid;gap:8px;">
-          ${practiceSummaryRows.map((row) => this._renderMetricRow(row.label, row.value)).join('')}
-        </div>
-        ${hasData ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">Start Practice Mode to build stats.</div>'}
+        ${hasStatsData ? '' : '<div style="margin-top:10px;color:var(--text3);font-size:12px;">No practice yet. Stats will appear after your first session. <a href="#/session/new" class="df-link" style="margin-left:4px;">Log a session</a>.</div>'}
       </div>
     `;
   },
+
 
   _renderMetricRow(label, value) {
     return `
