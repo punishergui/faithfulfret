@@ -988,6 +988,26 @@ const all = (sql, ...params) => execAll(sql, ...params);
 const one = (sql, ...params) => execOne(sql, ...params);
 const run = (sql, ...params) => execRun(sql, ...params);
 
+const deleteFeedEventsByEntityKey = (entityKey = '') => {
+  const safeKey = String(entityKey || '').trim();
+  if (!safeKey) return 0;
+  return run('DELETE FROM timeline_events WHERE entity_id = ?', safeKey).changes || 0;
+};
+
+const deleteFeedEventsByEntity = (entityType, entityId) => {
+  const safeType = String(entityType || '').trim().toLowerCase();
+  const rawId = String(entityId == null ? '' : entityId).trim();
+  if (!safeType || !rawId) return 0;
+  const keys = new Set([rawId, `${safeType}:${rawId}`]);
+  let changes = 0;
+  keys.forEach((key) => {
+    changes += deleteFeedEventsByEntityKey(key);
+  });
+  return changes;
+};
+
+const clearTimelineEvents = () => run('DELETE FROM timeline_events').changes || 0;
+
 const listSessions = () => all('SELECT * FROM sessions ORDER BY date DESC, createdAt DESC');
 
 const listSessionDailyTotals = () => all(`
@@ -1011,7 +1031,9 @@ const getSession = (id) => one('SELECT * FROM sessions WHERE id = ?', id);
 const saveSession = (data) => { const row = coerceSession(data); Q.upsertSession.run(row); return getSession(row.id); };
 const deleteSession = (id) => {
   run('DELETE FROM session_gear WHERE sessionId = ?', id);
-  return run('DELETE FROM sessions WHERE id = ?', id);
+  const result = run('DELETE FROM sessions WHERE id = ?', id);
+  deleteFeedEventsByEntity('session', id);
+  return result;
 };
 
 const listGear = (includeLinks = true) => {
@@ -1026,7 +1048,9 @@ const deleteGear = (id) => {
   run('DELETE FROM gear_links WHERE gearId = ?', id);
   run('DELETE FROM gear_images WHERE gearId = ?', id);
   run('DELETE FROM session_gear WHERE gearId = ?', id);
-  return run('DELETE FROM gear_items WHERE id = ?', id);
+  const result = run('DELETE FROM gear_items WHERE id = ?', id);
+  deleteFeedEventsByEntity('gear', id);
+  return result;
 };
 
 const listGearImages = (gearId) => db.prepare('SELECT * FROM gear_images WHERE gearId = ? ORDER BY sortOrder ASC, createdAt ASC').all(gearId);
@@ -1112,12 +1136,20 @@ const getGearUsage = () => db.prepare(`
 const listPresets = () => all('SELECT * FROM presets ORDER BY createdAt DESC');
 const getPreset = (id) => one('SELECT * FROM presets WHERE id = ?', id);
 const savePreset = (data) => { const row = coercePreset(data); Q.upsertPreset.run(row); return getPreset(row.id); };
-const deletePreset = (id) => run('DELETE FROM presets WHERE id = ?', id);
+const deletePreset = (id) => {
+  const result = run('DELETE FROM presets WHERE id = ?', id);
+  deleteFeedEventsByEntity('preset', id);
+  return result;
+};
 
 const listResources = () => all('SELECT * FROM resources ORDER BY rating DESC, createdAt DESC');
 const getResource = (id) => one('SELECT * FROM resources WHERE id = ?', id);
 const saveResource = (data) => { const row = coerceResource(data); Q.upsertResource.run(row); return getResource(row.id); };
-const deleteResource = (id) => run('DELETE FROM resources WHERE id = ?', id);
+const deleteResource = (id) => {
+  const result = run('DELETE FROM resources WHERE id = ?', id);
+  deleteFeedEventsByEntity('resource', id);
+  return result;
+};
 
 const listTrainingVideos = (filters = {}) => {
   const where = [];
@@ -1243,6 +1275,8 @@ const deleteTrainingVideo = (id) => {
     run('DELETE FROM video_timestamps WHERE videoId = ?', targetId);
     run('DELETE FROM video_playlist_items WHERE videoId = ?', targetId);
     run('DELETE FROM training_videos WHERE id = ?', targetId);
+    deleteFeedEventsByEntity('video', targetId);
+    deleteFeedEventsByEntity('training', targetId);
   });
   tx(Number(id));
 };
@@ -1426,6 +1460,7 @@ const deleteVideoPlaylist = (id) => {
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', playlistId);
     run('UPDATE video_playlists SET parent_playlist_id = NULL WHERE parent_playlist_id = ?', playlistId);
     run('DELETE FROM video_playlists WHERE id = ?', playlistId);
+    deleteFeedEventsByEntity('playlist', playlistId);
   });
   tx(Number(id));
 };
@@ -1585,6 +1620,7 @@ const deleteLesson = (id) => {
     run('DELETE FROM lesson_skills WHERE lesson_id = ?', lessonId);
     run('DELETE FROM attachments WHERE entity_type = ? AND entity_id = ?', 'lesson', lessonId);
     run('DELETE FROM lessons WHERE id = ?', lessonId);
+    deleteFeedEventsByEntity('training', lessonId);
   });
   tx(Number(id));
 };
@@ -2052,6 +2088,8 @@ const deleteTrainingPlaylist = (id) => {
   const tx = db.transaction((targetId) => {
     run('DELETE FROM training_playlist_items WHERE playlist_id = ?', targetId);
     run('DELETE FROM training_playlists WHERE id = ?', targetId);
+    deleteFeedEventsByEntity('training', targetId);
+    deleteFeedEventsByEntity('playlist', targetId);
   });
   tx(playlistId);
 };
@@ -2167,7 +2205,12 @@ const saveTrainingProvider = (data = {}) => {
   const result = db.prepare('INSERT INTO providers (name,slug,url,created_at) VALUES (@name,@slug,@url,@created_at)').run({ name: data.name || '', slug: data.slug || slugify(data.name), url: data.url || '', created_at: now });
   return getTrainingProvider(result.lastInsertRowid);
 };
-const deleteTrainingProvider = (id) => run('DELETE FROM providers WHERE id = ?', Number(id));
+const deleteTrainingProvider = (id) => {
+  const providerId = Number(id);
+  const result = run('DELETE FROM providers WHERE id = ?', providerId);
+  deleteFeedEventsByEntity('training', providerId);
+  return result;
+};
 
 const listLevels = (providerId) => db.prepare(`SELECT * FROM levels ${providerId ? 'WHERE provider_id = ?' : ''} ORDER BY sort_order ASC, id ASC`).all(...(providerId ? [Number(providerId)] : []));
 const bootstrapProviderLevels = (providerId) => {
@@ -2230,7 +2273,14 @@ const saveTrainingLesson = (data = {}) => {
   const result = db.prepare('INSERT INTO lessons (module_id,title,description,video_url,video_provider,video_id,thumb_url,duration_sec,skill_tags,lesson_kind,sort_order,created_at,updated_at,slug,lesson_type,author,summary,practice_plan,notes) VALUES (@module_id,@title,@description,@video_url,@video_provider,@video_id,@thumb_url,@duration_sec,@skill_tags,@lesson_kind,@sort_order,@created_at,@updated_at,@slug,@lesson_type,@author,@summary,@practice_plan,@notes)').run({ ...payload, created_at: now, updated_at: now, slug: slugify(payload.title), lesson_type: 'core', author: '', summary: '', practice_plan: '', notes: '' });
   return getTrainingLesson(result.lastInsertRowid);
 };
-const deleteTrainingLesson = (id) => { run('DELETE FROM lesson_skills WHERE lesson_id = ?', Number(id)); run('DELETE FROM song_lessons WHERE lesson_id = ?', Number(id)); return run('DELETE FROM lessons WHERE id = ?', Number(id)); };
+const deleteTrainingLesson = (id) => {
+  const lessonId = Number(id);
+  run('DELETE FROM lesson_skills WHERE lesson_id = ?', lessonId);
+  run('DELETE FROM song_lessons WHERE lesson_id = ?', lessonId);
+  const result = run('DELETE FROM lessons WHERE id = ?', lessonId);
+  deleteFeedEventsByEntity('training', lessonId);
+  return result;
+};
 const saveLessonSkillLinks = (lessonId, skillIds = []) => { run('DELETE FROM lesson_skills WHERE lesson_id = ?', Number(lessonId)); const st = db.prepare('INSERT INTO lesson_skills (lesson_id,skill_id) VALUES (?,?)'); skillIds.forEach((sid) => { if (Number(sid)) st.run(Number(lessonId), Number(sid)); }); };
 const listSkillGroups = () => {
   const groups = all('SELECT * FROM skill_groups ORDER BY sort_order ASC, name ASC');
@@ -2265,7 +2315,12 @@ const saveSong = (data = {}) => {
   if (data.id) { run('UPDATE songs SET provider_id=@provider_id,title=@title,artist=@artist,level_hint=@level_hint,thumb_url=@thumb_url WHERE id=@id', { id: Number(data.id), provider_id: Number(data.provider_id), title: data.title || '', artist: data.artist || '', level_hint: data.level_hint || '', thumb_url: data.thumb_url || '' }); return getSong(data.id); }
   const r = db.prepare('INSERT INTO songs (provider_id,title,artist,level_hint,thumb_url,created_at) VALUES (?,?,?,?,?,?)').run(Number(data.provider_id), data.title || '', data.artist || '', data.level_hint || '', data.thumb_url || '', now); return getSong(r.lastInsertRowid);
 };
-const deleteSong = (id) => { run('DELETE FROM song_lessons WHERE song_id = ?', Number(id)); run('DELETE FROM songs WHERE id = ?', Number(id)); };
+const deleteSong = (id) => {
+  const songId = Number(id);
+  run('DELETE FROM song_lessons WHERE song_id = ?', songId);
+  run('DELETE FROM songs WHERE id = ?', songId);
+  deleteFeedEventsByEntity('song', songId);
+};
 const assignSongLessons = (songId, lessonIds = []) => {
   run('DELETE FROM song_lessons WHERE song_id = ?', Number(songId));
   const st = db.prepare('INSERT INTO song_lessons (song_id,lesson_id,sort_order) VALUES (?,?,?)');
@@ -2422,8 +2477,7 @@ const saveRepertoireSong = (data = {}) => {
 const deleteRepertoireSong = (id) => {
   const songId = Number(id);
   run('DELETE FROM session_song WHERE song_id = ?', songId);
-  run('DELETE FROM timeline_events WHERE entity_id = ?', String(songId));
-  run('DELETE FROM timeline_events WHERE entity_id = ?', `song:${songId}`);
+  deleteFeedEventsByEntity('song', songId);
   run('DELETE FROM repertoire_songs WHERE id = ?', songId);
 };
 const replaceSessionSongs = (sessionId, songs = []) => {
@@ -2448,4 +2502,4 @@ const listSessionSongs = (sessionId) => db.prepare(`SELECT ss.*, rs.title, rs.ar
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, resetBadges, unlockBadge, deleteTimelineEventsByEventType, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, resetBadges, unlockBadge, deleteTimelineEventsByEventType, deleteFeedEventsByEntityKey, deleteFeedEventsByEntity, clearTimelineEvents, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

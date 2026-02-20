@@ -1722,6 +1722,18 @@ select.df-input option {
   margin-top: 2px;
 }
 
+.dashboard-latest-badge {
+  margin-top: 10px;
+  margin-left: 100px;
+  padding: 10px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: rgba(0,0,0,.25);
+  display: grid;
+  gap: 4px;
+  max-width: 340px;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: 1fr 320px;
@@ -1876,6 +1888,29 @@ select.df-input option {
 .timeline-chip__count {
   margin-left: 4px;
   opacity: .8;
+}
+
+.timeline-pill {
+  min-height: 36px;
+  line-height: 1.2;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.timeline-pill__count {
+  min-height: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 1;
 }
 
 .timeline-card__title {
@@ -3160,6 +3195,11 @@ select.df-input option {
   .ff-hero__right {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .dashboard-latest-badge {
+    margin-left: 0;
+    max-width: 100%;
   }
 
   .session-hero__inner {

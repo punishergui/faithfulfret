@@ -478,6 +478,10 @@
       return api('/api/badges/reset', { method: 'POST' });
     },
 
+    async clearTimelineHistory() {
+      return api('/api/timeline/clear', { method: 'POST' });
+    },
+
     async getRepertoireSongs(filters = {}) {
       const params = new URLSearchParams();
       if (filters.status) params.set('status', String(filters.status));

@@ -111,6 +111,7 @@ Pages.Settings = {
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
               <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
+              <button id="mot-clear-timeline" type="button" class="df-btn df-btn--danger">Clear timeline history</button>
               <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
             </div>
           </div>
@@ -502,6 +503,18 @@ Pages.Settings = {
         window.dispatchEvent(new Event('ff:data-changed'));
       } catch (error) {
         setMotStatus(`Reset failed: ${error.message}`, false);
+      }
+    });
+
+    app.querySelector('#mot-clear-timeline')?.addEventListener('click', async () => {
+      if (!window.confirm('Clear ALL timeline history? This is irreversible and does not delete sessions, gear, videos, playlists, resources, presets, or songs.')) return;
+      try {
+        await DB.clearTimelineHistory();
+        Utils.toast?.('Timeline history cleared.');
+        setMotStatus('Timeline history cleared.', true);
+        window.dispatchEvent(new Event('ff:data-changed'));
+      } catch (error) {
+        setMotStatus(`Clear failed: ${error.message}`, false);
       }
     });
   },
