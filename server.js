@@ -776,8 +776,8 @@ apiRouter.get('/badges', (req, res) => {
 });
 
 apiRouter.post('/badges/reset', (req, res) => {
-  Store.resetBadges();
-  return res.json({ ok: true });
+  const result = Store.resetBadges();
+  return res.json({ ok: true, ...result });
 });
 
 apiRouter.get('/sessions', (req, res) => {
@@ -807,6 +807,9 @@ apiRouter.get('/timeline', (req, res) => {
 });
 
 apiRouter.get('/feed', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   try {
     const limitRaw = Number.parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 10;
