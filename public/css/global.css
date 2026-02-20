@@ -254,6 +254,67 @@ body::after {
   }
 }
 
+
+.ff-theme-editor {
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ff-theme-editor__summary {
+  list-style: none;
+  padding: 12px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--panel) 90%, #000 10%);
+}
+.ff-theme-editor__summary::-webkit-details-marker { display: none; }
+.ff-theme-editor__body {
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+.ff-theme-editor__current { color: var(--text2); font-size: 12px; }
+.ff-theme-editor__current strong { color: var(--text); }
+.ff-theme-editor__rows { display: grid; gap: 8px; }
+.ff-theme-editor__row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(120px, 1.2fr) 24px minmax(0, .8fr) minmax(0, 2fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  border: 1px solid var(--line);
+  padding: 8px;
+}
+.ff-theme-editor__swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line2);
+}
+.ff-theme-editor__color { padding: 2px; min-height: 34px; }
+.ff-theme-editor__badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+.ff-theme-editor__actions,
+.ff-theme-editor__custom,
+.ff-theme-editor__paste { display: grid; gap: 8px; }
+.ff-theme-editor__json-preview {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  padding: 8px;
+  color: var(--text2);
+  font-size: 11px;
+}
+@media (max-width: 980px) {
+  .ff-theme-editor__row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav__logo-dot,
   .df-btn,

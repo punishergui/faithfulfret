@@ -185,6 +185,7 @@
   });
 
   window.Pages = window.Pages || {};
+  window.ThemeOverrides?.applyOverrides?.(window.Utils?.getTheme?.());
   window.Utils?.applyThemeColorMeta?.();
   window.Utils?.applyHeroSettings?.();
 })();

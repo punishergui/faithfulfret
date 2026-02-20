@@ -109,6 +109,7 @@ After deploy, verify video cards on both `#/training/videos` and `#/training/pla
 After deploy, verify `#/resources` shows the new hero + sticky search/filter chips + responsive card grid (1/2/3+ columns by breakpoint), and confirm Add/Open/Edit actions plus keyboard tab/focus still work.
 After deploy, verify hero bars on `#/gear` and `#/resources` use only `/img/hero/djent.jpg`, and switching themes updates overlay intensity/tint without changing the underlying image.
 After deploy, verify Settings → Theme Picker → Hero sliders change only hero image strength/overlay darkness, persist across refresh via localStorage (`ff.heroImgOpacity`, `ff.heroOverlayAlpha`), and Reset restores `0.55 / 0.52`.
+After deploy, verify Settings → Theme Picker → Theme Editor saves per-theme CSS overrides in localStorage (`ff_theme_overrides:<themeId>`), applies immediately on theme switch/load, supports per-variable reset + reset all, and survives GHCR image updates because data stays client-side.
 Also verify preset exports include embedded audio data URLs (`tables.presets[].audioData`) so uploaded/recorded audio survives import/export restores.
 
 ### Verify endpoints
