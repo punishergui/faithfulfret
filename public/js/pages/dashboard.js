@@ -231,10 +231,10 @@ Pages.Dashboard = {
             <span class="section-header__label">Timeline</span>
           </div>
           <div class="timeline-filters" aria-label="Timeline filters">
-            <button type="button" class="timeline-chip is-active" data-filter-shortcut="all">All</button>
-            <button type="button" class="timeline-chip" data-filter-shortcut="none">None</button>
-            ${filters.map((filter) => `<button type="button" class="timeline-chip" data-filter="${filter.key}">${filter.label} <span class="timeline-chip__count">${filter.count}</span></button>`).join('')}
-            <button type="button" class="df-btn df-btn--outline" data-save-filter-default>Save as default</button>
+            <button type="button" class="timeline-chip timeline-pill is-active" data-filter-shortcut="all">All</button>
+            <button type="button" class="timeline-chip timeline-pill" data-filter-shortcut="none">None</button>
+            ${filters.map((filter) => `<button type="button" class="timeline-chip timeline-pill" data-filter="${filter.key}">${filter.label} <span class="timeline-chip__count timeline-pill__count">${filter.count}</span></button>`).join('')}
+            <button type="button" class="df-btn df-btn--outline timeline-pill" data-save-filter-default>Save as default</button>
           </div>
         </div>
         <div class="timeline-list" data-timeline-list>
@@ -795,7 +795,7 @@ Pages.Dashboard = {
     }, 0);
 
     const latestBadgeHtml = latestBadge
-      ? `<div style="margin-top:10px;padding:10px;border:1px solid var(--line2);border-radius:10px;background:rgba(0,0,0,.25);display:grid;gap:4px;max-width:340px;">
+      ? `<div class="dashboard-latest-badge">
           <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;">Latest badge</div>
           <div style="font-weight:700;display:flex;align-items:center;gap:8px;"><span>🏅</span><span>${latestBadge.title || 'Badge unlocked'}</span></div>
           ${latestBadge.description ? `<div style="font-size:12px;color:var(--text2);">${latestBadge.description}</div>` : ''}

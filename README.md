@@ -221,6 +221,7 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # Songs deploy check: verify nav shows Songs, `#/songs` supports add/edit/status advance/log-practice/delete flows, `#/repertoire` redirects to `#/songs`, and Timeline Songs items open Songs page.
 # Dashboard badges deploy check: unlock a badge and confirm Dashboard hero shows Latest badge (title/date), then run Reset badges in Settings and confirm `/api/badges` returns `[]` and the hero badge widget disappears.
 # Dashboard filter defaults deploy check: select multiple Timeline filters, use Save as default, reload `#/dashboard`, and verify selected filters persist; All/None shortcuts should toggle all/none.
+# Timeline integrity deploy check: delete a session/gear/video/playlist/resource/preset/song and verify related Timeline items disappear immediately; then run Settings → Motivation → Clear timeline history and confirm `/api/feed?limit=10&offset=0` returns `items: []` when no other entities remain.
 # Settings deploy check: verify Settings → Motivation saves usual practice time, restore cooldown/limits, restore toggle, and daily reminder toggle.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 

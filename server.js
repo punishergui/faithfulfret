@@ -780,6 +780,11 @@ apiRouter.post('/badges/reset', (req, res) => {
   return res.json({ ok: true, ...result });
 });
 
+apiRouter.post('/timeline/clear', (req, res) => {
+  const clearedTimelineEvents = Store.clearTimelineEvents();
+  return res.json({ ok: true, clearedTimelineEvents });
+});
+
 apiRouter.get('/sessions', (req, res) => {
   const sessions = Store.listSessions();
   const gearRows = Store.listSessionGearBySessionIds(sessions.map((row) => row.id));
@@ -1024,8 +1029,47 @@ apiRouter.get('/feed', (req, res) => {
       });
     });
 
+    const timelineEntityExists = (entityType, entityId) => {
+      const safeType = String(entityType || '').trim().toLowerCase();
+      const safeId = String(entityId || '').trim();
+      if (!safeType || !safeId) return true;
+      if (safeType === 'session') return Boolean(Store.getSession(safeId));
+      if (safeType === 'gear') return Boolean(Store.getGear(safeId));
+      if (safeType === 'resource') return Boolean(Store.getResource(safeId));
+      if (safeType === 'preset') return Boolean(Store.getPreset(safeId));
+      if (safeType === 'video' || safeType === 'training') return Boolean(Store.getTrainingVideo(Number(safeId)));
+      if (safeType === 'playlist') return Boolean(Store.getVideoPlaylist(Number(safeId)));
+      if (safeType === 'song') return Boolean(Store.getRepertoireSong(Number(safeId)));
+      if (safeType === 'badge') return Boolean(Store.getBadgeUnlockByKey(safeId));
+      if (safeType === 'system') return true;
+      return true;
+    };
+
+    const parseEntityRef = (eventType, entityIdRaw) => {
+      const raw = String(entityIdRaw || '').trim();
+      const fallbackByEvent = {
+        session: 'session',
+        song_added: 'song',
+        song_practiced: 'song',
+        song_status_changed: 'song',
+        badge_unlocked: 'badge',
+      };
+      if (raw.includes(':')) {
+        const [entityType, ...idParts] = raw.split(':');
+        return { entityType: String(entityType || '').trim().toLowerCase(), entityId: idParts.join(':').trim() };
+      }
+      return { entityType: fallbackByEvent[String(eventType || '').trim()] || '', entityId: raw };
+    };
+
     Store.listTimelineEvents({ limit: 500, offset: 0 }).forEach((event) => {
       const map = {
+        session: 'session',
+        gear: 'gear',
+        training: 'training',
+        video: 'video',
+        playlist: 'playlist',
+        resource: 'resource',
+        preset: 'preset',
         badge_unlocked: 'badge',
         song_added: 'song',
         song_practiced: 'song',
@@ -1034,6 +1078,8 @@ apiRouter.get('/feed', (req, res) => {
         streak_milestone: 'system',
       };
       const type = map[event.event_type] || 'system';
+      const ref = parseEntityRef(event.event_type, event.entity_id);
+      if (!timelineEntityExists(ref.entityType, ref.entityId)) return;
       pushItem({
         id: `evt:${event.id}`,
         type,
