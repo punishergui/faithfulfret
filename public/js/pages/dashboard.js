@@ -3,6 +3,9 @@
 window.Pages = window.Pages || {};
 
 Pages.Dashboard = {
+  _feedRefreshTimer: null,
+  _onDataChanged: null,
+
   async render() {
     const app = document.getElementById('app');
     app.innerHTML = '<div class="page-wrap" style="padding:60px 24px;text-align:center;"><p style="color:var(--text3);font-family:var(--f-mono);">Loading...</p></div>';
@@ -33,14 +36,18 @@ Pages.Dashboard = {
     const today = Utils.today();
     const recent = sessions.slice(0, 8);
     const progressSummary = window.progressMem?.getSummary?.() || null;
-    const streakSummary = progressSummary?.streak || stats?.streak || null;
 
     let feedItems = [];
+    let feedFacets = null;
     let feedFailed = false;
     try {
       const feedResponse = await DB.getFeed(50);
       feedItems = Array.isArray(feedResponse?.items) ? feedResponse.items : [];
-      if (window.DF_DEBUG_FEED) console.log('[DF feed]', feedItems);
+      feedFacets = feedResponse?.facets || null;
+      if (window.DF_DEBUG_FEED) {
+        console.log('[DF feed]', feedItems);
+        console.log('[DF feed countsByType]', feedFacets?.countsByType || this._countByType(feedItems));
+      }
     } catch (error) {
       console.error('feed load failed', error);
       feedFailed = true;
@@ -69,11 +76,11 @@ Pages.Dashboard = {
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
         <div class="dashboard-grid dash-grid" style="align-items:start;">
           <div class="dashboard-main-col timeline">
-            ${this._renderTimeline(timelineItems, feedFailed)}
+            ${this._renderTimeline(timelineItems, feedFacets, feedFailed)}
             ${!timelineItems.length ? this._renderRecentSessions(recent, today) : ''}
           </div>
           <aside class="dashboard-side-col dash-side">
-            ${this._renderNowPanel(streakSummary)}
+            ${this._renderProgressMemory(progressSummary, stats)}
             ${this._renderQuickLog(today)}
             ${this._renderCompactHeatmap(heatmapDays, today)}
           </aside>
@@ -82,8 +89,29 @@ Pages.Dashboard = {
     `;
 
     this._initStatCounters(app, stats);
+    this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
+    this._bindDataChanged();
+  },
+
+  _bindDataChanged() {
+    if (this._onDataChanged) return;
+    this._onDataChanged = () => {
+      if (this._feedRefreshTimer) clearTimeout(this._feedRefreshTimer);
+      this._feedRefreshTimer = setTimeout(() => {
+        if (location.hash.startsWith('#/dashboard')) this.render();
+      }, 250);
+    };
+    window.addEventListener('ff:data-changed', this._onDataChanged);
+  },
+
+  _countByType(items = []) {
+    const counts = { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 };
+    items.forEach((item) => {
+      if (counts[item?.type] != null) counts[item.type] += 1;
+    });
+    return counts;
   },
 
   _readJson(key, fallback) {
@@ -162,21 +190,29 @@ Pages.Dashboard = {
     return Number(dateValue) || Number(session?.createdAt) || 0;
   },
 
-  _renderTimeline(items = [], feedFailed = false) {
+  _renderTimeline(items = [], feedFacets = null, feedFailed = false) {
+    const counts = feedFacets?.countsByType || this._countByType(items);
+    const filters = [
+      { key: 'all', label: 'All', count: items.length },
+      { key: 'session', label: 'Sessions', count: counts.session || 0 },
+      { key: 'gear', label: 'Gear', count: counts.gear || 0 },
+      { key: 'training', label: 'Training', count: counts.training || 0 },
+      { key: 'video', label: 'Videos', count: counts.video || 0 },
+      { key: 'playlist', label: 'Playlists', count: counts.playlist || 0 },
+      { key: 'resource', label: 'Resources', count: counts.resource || 0 },
+      { key: 'preset', label: 'Presets', count: counts.preset || 0 },
+    ];
     return `
-      <section>
+      <section id="dashboard-timeline" data-feed='${JSON.stringify(items).replace(/'/g, '&#39;')}' data-facets='${JSON.stringify(counts).replace(/'/g, '&#39;')}' data-feed-failed="${feedFailed ? '1' : '0'}">
         <div class="timeline-header">
           <div class="section-header">
             <span class="section-header__label">Timeline</span>
           </div>
           <div class="timeline-filters" aria-label="Timeline filters">
-            <button type="button" class="timeline-chip is-active">All</button>
-            <button type="button" class="timeline-chip">Sessions</button>
-            <button type="button" class="timeline-chip" disabled>Training soon</button>
-            <button type="button" class="timeline-chip" disabled>Gear soon</button>
+            ${filters.map((filter) => `<button type="button" class="timeline-chip ${filter.key === 'all' ? 'is-active' : ''}" data-filter="${filter.key}">${filter.label} <span class="timeline-chip__count">${filter.count}</span></button>`).join('')}
           </div>
         </div>
-        <div class="timeline-list">
+        <div class="timeline-list" data-timeline-list>
           ${items.length
             ? items.map((item) => this._renderTimelineCard(item)).join('')
             : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity yet</div><div class="empty-state__text">Log your first session.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable, showing fallback modules below.</div>' : ''}</div>`}
@@ -186,16 +222,24 @@ Pages.Dashboard = {
   },
 
   _renderTimelineCard(item = {}) {
-    const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4v16"/></svg>';
+    const iconKey = item?.thumb?.icon || item?.type || 'session';
+    const icon = `<span class="timeline-icon" aria-hidden="true">${this._iconForType(iconKey)}</span>`;
     const chips = [];
     if (item?.meta?.minutes) chips.push(`<span class="timeline-chip">${item.meta.minutes}m</span>`);
     if (item?.meta?.bpm) chips.push(`<span class="timeline-chip">${item.meta.bpm} bpm</span>`);
     if (item?.meta?.tool) chips.push(`<span class="timeline-chip">${item.meta.tool}</span>`);
     (Array.isArray(item?.meta?.tags) ? item.meta.tags : []).slice(0, 3).forEach((tag) => chips.push(`<span class="timeline-chip">${tag}</span>`));
-    const href = item.href || '#/sessions';
+    const href = item.href || '';
+    const thumb = item?.thumb?.kind === 'image' && item?.thumb?.src
+      ? `<img class="timeline-thumb__img" src="${item.thumb.src}" alt="" loading="lazy" decoding="async">`
+      : `<div class="timeline-thumb__icon">${icon}</div>`;
+    const cardAttrs = href
+      ? `onclick="go('${href}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){go('${href}')}"`
+      : '';
+    const cardClass = `timeline-card${href ? ' timeline-card--clickable' : ''}`;
     return `
-      <article class="timeline-card" onclick="go('${href}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){go('${href}')}">
-        <div class="timeline-card__icon">${icon}</div>
+      <article class="${cardClass}" ${cardAttrs}>
+        <div class="timeline-thumb">${thumb}</div>
         <div class="timeline-card__body">
           <div class="timeline-card__title">${item.title || 'Session'}</div>
           <div class="timeline-card__subtitle">${item.subtitle || 'Practice session'}</div>
@@ -203,10 +247,52 @@ Pages.Dashboard = {
         </div>
         <div class="timeline-card__side">
           <div class="timeline-card__time">${this._formatTimelineTime(item.ts)}</div>
-          <a href="${href}" class="df-btn df-btn--outline">View</a>
+          ${href ? `<a href="${href}" class="df-btn df-btn--outline">View</a>` : ''}
         </div>
       </article>
     `;
+  },
+
+  _initTimelineFilters(container, items = [], feedFacets = null, feedFailed = false) {
+    const timeline = container.querySelector('#dashboard-timeline');
+    if (!timeline) return;
+    const list = timeline.querySelector('[data-timeline-list]');
+    if (!list) return;
+    let activeFilter = 'all';
+    const renderList = () => {
+      const filtered = activeFilter === 'all' ? items : items.filter((item) => item?.type === activeFilter);
+      list.innerHTML = filtered.length
+        ? filtered.map((item) => this._renderTimelineCard(item)).join('')
+        : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity for this filter</div><div class="empty-state__text">Try a different feed type.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable.</div>' : ''}</div>`;
+    };
+    timeline.querySelectorAll('[data-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeFilter = button.dataset.filter || 'all';
+        timeline.querySelectorAll('[data-filter]').forEach((chip) => chip.classList.toggle('is-active', chip === button));
+        renderList();
+      });
+    });
+    const counts = feedFacets?.countsByType || this._countByType(items);
+    if (window.DF_DEBUG_FEED) console.log('[DF dashboard filters]', counts);
+  },
+
+  _iconForType(type) {
+    const iconMap = {
+      metronome: '🎵',
+      session: '🎵',
+      gear: '🎸',
+      guitar: '🎸',
+      training: '▶',
+      play: '▶',
+      video: '🎬',
+      playlist: '☰',
+      list: '☰',
+      resource: '🔗',
+      link: '🔗',
+      preset: '🎛',
+      knob: '🎛',
+    };
+    return iconMap[String(type || '').toLowerCase()] || '♪';
   },
 
   _formatTimelineTime(ts) {
@@ -217,21 +303,6 @@ Pages.Dashboard = {
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     if (diff < 172800000) return 'Yesterday';
     return new Date(stamp).toLocaleDateString();
-  },
-
-  _renderNowPanel(streakSummary) {
-    const currentStreak = Number(streakSummary?.current) || 0;
-    const bestStreak = Number(streakSummary?.best) || Number(streakSummary?.longestStreak) || currentStreak;
-    return `
-      <div class="df-panel df-panel--wide dashboard-panel" style="padding:14px;margin-bottom:16px;">
-        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Now</div>
-        ${this._renderMetricRow('Streak', currentStreak ? `${currentStreak} day${currentStreak === 1 ? '' : 's'}` : '—')}
-        <div style="margin-top:8px;">${this._renderMetricRow('Best', bestStreak || '—')}</div>
-        <div style="margin-top:12px;display:flex;justify-content:flex-end;">
-          <a href="#/log" class="df-btn df-btn--primary">Start Practice</a>
-        </div>
-      </div>
-    `;
   },
 
   _renderProgressMemory(summary, stats) {

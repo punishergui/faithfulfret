@@ -3,6 +3,7 @@
 
 (async function initDB() {
   async function api(path, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
     const res = await fetch(path, {
       headers: { 'Content-Type': 'application/json' },
       ...options,
@@ -20,7 +21,11 @@
     }
 
     try {
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        window.dispatchEvent(new Event('ff:data-changed'));
+      }
+      return parsed;
     } catch {
       throw new Error(`Invalid JSON response from ${path}`);
     }
