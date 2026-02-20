@@ -3,6 +3,14 @@
 window.Pages = window.Pages || {};
 
 Pages.Settings = {
+  TAB_STORAGE_KEY: 'ff_settings_tab',
+  TABS: [
+    { key: 'general', label: 'General' },
+    { key: 'timeline', label: 'Timeline' },
+    { key: 'motivation', label: 'Motivation' },
+    { key: 'data', label: 'Data' },
+    { key: 'advanced', label: 'Advanced' },
+  ],
   THEME_EDITOR_VARS: [
     '--bg', '--bg2', '--panel', '--panel2', '--text', '--text2', '--line', '--line2', '--glow', '--glow2',
     '--accent', '--accent2', '--green', '--yellow', '--red', '--hero-bg-tint', '--hero-bg-opacity', '--heroH',
@@ -18,6 +26,8 @@ Pages.Settings = {
     const themes = Utils.getThemes();
     const heroSettings = Utils.getHeroSettings();
 
+    const activeTab = this.getInitialTab();
+
     app.innerHTML = `
       ${Utils.renderPageHero({
         title: 'Settings',
@@ -26,131 +36,238 @@ Pages.Settings = {
       })}
 
       <div class="page-wrap" style="padding:28px 24px 40px;display:grid;gap:16px;">
+        <div class="df-pillrow" role="tablist" aria-label="Settings sections" style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${this.TABS.map((tab) => `
+            <button
+              type="button"
+              class="df-btn ${tab.key === activeTab ? 'df-btn--primary is-active' : 'df-btn--outline'}"
+              role="tab"
+              aria-selected="${tab.key === activeTab ? 'true' : 'false'}"
+              data-settings-pill="${tab.key}"
+            >${tab.label}</button>
+          `).join('')}
+        </div>
+
         <section class="df-panel df-panel--wide ff-panel--page settings-panel">
-          <div class="df-label">Theme Picker</div>
-
-          <div class="ff-theme-grid">
-            ${themes.map((t) => {
-              const [sw1, sw2, sw3, sw4] = t.swatches;
-              const accent = t.vars?.['--accent'] || t.metaColor || sw3;
-              const border = t.vars?.['--line2'] || accent;
-              const glow = t.id === 'radioactive-gain' ? '#86ff1e' : accent;
-              const cardStyle = [
-                `--theme-bg1:${sw1}`,
-                `--theme-bg2:${sw2}`,
-                `--theme-accent:${accent}`,
-                `--theme-border:${border}`,
-                `--theme-glow:${glow}`,
-                `--theme-nameplate-glow:${sw4}`,
-              ].join(';');
-              return `
-                <button
-                  type="button"
-                  class="ff-theme-card ${t.id === theme ? 'is-active' : ''}"
-                  data-theme-value="${t.id}"
-                  style="${cardStyle}"
-                  aria-label="Switch to ${t.name} theme"
-                >
-                  <div class="ff-theme-swatches">
-                    ${t.swatches.map((swatch) => `<span class="ff-theme-swatch" style="background:${swatch};"></span>`).join('')}
-                  </div>
-                  <div class="ff-theme-nameplate"><span class="ff-theme-title">${t.name}</span></div>
-                </button>
-              `;
-            }).join('')}
-          </div>
-
-          <details class="ff-theme-editor" open>
-            <summary class="ff-theme-editor__summary">Theme Editor</summary>
-            <div id="theme-editor-body" class="ff-theme-editor__body"></div>
-          </details>
-
-          <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
-            <div class="df-label">Hero</div>
-            <label class="df-label" for="hero-img-opacity">Image Strength</label>
-            <input id="hero-img-opacity" type="range" min="0.15" max="0.85" step="0.01" value="${heroSettings.img.toFixed(2)}">
-            <div id="hero-img-opacity-value" style="font-size:12px;color:var(--text2);">${heroSettings.img.toFixed(2)}</div>
-
-            <label class="df-label" for="hero-overlay-alpha">Overlay Darkness</label>
-            <input id="hero-overlay-alpha" type="range" min="0.10" max="0.85" step="0.01" value="${heroSettings.overlay.toFixed(2)}">
-            <div id="hero-overlay-alpha-value" style="font-size:12px;color:var(--text2);">${heroSettings.overlay.toFixed(2)}</div>
+          <section data-settings-tab="general" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">General</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Theme, layout preferences, and default session behavior.</p>
+            </header>
 
             <div>
-              <button id="hero-settings-reset" type="button" class="df-btn df-btn--outline">Reset</button>
+              <div class="df-label">Theme Picker</div>
+              <div class="ff-theme-grid">
+                ${themes.map((t) => {
+                  const [sw1, sw2, sw3, sw4] = t.swatches;
+                  const accent = t.vars?.['--accent'] || t.metaColor || sw3;
+                  const border = t.vars?.['--line2'] || accent;
+                  const glow = t.id === 'radioactive-gain' ? '#86ff1e' : accent;
+                  const cardStyle = [
+                    `--theme-bg1:${sw1}`,
+                    `--theme-bg2:${sw2}`,
+                    `--theme-accent:${accent}`,
+                    `--theme-border:${border}`,
+                    `--theme-glow:${glow}`,
+                    `--theme-nameplate-glow:${sw4}`,
+                  ].join(';');
+                  return `
+                    <button
+                      type="button"
+                      class="ff-theme-card ${t.id === theme ? 'is-active' : ''}"
+                      data-theme-value="${t.id}"
+                      style="${cardStyle}"
+                      aria-label="Switch to ${t.name} theme"
+                    >
+                      <div class="ff-theme-swatches">
+                        ${t.swatches.map((swatch) => `<span class="ff-theme-swatch" style="background:${swatch};"></span>`).join('')}
+                      </div>
+                      <div class="ff-theme-nameplate"><span class="ff-theme-title">${t.name}</span></div>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
             </div>
-          </div>
 
-          <div style="height:1px;background:var(--line2);"></div>
+            <details class="ff-theme-editor" open>
+              <summary class="ff-theme-editor__summary">Theme Editor</summary>
+              <div id="theme-editor-body" class="ff-theme-editor__body"></div>
+            </details>
 
-          <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
-            <div class="df-label">Backup &amp; Restore</div>
-            <div style="font-size:13px;color:var(--text2);">Create a full data backup zip or import one to restore all sessions, gear, presets, uploads, and training history.</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <button id="settings-backup-download" type="button" class="df-btn df-btn--outline">Download Backup (.zip)</button>
-              <label class="df-btn df-btn--outline" style="position:relative;overflow:hidden;cursor:pointer;">
-                Select Backup (.zip)
-                <input id="settings-backup-import-file" type="file" accept=".zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
-              </label>
-              <button id="settings-backup-import" type="button" class="df-btn df-btn--danger" disabled>Import Backup</button>
-              <button id="settings-backup-restore-last" type="button" class="df-btn df-btn--outline">Restore Last Safety Backup</button>
+            <div style="display:grid;gap:8px;padding:12px;border:1px solid var(--line2);">
+              <div class="df-label">Hero</div>
+              <label class="df-label" for="hero-img-opacity">Image Strength</label>
+              <input id="hero-img-opacity" type="range" min="0.15" max="0.85" step="0.01" value="${heroSettings.img.toFixed(2)}">
+              <div id="hero-img-opacity-value" style="font-size:12px;color:var(--text2);">${heroSettings.img.toFixed(2)}</div>
+
+              <label class="df-label" for="hero-overlay-alpha">Overlay Darkness</label>
+              <input id="hero-overlay-alpha" type="range" min="0.10" max="0.85" step="0.01" value="${heroSettings.overlay.toFixed(2)}">
+              <div id="hero-overlay-alpha-value" style="font-size:12px;color:var(--text2);">${heroSettings.overlay.toFixed(2)}</div>
+
+              <div>
+                <button id="hero-settings-reset" type="button" class="df-btn df-btn--outline">Reset</button>
+              </div>
             </div>
-            <div id="settings-backup-status" style="font-size:12px;color:var(--text2);"></div>
-          </div>
 
-          <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
-            <div class="df-label">Motivation</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+            <div style="display:grid;gap:10px;">
+              <div>
+                <div class="df-label">Playing Hand</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="df-btn ${hand === 'right' ? 'df-btn--primary' : 'df-btn--outline'}" data-handedness="right">Right-handed</button>
+                  <button type="button" class="df-btn ${hand === 'left' ? 'df-btn--primary' : 'df-btn--outline'}" data-handedness="left">Left-handed</button>
+                </div>
+                <p style="margin-top:8px;color:var(--text2);font-size:12px;">Mirrored fretboard/tool layouts are planned for a future phase.</p>
+              </div>
+
+              <div class="df-field">
+                <label class="df-label" for="setting-bpm-step">BPM Step Size</label>
+                <input id="setting-bpm-step" class="df-input" type="number" min="1" max="20" value="${bpmStep}">
+              </div>
+
+              <div class="df-field">
+                <label class="df-label" for="setting-default-minutes">Default Session Minutes</label>
+                <input id="setting-default-minutes" class="df-input" type="number" min="1" max="600" value="${defaultSessionMinutes}">
+              </div>
+
+              <div class="df-field">
+                <label class="df-label" for="setting-display-name">Display Name</label>
+                <input id="setting-display-name" class="df-input" type="text" maxlength="80" value="${displayName.replace(/"/g, '&quot;')}">
+              </div>
+            </div>
+          </section>
+
+          <section data-settings-tab="timeline" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">Timeline</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Feed visibility preferences and timeline management controls.</p>
+            </header>
+            <div style="padding:12px;border:1px solid var(--line2);font-size:13px;color:var(--text2);">
+              Timeline feed filters are controlled from Dashboard and saved there as defaults. Use Advanced tab actions for destructive timeline reset.
+            </div>
+          </section>
+
+          <section data-settings-tab="motivation" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">Motivation</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Configure reminders and streak-restore behavior.</p>
+            </header>
+            <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
+              <div class="df-label">Motivation</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
               <div class="df-field"><label class="df-label" for="mot-usual-time">Usual practice time</label><input id="mot-usual-time" class="df-input" type="time" value="19:00"></div>
               <div class="df-field"><label class="df-label" for="mot-cooldown">Restore cooldown days</label><input id="mot-cooldown" class="df-input" type="number" min="1" value="7"></div>
               <div class="df-field"><label class="df-label" for="mot-max-uses">Max restore uses / 30 days</label><input id="mot-max-uses" class="df-input" type="number" min="1" value="1"></div>
-            </div>
-            <div style="display:flex;gap:14px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:8px;"><input id="mot-allow-restore" type="checkbox" checked> Allow streak restore</label>
-              <label style="display:flex;align-items:center;gap:8px;"><input id="mot-reminder" type="checkbox"> Daily practice reminder</label>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
-              <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
-              <button id="mot-clear-timeline" type="button" class="df-btn df-btn--danger">Clear timeline history</button>
-              <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
-            </div>
-          </div>
-
-          <div style="display:grid;gap:14px;">
-            <div>
-              <div class="df-label">Playing Hand</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="df-btn ${hand === 'right' ? 'df-btn--primary' : 'df-btn--outline'}" data-handedness="right">Right-handed</button>
-                <button type="button" class="df-btn ${hand === 'left' ? 'df-btn--primary' : 'df-btn--outline'}" data-handedness="left">Left-handed</button>
               </div>
-              <p style="margin-top:8px;color:var(--text2);font-size:12px;">Mirrored fretboard/tool layouts are planned for a future phase.</p>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:8px;"><input id="mot-allow-restore" type="checkbox" checked> Allow streak restore</label>
+                <label style="display:flex;align-items:center;gap:8px;"><input id="mot-reminder" type="checkbox"> Daily practice reminder</label>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
+                <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
+              </div>
             </div>
+          </section>
 
-            <div class="df-field">
-              <label class="df-label" for="setting-bpm-step">BPM Step Size</label>
-              <input id="setting-bpm-step" class="df-input" type="number" min="1" max="20" value="${bpmStep}">
+          <section data-settings-tab="data" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">Data</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Export and restore full local backups.</p>
+            </header>
+            <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
+              <div class="df-label">Backup &amp; Restore</div>
+              <div style="font-size:13px;color:var(--text2);">Create a full data backup zip or import one to restore all sessions, gear, presets, uploads, and training history.</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button id="settings-backup-download" type="button" class="df-btn df-btn--outline">Download Backup (.zip)</button>
+                <label class="df-btn df-btn--outline" style="position:relative;overflow:hidden;cursor:pointer;">
+                  Select Backup (.zip)
+                  <input id="settings-backup-import-file" type="file" accept=".zip" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+                </label>
+                <button id="settings-backup-import" type="button" class="df-btn df-btn--danger" disabled>Import Backup</button>
+                <button id="settings-backup-restore-last" type="button" class="df-btn df-btn--outline">Restore Last Safety Backup</button>
+              </div>
+              <div id="settings-backup-status" style="font-size:12px;color:var(--text2);"></div>
             </div>
+          </section>
 
-            <div class="df-field">
-              <label class="df-label" for="setting-default-minutes">Default Session Minutes</label>
-              <input id="setting-default-minutes" class="df-input" type="number" min="1" max="600" value="${defaultSessionMinutes}">
+          <section data-settings-tab="advanced" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">Advanced</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Danger zone actions that reset or remove local data.</p>
+            </header>
+            <div style="display:grid;gap:8px;padding:12px;border:1px solid var(--line2);">
+              <div class="df-label">Danger Zone</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
+                <button id="mot-clear-timeline" type="button" class="df-btn df-btn--danger">Clear timeline history</button>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button id="settings-reset-phase0" type="button" class="df-btn df-btn--danger">Reset Phase 0 Settings</button>
+              </div>
             </div>
+          </section>
 
-            <div class="df-field">
-              <label class="df-label" for="setting-display-name">Display Name</label>
-              <input id="setting-display-name" class="df-input" type="text" maxlength="80" value="${displayName.replace(/"/g, '&quot;')}">
-            </div>
-
-            <div>
-              <button id="settings-reset-phase0" type="button" class="df-btn df-btn--danger">Reset Phase 0 Settings</button>
-            </div>
-          </div>
         </section>
       </div>
     `;
 
+    this.bindTabs(app, activeTab);
     this.renderThemeEditor(app, theme);
     this.bindEvents(app);
+  },
+
+  getInitialTab() {
+    const hash = location.hash || '';
+    const query = hash.includes('?') ? hash.split('?')[1] : '';
+    const tabFromUrl = new URLSearchParams(query).get('tab');
+    if (this.TABS.some((tab) => tab.key === tabFromUrl)) return tabFromUrl;
+
+    const stored = localStorage.getItem(this.TAB_STORAGE_KEY);
+    if (this.TABS.some((tab) => tab.key === stored)) return stored;
+    return 'general';
+  },
+
+  updateSettingsTabUrl(tabKey) {
+    const nextHash = `#/settings?tab=${encodeURIComponent(tabKey)}`;
+    const nextUrl = `${location.pathname}${location.search}${nextHash}`;
+    window.history.replaceState(null, '', nextUrl);
+  },
+
+  setActiveTab(tabKey) {
+    const selected = this.TABS.some((tab) => tab.key === tabKey) ? tabKey : 'general';
+    this._activeTab = selected;
+    localStorage.setItem(this.TAB_STORAGE_KEY, selected);
+    this.updateSettingsTabUrl(selected);
+
+    document.querySelectorAll('[data-settings-tab]').forEach((section) => {
+      section.style.display = section.dataset.settingsTab === selected ? '' : 'none';
+    });
+
+    document.querySelectorAll('[data-settings-pill]').forEach((button) => {
+      const isActive = button.dataset.settingsPill === selected;
+      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      button.classList.toggle('is-active', isActive);
+      button.classList.toggle('df-btn--primary', isActive);
+      button.classList.toggle('df-btn--outline', !isActive);
+    });
+  },
+
+  bindTabs(app, activeTab) {
+    const pills = Array.from(app.querySelectorAll('[data-settings-pill]'));
+    pills.forEach((pill, index) => {
+      pill.addEventListener('click', () => this.setActiveTab(pill.dataset.settingsPill));
+      pill.addEventListener('keydown', (event) => {
+        if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        let nextIndex = index;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % pills.length;
+        if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pills.length) % pills.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = pills.length - 1;
+        pills[nextIndex]?.focus();
+      });
+    });
+    this.setActiveTab(activeTab);
   },
 
   normalizeHex(value) {
