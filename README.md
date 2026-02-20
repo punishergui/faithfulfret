@@ -210,6 +210,7 @@ docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/publ
 # Hero wrapper deploy check: verify `#/dashboard`, `#/sessions`, `#/settings`, and `#/resources` render a `.page-hero` wrapper (resources includes `.resources-hero` too), and `#/session/:id` renders `.session-hero`, each with the themed hero background visible.
 # Asset routing deploy check: `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` should be `200 image/jpeg` (never SPA HTML).
 # Dashboard layout deploy check: verify Recent Sessions + Recent Activity rows are fully clickable in the 70/30 layout, Quick Log remains the only fresh-start button, and mobile stacks into one column.
+# Dashboard timeline deploy check: verify the dashboard shows Timeline cards from `/api/feed?limit=50`, sticky Now/Quick Log panel on desktop, stacked panel under feed on mobile, and fallback session list/empty state when feed is unavailable.
 # Keep rollback path: always publish immutable vX.Y.Z tags and pin docker-compose.prod.yml image tag for fast rollback.
 
 # Verify DB path after deploy

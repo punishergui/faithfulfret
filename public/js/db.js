@@ -87,6 +87,11 @@
       return rows.map(normalizeSession);
     },
 
+    async getFeed(limit = 50) {
+      const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(Number(limit), 200)) : 50;
+      return api(`/api/feed?limit=${safeLimit}`);
+    },
+
     async getSessionHeatmap() {
       return api('/api/session-heatmap');
     },
