@@ -61,13 +61,16 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-For rewrite-app hotfixes that must persist local `public` asset edits, use local compose with forced recreate:
+`rewrite-app` images are self-contained for hero assets/overlay. Deploy from GHCR with **no local `public` bind-mount overrides** (only `./data:/data` is expected).
 
 ```bash
-docker compose up -d --force-recreate
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags when needed for instant rollback.
+
+After deploy, verify hero asset wiring is GHCR-safe (no local overrides): `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` returns `200`, and `grep -R "/img/hero/.*\.svg" -n public` returns no active hero SVG references.
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
