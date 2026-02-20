@@ -441,33 +441,174 @@ apiRouter.get('/feed', (req, res) => {
   try {
     const limitRaw = Number.parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 50;
-    const sessions = Store.listSessions().slice(0, limit);
-    const items = sessions.map((session) => {
+
+    const toTs = (...values) => {
+      for (const value of values) {
+        if (value == null || value === '') continue;
+        if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+        const parsed = new Date(String(value)).getTime();
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
+      return 0;
+    };
+
+    const safeThumbSource = (value) => {
+      const src = String(value || '').trim();
+      if (!src) return '';
+      if (/^https?:\/\//i.test(src)) return src;
+      if (src.startsWith('/')) return src;
+      return '';
+    };
+
+    const makeIconThumb = (icon) => ({ kind: 'icon', icon });
+    const countsByType = {
+      session: 0,
+      gear: 0,
+      training: 0,
+      video: 0,
+      playlist: 0,
+      resource: 0,
+      preset: 0,
+    };
+    const items = [];
+    const pushItem = (item) => {
+      if (!item || !item.id || !item.type || !Number(item.ts)) return;
+      items.push(item);
+      if (Object.prototype.hasOwnProperty.call(countsByType, item.type)) countsByType[item.type] += 1;
+    };
+
+    Store.listSessions().forEach((session) => {
       const tags = [session.focus, session.focusTag].map((value) => String(value || '').trim()).filter(Boolean);
       const uniqueTags = [...new Set(tags)].slice(0, 4);
       const notes = String(session.notes || '').trim();
       const win = String(session.win || '').trim();
-      const subtitle = notes.split(/\r?\n/).find(Boolean) || win || 'Practice session';
-      return {
-        id: `sess:${session.id}`,
+      pushItem({
+        id: `session:${session.id}`,
         type: 'session',
-        ts: Number(new Date(`${session.date}T12:00:00`).getTime()) || Number(session.createdAt) || Date.now(),
+        ts: toTs(`${session.date}T12:00:00`, session.createdAt),
         title: String(session.title || session.focus || session.focusTag || `Session ${session.id}`).trim(),
-        subtitle,
+        subtitle: notes.split(/\r?\n/).find(Boolean) || win || 'Practice session',
+        href: `#/session/${session.id}`,
+        thumb: makeIconThumb('metronome'),
         meta: {
           minutes: Number(session.durationMinutes) || null,
           bpm: Number(session.bpm) || null,
-          tool: session.focus ? String(session.focus) : null,
           tags: uniqueTags,
         },
-        href: `#/session/${session.id}`,
         accent: 'accent',
-      };
-    }).sort((a, b) => b.ts - a.ts);
-    return res.json({ items });
+      });
+    });
+
+    Store.listGear(true).forEach((gear) => {
+      const firstImage = safeThumbSource(gear.imageData) || safeThumbSource((gear.imagesList && gear.imagesList[0] && gear.imagesList[0].filePath) || '');
+      const status = String(gear.status || '').trim();
+      pushItem({
+        id: `gear:${gear.id}`,
+        type: 'gear',
+        ts: toTs(gear.createdAt, gear.dateAcquired, gear.boughtDate),
+        title: String(gear.name || `${gear.brand || ''} ${gear.model || ''}` || `Gear ${gear.id}`).trim(),
+        subtitle: status.toLowerCase() === 'sold' ? 'Marked as sold' : `${status || 'Tracked'} gear`,
+        href: `#/gear/edit/${gear.id}`,
+        thumb: firstImage ? { kind: 'image', src: firstImage } : makeIconThumb('guitar'),
+        meta: {
+          label: gear.category || gear.type || null,
+        },
+        accent: status.toLowerCase() === 'sold' ? 'yellow' : 'green',
+      });
+    });
+
+    Store.listTrainingVideos({ includeProgress: 1 }).forEach((video) => {
+      const videoThumb = safeThumbSource(video.thumbnail_url) || safeThumbSource(video.thumb_url) || safeThumbSource(video.thumbUrl);
+      const createdTs = toTs(video.createdAt, video.updatedAt);
+      pushItem({
+        id: `video:${video.id}`,
+        type: 'video',
+        ts: createdTs,
+        title: String(video.title || `Video ${video.id}`).trim(),
+        subtitle: String(video.author || video.category || 'Training video').trim(),
+        href: `#/training/videos/${video.id}`,
+        thumb: videoThumb ? { kind: 'image', src: videoThumb } : makeIconThumb('video'),
+        meta: {
+          tags: String(video.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 3),
+        },
+        accent: 'neutral',
+      });
+
+      const watchedTs = toTs(video.watched_at);
+      const masteredTs = toTs(video.mastered_at);
+      const trainingTs = masteredTs || watchedTs;
+      if (trainingTs) {
+        pushItem({
+          id: `training:${video.id}`,
+          type: 'training',
+          ts: trainingTs,
+          title: masteredTs ? `Completed: ${video.title || `Video ${video.id}`}` : `Started: ${video.title || `Video ${video.id}`}`,
+          subtitle: masteredTs ? 'Marked mastered' : 'Progress started',
+          href: `#/training/videos/${video.id}`,
+          thumb: videoThumb ? { kind: 'image', src: videoThumb } : makeIconThumb('play'),
+          accent: masteredTs ? 'green' : 'accent',
+        });
+      }
+    });
+
+    Store.listVideoPlaylists({ scope: 'all' }).forEach((playlist) => {
+      const ts = toTs(playlist.updatedAt, playlist.createdAt);
+      pushItem({
+        id: `playlist:${playlist.id}`,
+        type: 'playlist',
+        ts,
+        title: String(playlist.name || `Playlist ${playlist.id}`).trim(),
+        subtitle: playlist.updatedAt && Number(playlist.updatedAt) > Number(playlist.createdAt || 0) ? 'Playlist updated' : 'Playlist added',
+        href: `#/training/playlists/${playlist.id}`,
+        thumb: safeThumbSource(playlist.preview_thumbnail_url)
+          ? { kind: 'image', src: safeThumbSource(playlist.preview_thumbnail_url) }
+          : makeIconThumb('list'),
+        meta: { extra: `${Number(playlist.video_count) || 0} items` },
+        accent: 'accent',
+      });
+    });
+
+    Store.listResources().forEach((resource) => {
+      pushItem({
+        id: `resource:${resource.id}`,
+        type: 'resource',
+        ts: toTs(resource.createdAt),
+        title: String(resource.title || `Resource ${resource.id}`).trim(),
+        subtitle: String(resource.category || 'Reference').trim(),
+        href: `#/resources/edit/${resource.id}`,
+        thumb: makeIconThumb('link'),
+        accent: 'neutral',
+      });
+    });
+
+    Store.listPresets().forEach((preset) => {
+      let imagePath = '';
+      try {
+        const settings = typeof preset.settings === 'string' ? JSON.parse(preset.settings || '{}') : (preset.settings || {});
+        imagePath = safeThumbSource(settings.imagePath);
+      } catch (error) {
+        imagePath = '';
+      }
+      pushItem({
+        id: `preset:${preset.id}`,
+        type: 'preset',
+        ts: toTs(preset.createdAt),
+        title: String(preset.name || `Preset ${preset.id}`).trim(),
+        subtitle: String(preset.ampModel || 'Amp preset').trim(),
+        href: '#/presets',
+        thumb: imagePath ? { kind: 'image', src: imagePath } : makeIconThumb('knob'),
+        meta: {
+          tags: String(preset.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 3),
+        },
+        accent: 'yellow',
+      });
+    });
+
+    const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, limit);
+    return res.json({ items: sortedItems, facets: { countsByType } });
   } catch (error) {
     console.error('feed route failed', error);
-    return res.json({ items: [] });
+    return res.json({ items: [], facets: { countsByType: { session: 0, gear: 0, training: 0, video: 0, playlist: 0, resource: 0, preset: 0 } } });
   }
 });
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));

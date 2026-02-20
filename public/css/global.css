@@ -1807,37 +1807,55 @@ select.df-input option {
 
 .timeline-card {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--panel) 88%, transparent), color-mix(in srgb, var(--panel2) 92%, #000 8%));
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.timeline-card--clickable {
   cursor: pointer;
 }
 
 .timeline-card:hover {
   border-color: var(--accent);
   box-shadow: 0 0 12px var(--glow);
+  transform: translateY(-1px);
 }
 
-.timeline-card__icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+.timeline-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel2) 86%, #000 14%);
+  display: grid;
+  place-items: center;
+}
+
+.timeline-thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.timeline-thumb__icon {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   color: var(--accent);
+  font-size: 20px;
 }
 
-.timeline-card__icon svg {
-  width: 15px;
-  height: 15px;
-  stroke: currentColor;
-  stroke-width: 2;
-  fill: none;
+.timeline-chip__count {
+  margin-left: 4px;
+  opacity: .8;
 }
 
 .timeline-card__title {
@@ -3150,7 +3168,7 @@ select.df-input option {
   }
 
   .timeline-card {
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
   }
 
   .timeline-card__side {
