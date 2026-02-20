@@ -274,7 +274,7 @@ window.Utils = {
     if (!meta) return;
     const theme = window.Utils.getThemeMap()[themeId || window.Utils.getTheme()];
     const fallback = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-    const color = theme?.metaColor || theme?.vars?.['--accent'] || fallback;
+    const color = fallback || theme?.metaColor || theme?.vars?.['--accent'];
     if (color) meta.setAttribute('content', color);
   },
 
@@ -284,6 +284,7 @@ window.Utils = {
     localStorage.setItem('theme', value);
     document.documentElement.dataset.theme = value;
     if (document.body) document.body.dataset.theme = value;
+    window.ThemeOverrides?.applyOverrides?.(value);
     window.Utils.applyThemeColorMeta(value);
     window.Utils.applyHeroSettings();
     return value;

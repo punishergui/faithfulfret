@@ -101,6 +101,7 @@
     if (document.body && document.body.dataset.theme !== value) {
       document.body.dataset.theme = value;
     }
+    window.ThemeOverrides?.applyOverrides?.(value);
     return value;
   }
 

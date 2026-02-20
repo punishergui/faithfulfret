@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Daily Fret">
 
   <script src="/js/themes.js"></script>
+  <script src="/js/theme-overrides.js"></script>
   <script>
     (function() {
       var themes = Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [];
@@ -22,8 +23,16 @@
       var hand = localStorage.getItem('handedness') || 'right';
       document.documentElement.dataset.theme = theme;
       document.documentElement.dataset.handedness = hand;
+      try {
+        var rawOverrides = localStorage.getItem('ff_theme_overrides:' + theme) || '{}';
+        var overrides = JSON.parse(rawOverrides);
+        Object.keys(overrides || {}).forEach(function (name) {
+          if (name.indexOf('--') !== 0) return;
+          document.documentElement.style.setProperty(name, String(overrides[name] || ''));
+        });
+      } catch (e) {}
       var meta = document.querySelector('meta[name="theme-color"]');
-      var accent = (map[theme] && (map[theme].metaColor || (map[theme].vars && map[theme].vars['--accent']))) || '#111111';
+      var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || (map[theme] && (map[theme].metaColor || (map[theme].vars && map[theme].vars['--accent']))) || '#111111';
       if (meta) meta.setAttribute('content', accent);
     })();
   </script>
