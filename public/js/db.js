@@ -92,11 +92,12 @@
       return rows.map(normalizeSession);
     },
 
-    async getFeed(limit = 10, offset = 0, type = null) {
+    async getFeed(limit = 10, offset = 0, types = null) {
       const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(Number(limit), 200)) : 10;
       const safeOffset = Number.isFinite(Number(offset)) ? Math.max(0, Number(offset)) : 0;
       const query = new URLSearchParams({ limit: String(safeLimit), offset: String(safeOffset) });
-      if (type) query.set('type', String(type));
+      if (Array.isArray(types) && types.length) query.set('types', types.join(','));
+      else if (typeof types === 'string' && types.trim()) query.set('types', types.trim());
       return api(`/api/feed?${query.toString()}`);
     },
 
@@ -473,6 +474,10 @@
       return api('/api/badges');
     },
 
+    async resetBadges() {
+      return api('/api/badges/reset', { method: 'POST' });
+    },
+
     async getRepertoireSongs(filters = {}) {
       const params = new URLSearchParams();
       if (filters.status) params.set('status', String(filters.status));
@@ -488,6 +493,10 @@
 
     async deleteRepertoireSong(id) {
       return api(`/api/repertoire/songs/${id}`, { method: 'DELETE' });
+    },
+
+    async deleteSong(id) {
+      return api(`/api/songs/${id}`, { method: 'DELETE' });
     },
 
     async getSessionSongs(sessionId) {

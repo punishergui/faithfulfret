@@ -440,7 +440,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS user_settings (
   streak_restore_cooldown_days INTEGER DEFAULT 7,
   allow_streak_restore INTEGER DEFAULT 1,
   streak_restore_max_uses_per_30_days INTEGER DEFAULT 1,
-  daily_practice_reminder INTEGER DEFAULT 0
+  daily_practice_reminder INTEGER DEFAULT 0,
+  feed_default_types TEXT
 )`);
 db.exec(`CREATE TABLE IF NOT EXISTS streak_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -494,6 +495,7 @@ ensureColumn('lessons', 'description', 'TEXT');
 ensureColumn('lessons', 'lesson_kind', "TEXT NOT NULL DEFAULT 'lesson'");
 ensureColumn('lessons', 'skill_tags', 'TEXT');
 ensureColumn('lesson_skills', 'skill_id', 'INTEGER');
+ensureColumn('user_settings', 'feed_default_types', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_levels_provider_sort ON levels(provider_id, sort_order)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_modules_level_sort ON modules(level_id, sort_order)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_lessons_module_sort ON lessons(module_id, sort_order)');
@@ -2273,12 +2275,20 @@ const assignSongLessons = (songId, lessonIds = []) => {
 
 const getUserSettings = () => {
   const row = one('SELECT * FROM user_settings WHERE id = 1') || {};
+  let feedDefaultTypes = null;
+  try {
+    const parsed = JSON.parse(String(row.feed_default_types || '[]'));
+    if (Array.isArray(parsed)) feedDefaultTypes = parsed.map((value) => String(value || '').trim()).filter(Boolean);
+  } catch (error) {
+    feedDefaultTypes = null;
+  }
   return {
     usual_practice_time: row.usual_practice_time || '19:00',
     streak_restore_cooldown_days: Number(row.streak_restore_cooldown_days) || 7,
     allow_streak_restore: Number(row.allow_streak_restore) ? 1 : 0,
     streak_restore_max_uses_per_30_days: Number(row.streak_restore_max_uses_per_30_days) || 1,
     daily_practice_reminder: Number(row.daily_practice_reminder) ? 1 : 0,
+    feed_default_types: feedDefaultTypes,
   };
 };
 
@@ -2290,13 +2300,17 @@ const saveUserSettings = (input = {}) => {
     allow_streak_restore: Number(input.allow_streak_restore ?? current.allow_streak_restore) ? 1 : 0,
     streak_restore_max_uses_per_30_days: Number(input.streak_restore_max_uses_per_30_days ?? current.streak_restore_max_uses_per_30_days) || 1,
     daily_practice_reminder: Number(input.daily_practice_reminder ?? current.daily_practice_reminder) ? 1 : 0,
+    feed_default_types: JSON.stringify(Array.isArray(input.feed_default_types)
+      ? input.feed_default_types.map((value) => String(value || '').trim()).filter(Boolean)
+      : (Array.isArray(current.feed_default_types) ? current.feed_default_types : [])),
   };
   run(`UPDATE user_settings SET
     usual_practice_time=@usual_practice_time,
     streak_restore_cooldown_days=@streak_restore_cooldown_days,
     allow_streak_restore=@allow_streak_restore,
     streak_restore_max_uses_per_30_days=@streak_restore_max_uses_per_30_days,
-    daily_practice_reminder=@daily_practice_reminder
+    daily_practice_reminder=@daily_practice_reminder,
+    feed_default_types=@feed_default_types
     WHERE id = 1`, next);
   return getUserSettings();
 };
@@ -2340,6 +2354,7 @@ const countTimelineEvents = ({ eventType = '' } = {}) => {
 
 const listBadgeUnlocks = () => all('SELECT * FROM badge_unlocks ORDER BY unlocked_at DESC, id DESC');
 const getBadgeUnlockByKey = (key) => one('SELECT * FROM badge_unlocks WHERE badge_key = ?', String(key));
+const resetBadges = () => run('DELETE FROM badge_unlocks');
 const unlockBadge = ({ badge_key, title, description = '', encouragement = '' }) => {
   if (!badge_key || !title) return null;
   const existing = getBadgeUnlockByKey(badge_key);
@@ -2393,8 +2408,11 @@ const saveRepertoireSong = (data = {}) => {
   return getRepertoireSong(res.lastInsertRowid);
 };
 const deleteRepertoireSong = (id) => {
-  run('DELETE FROM session_song WHERE song_id = ?', Number(id));
-  run('DELETE FROM repertoire_songs WHERE id = ?', Number(id));
+  const songId = Number(id);
+  run('DELETE FROM session_song WHERE song_id = ?', songId);
+  run('DELETE FROM timeline_events WHERE entity_id = ?', String(songId));
+  run('DELETE FROM timeline_events WHERE entity_id = ?', `song:${songId}`);
+  run('DELETE FROM repertoire_songs WHERE id = ?', songId);
 };
 const replaceSessionSongs = (sessionId, songs = []) => {
   const tx = db.transaction(() => {
@@ -2418,4 +2436,4 @@ const listSessionSongs = (sessionId) => db.prepare(`SELECT ss.*, rs.title, rs.ar
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, unlockBadge, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, resetBadges, unlockBadge, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

@@ -736,7 +736,7 @@ apiRouter.get('/stats', (req, res) => {
   const base = buildStats();
   const streak = getStreakSummary();
   const settings = Store.getUserSettings();
-  const badges = Store.listBadgeUnlocks().slice(0, 5);
+  const badges = Store.listBadgeUnlocks();
   res.json({ ...base, streakDetail: streak, motivation: { streak, badges, settings } });
 });
 
@@ -775,6 +775,11 @@ apiRouter.get('/badges', (req, res) => {
   res.json(Store.listBadgeUnlocks());
 });
 
+apiRouter.post('/badges/reset', (req, res) => {
+  Store.resetBadges();
+  return res.json({ ok: true });
+});
+
 apiRouter.get('/sessions', (req, res) => {
   const sessions = Store.listSessions();
   const gearRows = Store.listSessionGearBySessionIds(sessions.map((row) => row.id));
@@ -807,8 +812,15 @@ apiRouter.get('/feed', (req, res) => {
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 10;
     const offsetRaw = Number.parseInt(req.query.offset, 10);
     const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
-    const typeFilter = String(req.query.type || '').trim().toLowerCase();
-    const hasTypeFilter = !!typeFilter;
+    const parseTypeList = (value) => String(value || '')
+      .split(',')
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+    const selectedTypes = new Set([
+      ...parseTypeList(req.query.types),
+      ...parseTypeList(req.query.type),
+    ]);
+    const hasTypeFilter = selectedTypes.size > 0;
 
     const toTs = (...values) => {
       for (const value of values) {
@@ -986,7 +998,7 @@ apiRouter.get('/feed', (req, res) => {
         ts: toTs(song.updated_at, song.created_at, song.last_practiced_at),
         title: String(song.title || `Song ${song.id}`).trim(),
         subtitle: String(song.status || 'learning').replace(/_/g, ' '),
-        href: '#/repertoire',
+        href: '#/songs',
         thumb: makeIconThumb('song'),
         meta: {
           tags: [song.artist, song.difficulty].filter(Boolean),
@@ -1025,14 +1037,14 @@ apiRouter.get('/feed', (req, res) => {
         ts: toTs(event.created_at),
         title: event.title,
         subtitle: event.subtitle || 'System activity',
-        href: type === 'song' ? '#/repertoire' : '#/dashboard',
+        href: type === 'song' ? '#/songs' : '#/dashboard',
         thumb: makeIconThumb(type),
         accent: type === 'system' ? 'neutral' : 'accent',
       });
     });
 
     const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
-    const filteredItems = hasTypeFilter ? sortedItems.filter((item) => item.type === typeFilter) : sortedItems;
+    const filteredItems = hasTypeFilter ? sortedItems.filter((item) => selectedTypes.has(item.type)) : sortedItems;
     const total = filteredItems.length;
     if (offset >= total) return res.json({ items: [], total, facets: { countsByType } });
     const pagedItems = filteredItems.slice(offset, offset + limit);
@@ -1176,6 +1188,10 @@ apiRouter.put('/repertoire/songs/:id', (req, res) => {
   return res.json(saved);
 });
 apiRouter.delete('/repertoire/songs/:id', (req, res) => {
+  Store.deleteRepertoireSong(req.params.id);
+  return res.json({ ok: true });
+});
+apiRouter.delete('/songs/:id', (req, res) => {
   Store.deleteRepertoireSong(req.params.id);
   return res.json({ ok: true });
 });

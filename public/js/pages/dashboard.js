@@ -74,9 +74,10 @@ Pages.Dashboard = {
     }));
 
     const timelineItems = feedItems.length ? feedItems : fallbackFeedItems;
+    const latestBadge = Array.isArray(stats?.motivation?.badges) && stats.motivation.badges.length ? stats.motivation.badges[0] : null;
 
     app.innerHTML = `
-      ${this._renderHero(stats, streak)}
+      ${this._renderHero(stats, streak, latestBadge)}
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
         <div class="dashboard-grid dash-grid" style="align-items:start;">
           <div class="dashboard-main-col timeline">
@@ -93,7 +94,7 @@ Pages.Dashboard = {
     `;
 
     this._initStatCounters(app, stats);
-    this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed, initialFeedTotal);
+    this._initTimelineFilters(app, timelineItems, feedFacets, feedFailed, initialFeedTotal, stats?.motivation?.settings);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
     this._runRegressionChecks(app);
@@ -212,7 +213,6 @@ Pages.Dashboard = {
   _renderTimeline(items = [], feedFacets = null, feedFailed = false, totalItems = 0) {
     const counts = feedFacets?.countsByType || this._countByType(items);
     const filters = [
-      { key: 'all', label: 'All', count: Number(totalItems) || items.length },
       { key: 'session', label: 'Sessions', count: counts.session || 0 },
       { key: 'gear', label: 'Gear', count: counts.gear || 0 },
       { key: 'training', label: 'Training', count: counts.training || 0 },
@@ -231,7 +231,10 @@ Pages.Dashboard = {
             <span class="section-header__label">Timeline</span>
           </div>
           <div class="timeline-filters" aria-label="Timeline filters">
-            ${filters.map((filter) => `<button type="button" class="timeline-chip ${filter.key === 'all' ? 'is-active' : ''}" data-filter="${filter.key}">${filter.label} <span class="timeline-chip__count">${filter.count}</span></button>`).join('')}
+            <button type="button" class="timeline-chip is-active" data-filter-shortcut="all">All</button>
+            <button type="button" class="timeline-chip" data-filter-shortcut="none">None</button>
+            ${filters.map((filter) => `<button type="button" class="timeline-chip" data-filter="${filter.key}">${filter.label} <span class="timeline-chip__count">${filter.count}</span></button>`).join('')}
+            <button type="button" class="df-btn df-btn--outline" data-save-filter-default>Save as default</button>
           </div>
         </div>
         <div class="timeline-list" data-timeline-list>
@@ -278,7 +281,7 @@ Pages.Dashboard = {
     `;
   },
 
-  _initTimelineFilters(container, items = [], feedFacets = null, feedFailed = false, initialTotal = 0) {
+  _initTimelineFilters(container, items = [], feedFacets = null, feedFailed = false, initialTotal = 0, settings = {}) {
     const timeline = container.querySelector('#dashboard-timeline');
     if (!timeline) return;
     const list = timeline.querySelector('[data-timeline-list]');
@@ -287,7 +290,11 @@ Pages.Dashboard = {
     const moreWrap = timeline.querySelector('[data-timeline-more-wrap]');
     const moreBtn = timeline.querySelector('[data-timeline-more]');
     const PAGE_SIZE = 10;
-    let activeFilter = 'all';
+    const allTypes = ['session', 'gear', 'training', 'video', 'playlist', 'resource', 'preset', 'song', 'badge', 'system'];
+    const defaultTypes = Array.isArray(settings?.feed_default_types) && settings.feed_default_types.length
+      ? settings.feed_default_types.filter((value) => allTypes.includes(value))
+      : allTypes;
+    let selectedTypes = new Set(defaultTypes);
     let loadingMore = false;
     let feedItems = Array.isArray(items) ? [...items] : [];
     let currentOffset = feedItems.length;
@@ -306,6 +313,12 @@ Pages.Dashboard = {
 
     const setMoreState = () => {
       if (!moreWrap || !moreBtn) return;
+      if (!selectedTypes.size) {
+        moreWrap.style.display = 'none';
+        moreBtn.disabled = true;
+        moreBtn.textContent = 'Show More';
+        return;
+      }
       const hasMore = currentOffset < total;
       moreWrap.style.display = hasMore ? 'flex' : 'none';
       moreBtn.disabled = loadingMore || !hasMore;
@@ -313,7 +326,12 @@ Pages.Dashboard = {
     };
 
     const renderList = () => {
-      const filtered = activeFilter === 'all' ? feedItems : feedItems.filter((item) => item?.type === activeFilter);
+      if (!selectedTypes.size) {
+        list.innerHTML = `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity selected</div><div class="empty-state__text">Pick at least one type filter.</div></div>`;
+        setMoreState();
+        return;
+      }
+      const filtered = feedItems.filter((item) => selectedTypes.has(item?.type));
       list.innerHTML = filtered.length
         ? filtered.map((item) => this._renderTimelineCard(item)).join('')
         : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity for this filter</div><div class="empty-state__text">Try a different feed type.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable.</div>' : ''}</div>`;
@@ -330,8 +348,12 @@ Pages.Dashboard = {
       loadingMore = true;
       setMoreState();
       try {
-        const type = activeFilter === 'all' ? null : activeFilter;
-        const response = await DB.getFeed(PAGE_SIZE, currentOffset, type);
+        if (!selectedTypes.size) {
+          total = 0;
+          renderList();
+          return;
+        }
+        const response = await DB.getFeed(PAGE_SIZE, currentOffset, [...selectedTypes]);
         const received = Array.isArray(response?.items) ? response.items : [];
         total = Number(response?.total) || 0;
         const fresh = dedupe(received);
@@ -349,14 +371,43 @@ Pages.Dashboard = {
       }
     };
 
+    const syncChips = () => {
+      timeline.querySelectorAll('[data-filter]').forEach((chip) => {
+        const key = chip.dataset.filter;
+        if (key === 'all') chip.classList.toggle('is-active', selectedTypes.size === allTypes.length);
+        else chip.classList.toggle('is-active', selectedTypes.has(key));
+      });
+    };
+
     timeline.querySelectorAll('[data-filter]').forEach((button) => {
       button.addEventListener('click', () => {
         const next = button.dataset.filter || 'all';
-        if (next === activeFilter && feedItems.length) return;
-        activeFilter = next;
-        timeline.querySelectorAll('[data-filter]').forEach((chip) => chip.classList.toggle('is-active', chip === button));
+        if (next === 'all') selectedTypes = new Set(allTypes);
+        else if (selectedTypes.has(next)) selectedTypes.delete(next);
+        else selectedTypes.add(next);
+        syncChips();
         loadFeedPage(true);
       });
+    });
+
+    timeline.querySelector('[data-filter-shortcut="all"]')?.addEventListener('click', () => {
+      selectedTypes = new Set(allTypes);
+      syncChips();
+      loadFeedPage(true);
+    });
+    timeline.querySelector('[data-filter-shortcut="none"]')?.addEventListener('click', () => {
+      selectedTypes = new Set();
+      syncChips();
+      loadFeedPage(true);
+    });
+    timeline.querySelector('[data-save-filter-default]')?.addEventListener('click', async () => {
+      try {
+        const settings = await DB.getMotivationSettings();
+        await DB.saveMotivationSettings({ ...settings, feed_default_types: [...selectedTypes] });
+        Utils.toast?.('Saved timeline default filters');
+      } catch (error) {
+        Utils.toast?.('Could not save timeline defaults', 'error');
+      }
     });
 
     moreBtn?.addEventListener('click', () => {
@@ -366,6 +417,7 @@ Pages.Dashboard = {
 
     const counts = feedFacets?.countsByType || this._countByType(items);
     if (window.DF_DEBUG_FEED) console.log('[DF dashboard filters]', counts);
+    syncChips();
     renderList();
   },
 
@@ -714,7 +766,7 @@ Pages.Dashboard = {
   },
 
 
-  _renderHero(stats, streak = {}) {
+  _renderHero(stats, streak = {}, latestBadge = null) {
     const greeting = Utils.greeting();
     const awayText = stats.daysSinceLastSession == null
       ? 'No sessions logged yet.'
@@ -742,9 +794,17 @@ Pages.Dashboard = {
       };
     }, 0);
 
+    const latestBadgeHtml = latestBadge
+      ? `<div style="margin-top:10px;padding:10px;border:1px solid var(--line2);border-radius:10px;background:rgba(0,0,0,.25);display:grid;gap:4px;max-width:340px;">
+          <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;">Latest badge</div>
+          <div style="font-weight:700;display:flex;align-items:center;gap:8px;"><span>🏅</span><span>${latestBadge.title || 'Badge unlocked'}</span></div>
+          ${latestBadge.description ? `<div style="font-size:12px;color:var(--text2);">${latestBadge.description}</div>` : ''}
+          <div style="font-size:11px;color:var(--text2);">${this._formatTimelineTime(latestBadge.unlocked_at)}</div>
+        </div>`
+      : '';
     return Utils.renderPageHero({
       title: greeting,
-      subtitle: `${awayText}<br>${streakChip}${warning}`,
+      subtitle: `${awayText}<br>${streakChip}${warning}${latestBadgeHtml}`,
       actions: restore,
     });
   },
