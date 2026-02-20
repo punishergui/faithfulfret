@@ -885,13 +885,106 @@ Q = {
 assertQueriesInitialized();
 }
 
-const all = (sql) => db.prepare(sql).all();
-const one = (sql, v) => db.prepare(sql).get(v);
-const run = (sql, ...params) => {
-  if (!params.length) return db.prepare(sql).run();
-  if (params.length === 1) return db.prepare(sql).run(params[0]);
-  return db.prepare(sql).run(...params);
+const debugSqlEnabled = () => process.env.DEBUG_SQL === '1';
+
+const countPositionalPlaceholders = (sql = '') => {
+  const text = String(sql || '');
+  let count = 0;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const prev = text[i - 1];
+    if (char === "'" && !inDoubleQuote && prev !== '\\') {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote && prev !== '\\') {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+    if (!inSingleQuote && !inDoubleQuote && char === '?') count += 1;
+  }
+  return count;
 };
+
+const normalizeSqlParams = (params = []) => {
+  if (!params.length) return { mode: 'none', values: [] };
+  if (params.length === 1) {
+    const [single] = params;
+    if (Array.isArray(single)) return { mode: 'positional', values: single };
+    if (single && typeof single === 'object' && !(single instanceof Date) && !Buffer.isBuffer(single)) {
+      return { mode: 'named', values: single };
+    }
+    return { mode: 'positional', values: [single] };
+  }
+  return { mode: 'positional', values: params };
+};
+
+const assertSqlParamBindings = (sql, normalized) => {
+  if (!normalized || normalized.mode !== 'positional') return;
+  const expected = countPositionalPlaceholders(sql);
+  const actual = normalized.values.length;
+  if (expected !== actual) {
+    throw new Error(`SQL positional param mismatch: expected ${expected}, received ${actual}`);
+  }
+};
+
+const debugSqlLog = (sql, normalized) => {
+  if (!debugSqlEnabled()) return;
+  console.log('[DEBUG_SQL] SQL:', String(sql || '').trim());
+  console.log('[DEBUG_SQL] params:', normalized?.mode === 'none' ? [] : normalized?.values);
+};
+
+const runSqlBindingRegressionChecks = () => {
+  const positional = normalizeSqlParams([1, 2]);
+  assertSqlParamBindings('SELECT ? + ?', positional);
+  const named = normalizeSqlParams([{ id: 1, limit: 10 }]);
+  if (named.mode !== 'named') throw new Error('SQL binding regression: named params mode detection failed');
+  let mismatchCaught = false;
+  try {
+    assertSqlParamBindings('SELECT ? + ?', normalizeSqlParams([1]));
+  } catch (error) {
+    mismatchCaught = String(error?.message || '').includes('SQL positional param mismatch');
+  }
+  if (!mismatchCaught) throw new Error('SQL binding regression: mismatch detection failed');
+};
+
+runSqlBindingRegressionChecks();
+
+const execAll = (sql, ...params) => {
+  const normalized = normalizeSqlParams(params);
+  assertSqlParamBindings(sql, normalized);
+  debugSqlLog(sql, normalized);
+  const stmt = db.prepare(sql);
+  if (normalized.mode === 'none') return stmt.all();
+  if (normalized.mode === 'named') return stmt.all(normalized.values);
+  return stmt.all(...normalized.values);
+};
+
+const execOne = (sql, ...params) => {
+  const normalized = normalizeSqlParams(params);
+  assertSqlParamBindings(sql, normalized);
+  debugSqlLog(sql, normalized);
+  const stmt = db.prepare(sql);
+  if (normalized.mode === 'none') return stmt.get();
+  if (normalized.mode === 'named') return stmt.get(normalized.values);
+  return stmt.get(...normalized.values);
+};
+
+const execRun = (sql, ...params) => {
+  const normalized = normalizeSqlParams(params);
+  assertSqlParamBindings(sql, normalized);
+  debugSqlLog(sql, normalized);
+  const stmt = db.prepare(sql);
+  if (normalized.mode === 'none') return stmt.run();
+  if (normalized.mode === 'named') return stmt.run(normalized.values);
+  return stmt.run(...normalized.values);
+};
+
+const all = (sql, ...params) => execAll(sql, ...params);
+const one = (sql, ...params) => execOne(sql, ...params);
+const run = (sql, ...params) => execRun(sql, ...params);
 
 const listSessions = () => all('SELECT * FROM sessions ORDER BY date DESC, createdAt DESC');
 
@@ -2236,8 +2329,7 @@ const listTimelineEvents = ({ limit = 50, offset = 0, eventType = '' } = {}) => 
     where.push('event_type = ?');
     vals.push(String(eventType));
   }
-  return db.prepare(`SELECT * FROM timeline_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`)
-    .all(...vals, safeLimit, safeOffset)
+  return execAll(`SELECT * FROM timeline_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, ...vals, safeLimit, safeOffset)
     .map((row) => ({ ...row, payload: row.payload ? (() => { try { return JSON.parse(row.payload); } catch { return null; } })() : null }));
 };
 
@@ -2270,7 +2362,7 @@ const listRepertoireSongs = ({ status = '', sort = 'last_practiced' } = {}) => {
     status: 'status ASC, title COLLATE NOCASE ASC',
     created: 'created_at DESC',
   }[String(sort)] || 'COALESCE(last_practiced_at, 0) DESC, updated_at DESC';
-  return db.prepare(`SELECT * FROM repertoire_songs ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderBy}`).all(...vals);
+  return execAll(`SELECT * FROM repertoire_songs ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY ${orderBy}`, ...vals);
 };
 const getRepertoireSong = (id) => one('SELECT * FROM repertoire_songs WHERE id = ?', Number(id));
 const saveRepertoireSong = (data = {}) => {
@@ -2326,4 +2418,4 @@ const listSessionSongs = (sessionId) => db.prepare(`SELECT ss.*, rs.title, rs.ar
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, unlockBadge, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, unlockBadge, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };

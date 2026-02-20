@@ -785,6 +785,22 @@ apiRouter.get('/sessions', (req, res) => {
   });
   res.json(sessions.map((row) => ({ ...row, gear: bySession[row.id] || [] })));
 });
+apiRouter.get('/timeline', (req, res) => {
+  try {
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 50;
+    const offsetRaw = Number.parseInt(req.query.offset, 10);
+    const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
+    const eventType = String(req.query.eventType || '').trim();
+    const items = Store.listTimelineEvents({ limit, offset, eventType });
+    const total = Store.countTimelineEvents({ eventType });
+    return res.json({ items, total, limit, offset, eventType: eventType || '' });
+  } catch (error) {
+    console.error('timeline route failed', error);
+    return res.status(500).json({ error: error.message || 'timeline failed' });
+  }
+});
+
 apiRouter.get('/feed', (req, res) => {
   try {
     const limitRaw = Number.parseInt(req.query.limit, 10);
@@ -2343,6 +2359,7 @@ apiRouter.post('/update', (req, res) => {
 
 apiRouter.use((err, req, res, next) => {
   if (!err) return next();
+  console.error('[API ERROR]', req.method, req.originalUrl, err && err.stack ? err.stack : err);
   return res.status(400).json({ error: err.message || 'request failed' });
 });
 
