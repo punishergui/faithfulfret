@@ -186,6 +186,7 @@
 
   window.Pages = window.Pages || {};
   window.Utils?.applyThemeColorMeta?.();
+  window.Utils?.applyHeroSettings?.();
 })();
 
 
