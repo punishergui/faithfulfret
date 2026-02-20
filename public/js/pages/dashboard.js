@@ -30,46 +30,60 @@ Pages.Dashboard = {
       return;
     }
 
-    const recent = sessions.slice(0, 8);
     const today = Utils.today();
-    const quickStart = this._readQuickStart();
-    const lastPractice = Utils.getLastPractice();
+    const recent = sessions.slice(0, 8);
     const progressSummary = window.progressMem?.getSummary?.() || null;
-    const recentActivity = this._buildRecentActivityItems(quickStart, lastPractice);
+    const streakSummary = progressSummary?.streak || stats?.streak || null;
+
+    let feedItems = [];
+    let feedFailed = false;
+    try {
+      const feedResponse = await DB.getFeed(50);
+      feedItems = Array.isArray(feedResponse?.items) ? feedResponse.items : [];
+      if (window.DF_DEBUG_FEED) console.log('[DF feed]', feedItems);
+    } catch (error) {
+      console.error('feed load failed', error);
+      feedFailed = true;
+    }
+
+    const fallbackFeedItems = recent.map((s) => ({
+      id: `sess:${s.id}`,
+      type: 'session',
+      ts: this._sessionTimestamp(s),
+      title: s.title || s.focus || s.focusTag || `Session ${s.id}`,
+      subtitle: s.notes || s.win || 'Practice session',
+      meta: {
+        minutes: Number(s.minutes) || Number(s.durationMinutes) || null,
+        bpm: Number(s.bpm) || null,
+        tool: s.focus || s.focusTag || null,
+        tags: [s.focus, s.focusTag].filter(Boolean).slice(0, 3),
+      },
+      href: `#/session/${s.id}`,
+      accent: 'accent',
+    }));
+
+    const timelineItems = feedItems.length ? feedItems : fallbackFeedItems;
 
     app.innerHTML = `
       ${this._renderHero(stats)}
       <div class="page-wrap dashboard-layout-wrap" style="padding:28px 24px;">
-        <div class="dashboard-grid" style="align-items:start;">
-          <div class="dashboard-main-col">
-            <div class="section-header dashboard-section-header">
-              <span class="section-header__label">Recent Sessions</span>
-              <a href="#/sessions" class="section-header__link">View All &rarr;</a>
-            </div>
-            ${this._renderRecentSessions(recent, today)}
-
-            <div class="section-header dashboard-section-header dashboard-section-gap">
-              <span class="section-header__label">Recent Activity</span>
-            </div>
-            ${this._renderRecentActivity(recentActivity)}
+        <div class="dashboard-grid dash-grid" style="align-items:start;">
+          <div class="dashboard-main-col timeline">
+            ${this._renderTimeline(timelineItems, feedFailed)}
+            ${!timelineItems.length ? this._renderRecentSessions(recent, today) : ''}
           </div>
-          <aside class="dashboard-side-col">
-            ${this._renderProgressMemory(progressSummary, stats)}
+          <aside class="dashboard-side-col dash-side">
+            ${this._renderNowPanel(streakSummary)}
             ${this._renderQuickLog(today)}
             ${this._renderCompactHeatmap(heatmapDays, today)}
-            ${this._renderCalendar(stats.allDates)}
           </aside>
         </div>
       </div>
     `;
 
     this._initStatCounters(app, stats);
-    this._initCalendarNav(app, stats.allDates);
     this._initQuickLog(app, today);
     this._initDashboardHeatmap(app);
-
-    // Stagger reveal
-    setTimeout(() => Utils.staggerReveal(app, '.session-row', 0), 50);
   },
 
   _readJson(key, fallback) {
@@ -141,6 +155,83 @@ Pages.Dashboard = {
     if (typeof value === 'number') return value;
     const parsed = new Date(value).getTime();
     return Number.isNaN(parsed) ? 0 : parsed;
+  },
+
+  _sessionTimestamp(session = {}) {
+    const dateValue = session?.date ? new Date(`${session.date}T12:00:00`).getTime() : 0;
+    return Number(dateValue) || Number(session?.createdAt) || 0;
+  },
+
+  _renderTimeline(items = [], feedFailed = false) {
+    return `
+      <section>
+        <div class="timeline-header">
+          <div class="section-header">
+            <span class="section-header__label">Timeline</span>
+          </div>
+          <div class="timeline-filters" aria-label="Timeline filters">
+            <button type="button" class="timeline-chip is-active">All</button>
+            <button type="button" class="timeline-chip">Sessions</button>
+            <button type="button" class="timeline-chip" disabled>Training soon</button>
+            <button type="button" class="timeline-chip" disabled>Gear soon</button>
+          </div>
+        </div>
+        <div class="timeline-list">
+          ${items.length
+            ? items.map((item) => this._renderTimelineCard(item)).join('')
+            : `<div class="timeline-card timeline-card--empty"><div class="empty-state__title">No activity yet</div><div class="empty-state__text">Log your first session.</div>${feedFailed ? '<div class="empty-state__text">Feed is temporarily unavailable, showing fallback modules below.</div>' : ''}</div>`}
+        </div>
+      </section>
+    `;
+  },
+
+  _renderTimelineCard(item = {}) {
+    const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4v16"/></svg>';
+    const chips = [];
+    if (item?.meta?.minutes) chips.push(`<span class="timeline-chip">${item.meta.minutes}m</span>`);
+    if (item?.meta?.bpm) chips.push(`<span class="timeline-chip">${item.meta.bpm} bpm</span>`);
+    if (item?.meta?.tool) chips.push(`<span class="timeline-chip">${item.meta.tool}</span>`);
+    (Array.isArray(item?.meta?.tags) ? item.meta.tags : []).slice(0, 3).forEach((tag) => chips.push(`<span class="timeline-chip">${tag}</span>`));
+    const href = item.href || '#/sessions';
+    return `
+      <article class="timeline-card" onclick="go('${href}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){go('${href}')}">
+        <div class="timeline-card__icon">${icon}</div>
+        <div class="timeline-card__body">
+          <div class="timeline-card__title">${item.title || 'Session'}</div>
+          <div class="timeline-card__subtitle">${item.subtitle || 'Practice session'}</div>
+          <div class="timeline-meta">${chips.join('')}</div>
+        </div>
+        <div class="timeline-card__side">
+          <div class="timeline-card__time">${this._formatTimelineTime(item.ts)}</div>
+          <a href="${href}" class="df-btn df-btn--outline">View</a>
+        </div>
+      </article>
+    `;
+  },
+
+  _formatTimelineTime(ts) {
+    const stamp = Number(ts) || 0;
+    if (!stamp) return '—';
+    const diff = Date.now() - stamp;
+    if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 172800000) return 'Yesterday';
+    return new Date(stamp).toLocaleDateString();
+  },
+
+  _renderNowPanel(streakSummary) {
+    const currentStreak = Number(streakSummary?.current) || 0;
+    const bestStreak = Number(streakSummary?.best) || Number(streakSummary?.longestStreak) || currentStreak;
+    return `
+      <div class="df-panel df-panel--wide dashboard-panel" style="padding:14px;margin-bottom:16px;">
+        <div style="font-family:var(--f-mono);font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Now</div>
+        ${this._renderMetricRow('Streak', currentStreak ? `${currentStreak} day${currentStreak === 1 ? '' : 's'}` : '—')}
+        <div style="margin-top:8px;">${this._renderMetricRow('Best', bestStreak || '—')}</div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+          <a href="#/log" class="df-btn df-btn--primary">Start Practice</a>
+        </div>
+      </div>
+    `;
   },
 
   _renderProgressMemory(summary, stats) {

@@ -1781,6 +1781,123 @@ select.df-input option {
   margin-bottom: 18px !important;
 }
 
+.dash-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 24px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.timeline-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.timeline-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px var(--glow);
+}
+
+.timeline-card__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.timeline-card__icon svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.timeline-card__title {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.timeline-card__subtitle {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 7px;
+}
+
+.timeline-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.timeline-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--text2);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+}
+
+.timeline-chip.is-active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.timeline-card__side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.timeline-card__time {
+  font-family: var(--f-mono);
+  color: var(--text3);
+  font-size: 11px;
+}
+
+.timeline-card--empty {
+  grid-template-columns: 1fr;
+  cursor: default;
+}
+
+.dash-side {
+  position: sticky;
+  top: 86px;
+  align-self: start;
+}
+
 /* ============================================================
    RECENT SESSION ROW
    ============================================================ */
@@ -2908,9 +3025,14 @@ select.df-input option {
    RESPONSIVE
    ============================================================ */
 @media (max-width: 1024px) {
-  .dashboard-grid {
+  .dashboard-grid,
+  .dash-grid {
     grid-template-columns: 1fr;
     gap: 22px;
+  }
+
+  .dash-side {
+    position: static;
   }
 }
 
@@ -3025,6 +3147,15 @@ select.df-input option {
 
   .session-row__chips {
     display: none;
+  }
+
+  .timeline-card {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .timeline-card__side {
+    grid-column: 1 / -1;
+    justify-items: start;
   }
 }
 

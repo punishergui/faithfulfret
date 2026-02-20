@@ -437,6 +437,39 @@ apiRouter.get('/sessions', (req, res) => {
   });
   res.json(sessions.map((row) => ({ ...row, gear: bySession[row.id] || [] })));
 });
+apiRouter.get('/feed', (req, res) => {
+  try {
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 200)) : 50;
+    const sessions = Store.listSessions().slice(0, limit);
+    const items = sessions.map((session) => {
+      const tags = [session.focus, session.focusTag].map((value) => String(value || '').trim()).filter(Boolean);
+      const uniqueTags = [...new Set(tags)].slice(0, 4);
+      const notes = String(session.notes || '').trim();
+      const win = String(session.win || '').trim();
+      const subtitle = notes.split(/\r?\n/).find(Boolean) || win || 'Practice session';
+      return {
+        id: `sess:${session.id}`,
+        type: 'session',
+        ts: Number(new Date(`${session.date}T12:00:00`).getTime()) || Number(session.createdAt) || Date.now(),
+        title: String(session.title || session.focus || session.focusTag || `Session ${session.id}`).trim(),
+        subtitle,
+        meta: {
+          minutes: Number(session.durationMinutes) || null,
+          bpm: Number(session.bpm) || null,
+          tool: session.focus ? String(session.focus) : null,
+          tags: uniqueTags,
+        },
+        href: `#/session/${session.id}`,
+        accent: 'accent',
+      };
+    }).sort((a, b) => b.ts - a.ts);
+    return res.json({ items });
+  } catch (error) {
+    console.error('feed route failed', error);
+    return res.json({ items: [] });
+  }
+});
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
 apiRouter.post('/sessions', (req, res) => {
   if (!req.body?.date) {
