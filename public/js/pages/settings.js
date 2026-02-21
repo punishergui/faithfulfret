@@ -5,6 +5,7 @@ window.Pages = window.Pages || {};
 Pages.Settings = {
   TAB_STORAGE_KEY: 'ff_settings_tab',
   TABS: [
+    { key: 'theme', label: 'Theme' },
     { key: 'general', label: 'General' },
     { key: 'timeline', label: 'Timeline' },
     { key: 'motivation', label: 'Motivation' },
@@ -27,32 +28,36 @@ Pages.Settings = {
     const heroSettings = Utils.getHeroSettings();
 
     const activeTab = this.getInitialTab();
+    const settingsPills = `
+      <div class="df-pillrow" role="tablist" aria-label="Settings sections" style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${this.TABS.map((tab) => `
+          <button
+            type="button"
+            class="df-btn ${tab.key === activeTab ? 'df-btn--primary is-active' : 'df-btn--outline'}"
+            role="tab"
+            aria-selected="${tab.key === activeTab ? 'true' : 'false'}"
+            aria-controls="settings-tab-${tab.key}"
+            tabindex="${tab.key === activeTab ? '0' : '-1'}"
+            data-settings-pill="${tab.key}"
+          >${tab.label}</button>
+        `).join('')}
+      </div>
+    `;
 
     app.innerHTML = `
       ${Utils.renderPageHero({
         title: 'Settings',
         subtitle: 'Personalize your theme and local practice defaults. These settings stay on this device via localStorage.',
+        leftExtra: settingsPills,
         texture: false,
       })}
 
       <div class="page-wrap" style="padding:28px 24px 40px;display:grid;gap:16px;">
-        <div class="df-pillrow" role="tablist" aria-label="Settings sections" style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${this.TABS.map((tab) => `
-            <button
-              type="button"
-              class="df-btn ${tab.key === activeTab ? 'df-btn--primary is-active' : 'df-btn--outline'}"
-              role="tab"
-              aria-selected="${tab.key === activeTab ? 'true' : 'false'}"
-              data-settings-pill="${tab.key}"
-            >${tab.label}</button>
-          `).join('')}
-        </div>
-
         <section class="df-panel df-panel--wide ff-panel--page settings-panel">
-          <section data-settings-tab="general" style="display:grid;gap:12px;">
+          <section id="settings-tab-theme" class="ff-panel" data-settings-tab="theme" style="display:grid;gap:12px;">
             <header>
-              <h2 style="margin:0 0 4px;">General</h2>
-              <p style="margin:0;font-size:13px;color:var(--text2);">Theme, layout preferences, and default session behavior.</p>
+              <h2 style="margin:0 0 4px;">Theme Settings</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Theme cards, custom theme variables, and hero overlay controls.</p>
             </header>
 
             <div>
@@ -109,6 +114,14 @@ Pages.Settings = {
               </div>
             </div>
 
+          </section>
+
+          <section id="settings-tab-general" class="ff-panel" data-settings-tab="general" style="display:grid;gap:12px;">
+            <header>
+              <h2 style="margin:0 0 4px;">General</h2>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Non-theme UI defaults and profile preferences.</p>
+            </header>
+
             <div style="display:grid;gap:10px;">
               <div>
                 <div class="df-label">Playing Hand</div>
@@ -136,7 +149,7 @@ Pages.Settings = {
             </div>
           </section>
 
-          <section data-settings-tab="timeline" style="display:grid;gap:12px;">
+          <section id="settings-tab-timeline" class="ff-panel" data-settings-tab="timeline" style="display:grid;gap:12px;">
             <header>
               <h2 style="margin:0 0 4px;">Timeline</h2>
               <p style="margin:0;font-size:13px;color:var(--text2);">Feed visibility preferences and timeline management controls.</p>
@@ -146,10 +159,10 @@ Pages.Settings = {
             </div>
           </section>
 
-          <section data-settings-tab="motivation" style="display:grid;gap:12px;">
+          <section id="settings-tab-motivation" class="ff-panel" data-settings-tab="motivation" style="display:grid;gap:12px;">
             <header>
               <h2 style="margin:0 0 4px;">Motivation</h2>
-              <p style="margin:0;font-size:13px;color:var(--text2);">Configure reminders and streak-restore behavior.</p>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Configure reminders, streak restore behavior, and badge reset tools.</p>
             </header>
             <div style="display:grid;gap:10px;padding:12px;border:1px solid var(--line2);">
               <div class="df-label">Motivation</div>
@@ -166,10 +179,13 @@ Pages.Settings = {
                 <button id="mot-save" type="button" class="df-btn df-btn--outline">Save Motivation Settings</button>
                 <span id="mot-status" style="font-size:12px;color:var(--text2);"></span>
               </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
+              </div>
             </div>
           </section>
 
-          <section data-settings-tab="data" style="display:grid;gap:12px;">
+          <section id="settings-tab-data" class="ff-panel" data-settings-tab="data" style="display:grid;gap:12px;">
             <header>
               <h2 style="margin:0 0 4px;">Data</h2>
               <p style="margin:0;font-size:13px;color:var(--text2);">Export and restore full local backups.</p>
@@ -190,7 +206,7 @@ Pages.Settings = {
             </div>
           </section>
 
-          <section data-settings-tab="advanced" style="display:grid;gap:12px;">
+          <section id="settings-tab-advanced" class="ff-panel" data-settings-tab="advanced" style="display:grid;gap:12px;">
             <header>
               <h2 style="margin:0 0 4px;">Advanced</h2>
               <p style="margin:0;font-size:13px;color:var(--text2);">Danger zone actions that reset or remove local data.</p>
@@ -198,7 +214,6 @@ Pages.Settings = {
             <div style="display:grid;gap:8px;padding:12px;border:1px solid var(--line2);">
               <div class="df-label">Danger Zone</div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button id="mot-reset-badges" type="button" class="df-btn df-btn--danger">Reset badges</button>
                 <button id="mot-clear-timeline" type="button" class="df-btn df-btn--danger">Clear timeline history</button>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -224,7 +239,7 @@ Pages.Settings = {
 
     const stored = localStorage.getItem(this.TAB_STORAGE_KEY);
     if (this.TABS.some((tab) => tab.key === stored)) return stored;
-    return 'general';
+    return 'theme';
   },
 
   updateSettingsTabUrl(tabKey) {
@@ -234,18 +249,22 @@ Pages.Settings = {
   },
 
   setActiveTab(tabKey) {
-    const selected = this.TABS.some((tab) => tab.key === tabKey) ? tabKey : 'general';
+    const selected = this.TABS.some((tab) => tab.key === tabKey) ? tabKey : 'theme';
     this._activeTab = selected;
     localStorage.setItem(this.TAB_STORAGE_KEY, selected);
     this.updateSettingsTabUrl(selected);
 
     document.querySelectorAll('[data-settings-tab]').forEach((section) => {
-      section.style.display = section.dataset.settingsTab === selected ? '' : 'none';
+      const isActive = section.dataset.settingsTab === selected;
+      section.style.display = isActive ? '' : 'none';
+      section.setAttribute('role', 'tabpanel');
+      section.setAttribute('aria-hidden', isActive ? 'false' : 'true');
     });
 
     document.querySelectorAll('[data-settings-pill]').forEach((button) => {
       const isActive = button.dataset.settingsPill === selected;
       button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      button.setAttribute('tabindex', isActive ? '0' : '-1');
       button.classList.toggle('is-active', isActive);
       button.classList.toggle('df-btn--primary', isActive);
       button.classList.toggle('df-btn--outline', !isActive);
@@ -264,7 +283,10 @@ Pages.Settings = {
         if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pills.length) % pills.length;
         if (event.key === 'Home') nextIndex = 0;
         if (event.key === 'End') nextIndex = pills.length - 1;
-        pills[nextIndex]?.focus();
+        const nextPill = pills[nextIndex];
+        if (!nextPill) return;
+        nextPill.focus();
+        this.setActiveTab(nextPill.dataset.settingsPill);
       });
     });
     this.setActiveTab(activeTab);
