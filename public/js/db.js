@@ -4,8 +4,9 @@
 (async function initDB() {
   async function api(path, options = {}) {
     const method = String(options.method || 'GET').toUpperCase();
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     const res = await fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...options,
     });
 
@@ -61,6 +62,7 @@
   window.DB = {
     // Sessions
     async saveSess(data) {
+      const idempotencyKey = data?.idempotencyKey || `sess:${data.id || 'new'}:${data.date || ''}:${data.minutes || data.durationMinutes || ''}:${data.focus || ''}:${data.videoId || ''}:${data.song_id || data.songId || ''}`;
       const payload = {
         ...data,
         durationMinutes: data.durationMinutes ?? data.minutes,
@@ -68,8 +70,8 @@
         focusTag: data.focusTag ?? data.focus,
       };
       const row = data.id
-        ? await api(`/api/sessions/${data.id}`, { method: 'PUT', body: JSON.stringify(payload) })
-        : await api('/api/sessions', { method: 'POST', body: JSON.stringify(payload) });
+        ? await api(`/api/sessions/${data.id}`, { method: 'PUT', body: JSON.stringify(payload), headers: { 'x-idempotency-key': idempotencyKey } })
+        : await api('/api/sessions', { method: 'POST', body: JSON.stringify(payload), headers: { 'x-idempotency-key': idempotencyKey } });
       return normalizeSession(row);
     },
 
@@ -509,6 +511,22 @@
 
     async saveSessionSongs(sessionId, songs = []) {
       return api(`/api/sessions/${sessionId}/songs`, { method: 'PUT', body: JSON.stringify({ songs }) });
+    },
+
+    async getSongPlaylists(songId) {
+      return api(`/api/songs/${songId}/playlists`);
+    },
+
+    async linkSongPlaylist(songId, playlistId) {
+      return api(`/api/songs/${songId}/playlists/${playlistId}`, { method: 'POST' });
+    },
+
+    async unlinkSongPlaylist(songId, playlistId) {
+      return api(`/api/songs/${songId}/playlists/${playlistId}`, { method: 'DELETE' });
+    },
+
+    async getPlaylistSongs(playlistId) {
+      return api(`/api/training/playlists/${playlistId}/songs`);
     },
 
     async exportAll() {

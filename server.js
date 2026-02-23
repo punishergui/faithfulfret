@@ -8,6 +8,7 @@ const https = require('https');
 const JSZip = require('jszip');
 const multer = require('multer');
 const Store = require('./data-store');
+const pkg = require('./package.json');
 
 const app = express();
 const apiRouter = express.Router();
@@ -35,6 +36,7 @@ const attachmentUpload = multer({
 });
 let isMaintenanceMode = false;
 let backupQueue = Promise.resolve();
+const idempotencyCache = new Map();
 
 app.use(express.json({ limit: '20mb' }));
 app.use('/api', (req, res, next) => {
@@ -47,6 +49,7 @@ function buildJsonExport(localSettings = {}) {
   const tables = typeof Store.exportAllTables === 'function' ? Store.exportAllTables() : {};
   return {
     schemaVersion: 3,
+    appVersion: String(pkg.version || '0.0.0'),
     createdAt: new Date().toISOString(),
     tables,
     localSettings: localSettings && typeof localSettings === 'object' ? localSettings : {},
@@ -85,6 +88,15 @@ function withExportMeta(payload) {
 function validateImportPayload(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid import payload');
   if (payload.tables != null && (typeof payload.tables !== 'object' || Array.isArray(payload.tables))) throw new Error('invalid tables payload');
+  if (payload.schemaVersion != null && !Number.isFinite(Number(payload.schemaVersion))) throw new Error('invalid schemaVersion');
+}
+
+function validateImportTables(tables = {}, knownTables = []) {
+  const tableSet = new Set(knownTables);
+  Object.entries(tables || {}).forEach(([name, rows]) => {
+    if (!tableSet.has(name)) throw new Error(`unknown table in import: ${name}`);
+    if (!Array.isArray(rows)) throw new Error(`invalid rows for table: ${name}`);
+  });
 }
 
 function normalizeLegacyTables(payload) {
@@ -104,6 +116,7 @@ function restoreFromPayload(payload) {
   validateImportPayload(payload);
   if (typeof Store.ensureSchema === 'function') Store.ensureSchema();
   const tables = normalizeLegacyTables(payload);
+  if (typeof Store.listUserTables === 'function') validateImportTables(tables, Store.listUserTables());
   if (typeof Store.importAllTables === 'function') {
     Store.importAllTables(tables);
   } else {
@@ -125,6 +138,19 @@ function restoreFromPayload(payload) {
     for (const row of (tables.presets || [])) Store.savePreset(row);
   }
   return countExportEntities({ ...payload, tables });
+}
+
+function withIdempotency(req, action) {
+  const key = String(req.get('x-idempotency-key') || '').trim();
+  if (!key) return action();
+  const now = Date.now();
+  for (const [k, v] of idempotencyCache.entries()) {
+    if ((now - v.ts) > 5 * 60 * 1000) idempotencyCache.delete(k);
+  }
+  if (idempotencyCache.has(key)) return idempotencyCache.get(key).data;
+  const data = action();
+  idempotencyCache.set(key, { ts: now, data });
+  return data;
 }
 
 function copyTreeIntoZip(zip, basePath, zipPath) {
@@ -862,10 +888,24 @@ apiRouter.get('/feed', (req, res) => {
       system: 0,
     };
     const items = [];
+    const newestByEntity = new Map();
     const pushItem = (item) => {
       if (!item || !item.id || !item.type || !Number(item.ts)) return;
-      items.push(item);
-      if (Object.prototype.hasOwnProperty.call(countsByType, item.type)) countsByType[item.type] += 1;
+      const entityKey = String(item.entity_id || item.id || '').trim();
+      if (entityKey) {
+        const prev = newestByEntity.get(entityKey);
+        if (prev && Number(prev.ts || 0) >= Number(item.ts || 0)) return;
+        newestByEntity.set(entityKey, item);
+      } else {
+        items.push(item);
+      }
+    };
+
+    const finalizeItems = () => {
+      newestByEntity.forEach((item) => items.push(item));
+      items.forEach((item) => {
+        if (Object.prototype.hasOwnProperty.call(countsByType, item.type)) countsByType[item.type] += 1;
+      });
     };
 
     Store.listSessions().forEach((session) => {
@@ -875,6 +915,7 @@ apiRouter.get('/feed', (req, res) => {
       const win = String(session.win || '').trim();
       pushItem({
         id: `session:${session.id}`,
+        entity_id: `session:${session.id}`,
         type: 'session',
         ts: toTs(`${session.date}T12:00:00`, session.createdAt),
         title: String(session.title || session.focus || session.focusTag || `Session ${session.id}`).trim(),
@@ -895,6 +936,7 @@ apiRouter.get('/feed', (req, res) => {
       const status = String(gear.status || '').trim();
       pushItem({
         id: `gear:${gear.id}`,
+        entity_id: `gear:${gear.id}`,
         type: 'gear',
         ts: toTs(gear.createdAt, gear.dateAcquired, gear.boughtDate),
         title: String(gear.name || `${gear.brand || ''} ${gear.model || ''}` || `Gear ${gear.id}`).trim(),
@@ -913,6 +955,7 @@ apiRouter.get('/feed', (req, res) => {
       const createdTs = toTs(video.createdAt, video.updatedAt);
       pushItem({
         id: `video:${video.id}`,
+        entity_id: `video:${video.id}`,
         type: 'video',
         ts: createdTs,
         title: String(video.title || `Video ${video.id}`).trim(),
@@ -946,6 +989,7 @@ apiRouter.get('/feed', (req, res) => {
       const ts = toTs(playlist.updatedAt, playlist.createdAt);
       pushItem({
         id: `playlist:${playlist.id}`,
+        entity_id: `playlist:${playlist.id}`,
         type: 'playlist',
         ts,
         title: String(playlist.name || `Playlist ${playlist.id}`).trim(),
@@ -966,6 +1010,7 @@ apiRouter.get('/feed', (req, res) => {
       })();
       pushItem({
         id: `resource:${resource.id}`,
+        entity_id: `resource:${resource.id}`,
         type: 'resource',
         ts: toTs(resource.createdAt),
         title: String(resource.title || `Resource ${resource.id}`).trim(),
@@ -986,6 +1031,7 @@ apiRouter.get('/feed', (req, res) => {
       }
       pushItem({
         id: `preset:${preset.id}`,
+        entity_id: `preset:${preset.id}`,
         type: 'preset',
         ts: toTs(preset.createdAt),
         title: String(preset.name || `Preset ${preset.id}`).trim(),
@@ -1002,6 +1048,7 @@ apiRouter.get('/feed', (req, res) => {
     Store.listRepertoireSongs({}).forEach((song) => {
       pushItem({
         id: `song:${song.id}`,
+        entity_id: `song:${song.id}`,
         type: 'song',
         ts: toTs(song.updated_at, song.created_at, song.last_practiced_at),
         title: String(song.title || `Song ${song.id}`).trim(),
@@ -1019,6 +1066,7 @@ apiRouter.get('/feed', (req, res) => {
     Store.listBadgeUnlocks().forEach((badge) => {
       pushItem({
         id: `badge:${badge.badge_key}`,
+        entity_id: `badge:${badge.badge_key}`,
         type: 'badge',
         ts: toTs(badge.unlocked_at),
         title: `Badge: ${badge.title}`,
@@ -1083,6 +1131,7 @@ apiRouter.get('/feed', (req, res) => {
       if (!timelineEntityExists(ref.entityType, ref.entityId)) return;
       pushItem({
         id: `evt:${event.id}`,
+        entity_id: ref.entityType && ref.entityId ? `${ref.entityType}:${ref.entityId}` : `evt:${event.id}`,
         type,
         ts: toTs(event.created_at),
         title: event.title,
@@ -1093,6 +1142,7 @@ apiRouter.get('/feed', (req, res) => {
       });
     });
 
+    finalizeItems();
     const sortedItems = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
     const filteredItems = hasTypeFilter ? sortedItems.filter((item) => selectedTypes.has(item.type)) : sortedItems;
     const total = filteredItems.length;
@@ -1106,11 +1156,12 @@ apiRouter.get('/feed', (req, res) => {
 });
 apiRouter.get('/session-heatmap', (req, res) => res.json(Store.listSessionDailyTotals()));
 apiRouter.post('/sessions', (req, res) => {
-  if (!req.body?.date) {
-    const session = Store.createDraftSession(req.body || {});
+  const payload = req.body || {};
+  if (!payload?.date) {
+    const session = withIdempotency(req, () => Store.createDraftSession(payload));
     return res.status(201).json({ id: session.id, ...session });
   }
-  const saved = Store.saveSession(req.body);
+  const saved = withIdempotency(req, () => Store.saveSession(payload));
   const streakBefore = Store.getStreakState();
   const streakNow = buildStats().currentStreak;
   if ((Number(streakBefore.previous_streak) || 0) > Number(streakNow || 0)) {
@@ -1204,16 +1255,56 @@ apiRouter.get('/sessions/:id/songs', (req, res) => {
 });
 apiRouter.put('/sessions/:id/songs', (req, res) => {
   const songs = Array.isArray(req.body?.songs) ? req.body.songs : [];
+  const firstSongId = Number(songs[0]?.song_id || songs[0]?.id || 0);
+  const session = Store.getSession(req.params.id);
+  if (session) Store.saveSession({ ...session, id: req.params.id, song_id: firstSongId || null });
   songs.forEach((row) => {
     const sid = Number(row.song_id || row.id);
     if (!sid) return;
     const song = Store.getRepertoireSong(sid);
     if (song) {
       Store.saveRepertoireSong({ ...song, id: sid, last_practiced_at: Date.now() });
-      Store.addTimelineEvent({ event_type: 'song_practiced', title: `Practiced: ${song.title}`, subtitle: 'Linked to session', entity_id: String(sid) });
+      Store.addTimelineEvent({ event_type: 'song_practiced', title: `Practiced: ${song.title}`, subtitle: 'Linked to session', entity_id: `song:${sid}` });
     }
   });
   return res.json(Store.replaceSessionSongs(req.params.id, songs));
+});
+
+apiRouter.get('/songs/:id/playlists', (req, res) => {
+  res.json(Store.listSongPlaylists(req.params.id));
+});
+
+apiRouter.post('/songs/:id/playlists/:playlistId', (req, res) => {
+  const songId = Number(req.params.id);
+  const playlistId = Number(req.params.playlistId);
+  const song = Store.getRepertoireSong(songId);
+  const playlist = Store.getVideoPlaylist(playlistId);
+  if (!song || !playlist) return res.status(404).json({ error: 'song or playlist not found' });
+  const linked = Store.linkSongPlaylist(songId, playlistId);
+  Store.addTimelineEvent({
+    event_type: 'song_status_changed',
+    title: `Linked playlist: ${song.title}`,
+    subtitle: playlist.name || `Playlist ${playlistId}`,
+    entity_id: `song_playlist:${songId}:${playlistId}`,
+  });
+  return res.status(201).json(linked);
+});
+
+apiRouter.delete('/songs/:id/playlists/:playlistId', (req, res) => {
+  const songId = Number(req.params.id);
+  const playlistId = Number(req.params.playlistId);
+  Store.unlinkSongPlaylist(songId, playlistId);
+  Store.addTimelineEvent({
+    event_type: 'song_status_changed',
+    title: 'Unlinked song playlist',
+    subtitle: `Song ${songId} · Playlist ${playlistId}`,
+    entity_id: `song_playlist:${songId}:${playlistId}`,
+  });
+  return res.json({ ok: true });
+});
+
+apiRouter.get('/training/playlists/:id/songs', (req, res) => {
+  res.json(Store.listPlaylistSongs(req.params.id));
 });
 
 apiRouter.get('/repertoire/songs', (req, res) => {
@@ -1940,10 +2031,25 @@ apiRouter.get('/video-playlists', (req, res) => {
   const q = String(req.query.q || '').trim();
   const playlists = Store.listVideoPlaylists({ scope, q });
   const rollupCounts = Store.getVideoPlaylistRollupCounts(playlists.map((playlist) => playlist.id));
+  const deepStatsMemo = new Map();
+  const progressMemo = new Map();
+  const getDeepStats = (playlistId) => {
+    const key = Number(playlistId);
+    if (!deepStatsMemo.has(key)) deepStatsMemo.set(key, Store.getPlaylistStatsDeep(key));
+    return deepStatsMemo.get(key);
+  };
+  const getVideoProgress = (videoId) => {
+    const key = Number(videoId);
+    if (!progressMemo.has(key)) progressMemo.set(key, Store.getTrainingVideoProgress(key) || null);
+    return progressMemo.get(key);
+  };
   const payload = playlists.map((playlist) => {
     const items = Store.listPlaylistItems(playlist.id);
     const rollupCount = Number(rollupCounts[Number(playlist.id)]) || 0;
-    const deepStats = Store.getPlaylistStatsDeep(playlist.id);
+    const deepStats = getDeepStats(playlist.id);
+    const deepVideoIds = Array.from(deepStats.deepVideoIds || []);
+    const watchedCount = deepVideoIds.reduce((acc, videoId) => acc + (getVideoProgress(videoId)?.watched_at ? 1 : 0), 0);
+    const masteredCount = deepVideoIds.reduce((acc, videoId) => acc + (getVideoProgress(videoId)?.mastered_at ? 1 : 0), 0);
     return {
       ...playlist,
       is_nested: Number(playlist.is_nested) ? 1 : 0,
@@ -1951,6 +2057,8 @@ apiRouter.get('/video-playlists', (req, res) => {
       video_count_rollup: rollupCount,
       video_count: rollupCount,
       totalVideoCount: rollupCount,
+      watchedCount,
+      masteredCount,
       deepDurationSeconds: Number(deepStats.deepDurationSeconds) || 0,
       unknownDurationCount: Number(deepStats.unknownDurationCount) || 0,
     };

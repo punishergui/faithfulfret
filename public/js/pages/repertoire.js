@@ -5,6 +5,11 @@ Pages.Repertoire = {
     const app = document.getElementById('app');
     const filters = this._readFilters();
     const songs = await DB.getRepertoireSongs(filters).catch(() => []);
+    const songPlaylistPairs = await Promise.all(songs.map(async (song) => {
+      const linked = await DB.getSongPlaylists(song.id).catch(() => []);
+      return [Number(song.id), linked];
+    }));
+    const linkedBySong = new Map(songPlaylistPairs);
 
     app.innerHTML = `
       ${Utils.renderPageHero({
@@ -34,7 +39,7 @@ Pages.Repertoire = {
         </section>
 
         <section class="repertoire-grid" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">
-          ${songs.length ? songs.map((song) => this._card(song)).join('') : '<div class="df-panel" style="padding:14px;color:var(--text2);">No songs yet. Add your first song.</div>'}
+          ${songs.length ? songs.map((song) => this._card(song, linkedBySong.get(Number(song.id)) || [])).join('') : '<div class="df-panel" style="padding:14px;color:var(--text2);">No songs yet. Add your first song.</div>'}
         </section>
       </div>
 
@@ -57,7 +62,7 @@ Pages.Repertoire = {
       </dialog>
     `;
 
-    this._bind(app, songs);
+    this._bind(app, songs, linkedBySong);
   },
 
   _readFilters() {
@@ -82,7 +87,7 @@ Pages.Repertoire = {
     return `<span style="font-size:11px;padding:4px 8px;border:1px solid var(--line2);border-radius:999px;color:${color};">${label}</span>`;
   },
 
-  _card(song) {
+  _card(song, linkedPlaylists = []) {
     const bpmLine = song.target_bpm ? `${Number(song.current_bpm) || 0}/${Number(song.target_bpm)} bpm` : (song.current_bpm ? `${song.current_bpm} bpm` : '—');
     const last = song.last_practiced_at ? new Date(Number(song.last_practiced_at)).toLocaleDateString() : 'Never';
     return `
@@ -99,14 +104,20 @@ Pages.Repertoire = {
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="df-btn df-btn--outline" data-advance-song="${song.id}">Advance status</button>
           <button class="df-btn df-btn--outline" data-log-song="${song.id}">Log practice</button>
+          <button class="df-btn df-btn--outline" data-link-song-playlist="${song.id}">Link playlist</button>
           <button class="df-btn" data-edit-song="${song.id}">Edit</button>
           <button class="df-btn df-btn--danger" data-delete-song="${song.id}">Delete</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${linkedPlaylists.length
+    ? linkedPlaylists.map((row) => `<span class="df-badge df-badge--muted">${row.playlist_name || `Playlist ${row.playlist_id}`} <button type="button" data-unlink-song-playlist="${song.id}:${row.playlist_id}" style="margin-left:6px;border:0;background:none;color:inherit;cursor:pointer;">×</button></span>`).join('')
+    : '<span style="font-size:12px;color:var(--text3);">No linked playlists</span>'}
         </div>
       </article>
     `;
   },
 
-  _bind(app, songs) {
+  _bind(app, songs, linkedBySong) {
     const status = app.querySelector('#rep-status');
     const sort = app.querySelector('#rep-sort');
     status?.addEventListener('change', () => this._setFilters({ status: status.value, sort: sort?.value || 'last_practiced' }));
@@ -177,6 +188,27 @@ Pages.Repertoire = {
       if (!window.confirm(`Delete song "${song.title}"?`)) return;
       await DB.deleteSong(id);
       Utils.toast?.('Song deleted.');
+      this.render();
+    }));
+
+    app.querySelectorAll('[data-link-song-playlist]').forEach((btn) => btn.addEventListener('click', async () => {
+      const songId = Number(btn.getAttribute('data-link-song-playlist'));
+      const playlists = await DB.getVideoPlaylists({ scope: 'all' }).catch(() => []);
+      if (!playlists.length) return Utils.toast?.('No playlists available', 'error');
+      const options = playlists.map((p) => `${p.id}: ${p.name || `Playlist ${p.id}`}`).join('\n');
+      const raw = window.prompt(`Link which playlist?\n${options}`);
+      const playlistId = Number((raw || '').split(':')[0].trim());
+      if (!playlistId) return;
+      await DB.linkSongPlaylist(songId, playlistId);
+      Utils.toast?.('Playlist linked');
+      this.render();
+    }));
+
+    app.querySelectorAll('[data-unlink-song-playlist]').forEach((btn) => btn.addEventListener('click', async () => {
+      const [songId, playlistId] = String(btn.getAttribute('data-unlink-song-playlist') || '').split(':').map((v) => Number(v) || 0);
+      if (!songId || !playlistId) return;
+      await DB.unlinkSongPlaylist(songId, playlistId);
+      Utils.toast?.('Playlist unlinked');
       this.render();
     }));
   },
