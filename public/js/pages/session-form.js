@@ -241,6 +241,7 @@ Pages.SessionForm = {
       if (data.minutes) data.minutes = parseInt(data.minutes);
       if (data.bpm) data.bpm = parseInt(data.bpm);
       if (data.dayNumber) data.dayNumber = parseInt(data.dayNumber);
+      data.song_id = Number(container.querySelector('#f-song-id')?.value || 0) || null;
 
       // Normalize YouTube input (accept full URL or ID)
       if (data.videoId) {
@@ -269,7 +270,7 @@ Pages.SessionForm = {
         const saved = await DB.saveSess(data);
         const nextGearIds = [...selectedGearIds];
         await DB.saveSessionGear(saved.id, nextGearIds);
-        const songId = Number(container.querySelector('#f-song-id')?.value || 0);
+        const songId = Number(data.song_id || 0);
         await DB.saveSessionSongs(saved.id, songId ? [{ song_id: songId, minutes: data.minutes || null }] : []);
         try { localStorage.setItem(lastGearKey, JSON.stringify(nextGearIds)); } catch (e) {}
         if (data.focus) { try { localStorage.setItem('df:lastFocus', data.focus); } catch (e) {} }

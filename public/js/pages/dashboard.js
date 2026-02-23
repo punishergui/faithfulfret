@@ -868,12 +868,13 @@ Pages.Dashboard = {
 
   _writeTimelineDefaults(types = [], allTypes = []) {
     const normalized = this._normalizeFeedTypes(types, allTypes);
+    const safeDefaults = normalized.length ? normalized : [...allTypes];
     try {
-      localStorage.setItem(this._timelineDefaultStorageKey, JSON.stringify(normalized));
+      localStorage.setItem(this._timelineDefaultStorageKey, JSON.stringify(safeDefaults));
     } catch (error) {
       // Ignore storage failures.
     }
-    return normalized;
+    return safeDefaults;
   },
 
   _renderRecentSessions(sessions, today) {

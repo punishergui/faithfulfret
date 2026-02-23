@@ -706,3 +706,39 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 Practice-mode localStorage keys: `df_last_bpm`, `df_practice_beats_per_chord`, `df_practice_countin_enabled`, `df_practice_countin_bars`, `df_practice_loop_enabled`, `df_last_key_root`, `df_last_key_mode`.
 
 Keep rollback path unchanged: publish immutable tags (`vX.Y.Z`) and pin `docker-compose.prod.yml` image to the selected tag when rolling back.
+
+## Deploy notes (Playlist metrics + Songs + Feed/Import hardening)
+
+Josh standard deploy sequence (prod):
+
+```bash
+docker compose -f docker-compose.prod.yml down
+docker rm -f daily-fret || true
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Rollback / pin path:
+
+```bash
+# pin to immutable release tag and redeploy
+# image: ghcr.io/punishergui/faithfulfret:v1.0.0
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Post-deploy sanity checks:
+
+```bash
+# feed dedupe + timeline payload
+curl -fsS "http://127.0.0.1:3000/api/feed?limit=20&offset=0" | jq '.items | length'
+
+# full export metadata + tables payload
+curl -fsS "http://127.0.0.1:3000/api/export" | jq '{schemaVersion, appVersion, counts: .counts.tables}'
+
+# import validation path (expects backup JSON)
+curl -fsS -X POST "http://127.0.0.1:3000/api/import" \
+  -H 'Content-Type: application/json' \
+  --data-binary @backup.json | jq .
+```

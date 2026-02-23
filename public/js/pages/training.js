@@ -277,10 +277,11 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
   const q = (qv('q') || '').trim();
   const activeScope = ['top', 'all', 'nested'].includes(scope) ? scope : 'top';
 
-  const [playlists, resolverPlaylists, groups] = await Promise.all([
+  const [playlists, resolverPlaylists, groups, repertoireSongs] = await Promise.all([
     DB.getVideoPlaylists({ scope: activeScope, q }),
     DB.getVideoPlaylists({ scope: 'all' }),
     DB.getVideoPlaylistGroups(),
+    DB.getRepertoireSongs({}).catch(() => []),
   ]);
 
   const sortRows = (rows = []) => rows.slice().sort((a, b) => {
@@ -293,16 +294,27 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
 
   const renderCard = (playlist) => {
     const videoCount = Number(playlist.totalVideoCount ?? playlist.video_count_rollup ?? playlist.video_count) || 0;
+    const watchedCount = Math.max(0, Number(playlist.watchedCount) || 0);
+    const masteredCountRaw = Math.max(0, Number(playlist.masteredCount) || 0);
+    const masteredCount = Math.min(watchedCount, masteredCountRaw);
     const thumb = getPlaylistThumb(playlist) || '';
     const name = esc(playlist.name || `Playlist ${playlist.id}`);
     const description = esc(playlist.description || '');
-    const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
+    const watchedPct = videoCount > 0 ? Math.round((watchedCount / videoCount) * 100) : 0;
+    const masteredPct = videoCount > 0 ? Math.round((masteredCount / videoCount) * 100) : 0;
+    const metaCount = videoCount === 0 ? '—' : `${videoCount} videos`;
     const totalDur = Number(playlist.deepDurationSeconds ?? playlist.deep_stats?.deepDurationSeconds) || 0;
     const unknownDur = Number(playlist.unknownDurationCount ?? playlist.deep_stats?.unknownDurationCount) || 0;
     const durationLabel = formatDurationWithUnknown(totalDur, unknownDur);
     const nested = Number(playlist.is_nested) === 1;
+    const metrics = videoCount === 0
+      ? '<span class="df-badge df-badge--muted">—</span>'
+      : `<span class="df-badge df-badge--muted">${videoCount} videos</span><span class="df-badge" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 35%, transparent);background:color-mix(in srgb,var(--green) 12%, transparent);">${watchedCount} watched</span><span class="df-badge df-badge--accent">${masteredCount} mastered</span>`;
+    const ring = videoCount === 0
+      ? ''
+      : `<span class="playlist-progress-ring" aria-label="${watchedPct}% watched, ${masteredPct}% mastered" title="${watchedPct}% watched • ${masteredPct}% mastered" style="--watched:${watchedPct};--mastered:${masteredPct};"></span>`;
     return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
-      <div>${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}</div>
+      <div class="playlist-thumb-wrap">${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}${ring}</div>
       <div class="training-playlist-list-copy">
         <div class="training-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span>${name}</span>
@@ -310,6 +322,8 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
         </div>
         <div class="training-playlist-list-description">${description || '—'}</div>
         <div style="color:var(--text2);font-size:12px;">${metaCount} • ${durationLabel} · ${esc(playlist.playlist_type || 'General')} · ${esc(playlist.difficulty_label || 'No difficulty')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${metrics}</div>
+        <div style="margin-top:8px;"><button type="button" class="df-btn df-btn--outline" data-link-playlist-song="${playlist.id}">Link to Song</button></div>
       </div>
     </a>`;
   };
@@ -428,6 +442,20 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     sessionStorage.setItem('trainingPlaylistStatus', 'Playlist created.');
     go('#/training/playlists');
   });
+
+  app.querySelectorAll('[data-link-playlist-song]').forEach((btn) => btn.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const playlistId = Number(btn.getAttribute('data-link-playlist-song'));
+    if (!playlistId) return;
+    if (!repertoireSongs.length) return showErr('Create a song first.');
+    const options = repertoireSongs.map((song) => `${song.id}: ${song.title}${song.artist ? ` — ${song.artist}` : ''}`).join('\n');
+    const raw = window.prompt(`Link playlist to which song?\n${options}`);
+    const songId = Number((raw || '').split(':')[0].trim());
+    if (!songId) return;
+    await DB.linkSongPlaylist(songId, playlistId);
+    showErr('Playlist linked to song.');
+  }));
 
   app.querySelectorAll('[data-group-toggle]').forEach((btn) => {
     btn.addEventListener('click', () => {

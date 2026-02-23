@@ -488,7 +488,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS session_song (
   notes TEXT,
   PRIMARY KEY (session_id, song_id)
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS song_playlists (
+  song_id INTEGER NOT NULL,
+  playlist_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (song_id, playlist_id)
+)`);
 ensureColumn('modules', 'level_id', 'INTEGER');
+ensureColumn('sessions', 'song_id', 'INTEGER');
 ensureColumn('modules', 'module_num', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('modules', 'thumb_url', 'TEXT');
 ensureColumn('lessons', 'description', 'TEXT');
@@ -506,6 +513,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_song_lessons_song_sort ON song_lessons(s
 db.exec('CREATE INDEX IF NOT EXISTS idx_timeline_events_created_at ON timeline_events(created_at DESC)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_repertoire_songs_status ON repertoire_songs(status)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_repertoire_songs_last_practiced ON repertoire_songs(last_practiced_at DESC)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_song_playlists_song ON song_playlists(song_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_song_playlists_playlist ON song_playlists(playlist_id)');
 
 db.prepare(`INSERT INTO user_settings (id)
   SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE id = 1)`).run();
@@ -592,6 +601,7 @@ function coerceSession(input = {}) {
     checklist: input.checklist || '',
     links: input.links || '',
     videoId: input.videoId || input.youtubeId || '',
+    song_id: n(input.song_id ?? input.songId),
   };
 }
 function coerceGear(input = {}) {
@@ -857,12 +867,12 @@ function coerceVideoTimestamp(input = {}) {
 
 function initQueries() {
 Q = {
-  upsertSession: db.prepare(`INSERT INTO sessions (id,date,title,durationMinutes,youtubeId,focusTag,notes,createdAt,bpm,dayNumber,focus,mood,win,checklist,links,videoId)
-    VALUES (:id,:date,:title,:durationMinutes,:youtubeId,:focusTag,:notes,:createdAt,:bpm,:dayNumber,:focus,:mood,:win,:checklist,:links,:videoId)
+  upsertSession: db.prepare(`INSERT INTO sessions (id,date,title,durationMinutes,youtubeId,focusTag,notes,createdAt,bpm,dayNumber,focus,mood,win,checklist,links,videoId,song_id)
+    VALUES (:id,:date,:title,:durationMinutes,:youtubeId,:focusTag,:notes,:createdAt,:bpm,:dayNumber,:focus,:mood,:win,:checklist,:links,:videoId,:song_id)
     ON CONFLICT(id) DO UPDATE SET
       date=excluded.date,title=excluded.title,durationMinutes=excluded.durationMinutes,youtubeId=excluded.youtubeId,focusTag=excluded.focusTag,
       notes=excluded.notes,bpm=excluded.bpm,dayNumber=excluded.dayNumber,focus=excluded.focus,mood=excluded.mood,win=excluded.win,
-      checklist=excluded.checklist,links=excluded.links,videoId=excluded.videoId`),
+      checklist=excluded.checklist,links=excluded.links,videoId=excluded.videoId,song_id=excluded.song_id`),
   upsertGear: db.prepare(`INSERT INTO gear_items (id,name,type,status,pricePaid,priceSold,vendor,links,notes,createdAt,category,brand,model,price,dateAcquired,buyUrl,primaryUrl,mfrUrl,manualUrl,imageData,boughtDate,boughtPrice,boughtFrom,tax,shipping,soldDate,soldPrice,soldFees,soldWhere,soldShipping,targetPrice,priority,desiredCondition)
     VALUES (:id,:name,:type,:status,:pricePaid,:priceSold,:vendor,:links,:notes,:createdAt,:category,:brand,:model,:price,:dateAcquired,:buyUrl,:primaryUrl,:mfrUrl,:manualUrl,:imageData,:boughtDate,:boughtPrice,:boughtFrom,:tax,:shipping,:soldDate,:soldPrice,:soldFees,:soldWhere,:soldShipping,:targetPrice,:priority,:desiredCondition)
     ON CONFLICT(id) DO UPDATE SET
@@ -1031,6 +1041,7 @@ const getSession = (id) => one('SELECT * FROM sessions WHERE id = ?', id);
 const saveSession = (data) => { const row = coerceSession(data); Q.upsertSession.run(row); return getSession(row.id); };
 const deleteSession = (id) => {
   run('DELETE FROM session_gear WHERE sessionId = ?', id);
+  run('DELETE FROM session_song WHERE session_id = ?', id);
   const result = run('DELETE FROM sessions WHERE id = ?', id);
   deleteFeedEventsByEntity('session', id);
   return result;
@@ -1458,6 +1469,8 @@ const deleteVideoPlaylist = (id) => {
   const tx = db.transaction((playlistId) => {
     run('DELETE FROM playlist_group_items WHERE playlist_id = ?', playlistId);
     run('DELETE FROM video_playlist_items WHERE COALESCE(playlist_id, playlistId) = ?', playlistId);
+    run('DELETE FROM song_playlists WHERE playlist_id = ?', playlistId);
+    run(`DELETE FROM timeline_events WHERE entity_id LIKE ?`, `song_playlist:%:${playlistId}`);
     run('UPDATE video_playlists SET parent_playlist_id = NULL WHERE parent_playlist_id = ?', playlistId);
     run('DELETE FROM video_playlists WHERE id = ?', playlistId);
     deleteFeedEventsByEntity('playlist', playlistId);
@@ -2477,6 +2490,7 @@ const saveRepertoireSong = (data = {}) => {
 const deleteRepertoireSong = (id) => {
   const songId = Number(id);
   run('DELETE FROM session_song WHERE song_id = ?', songId);
+  run('DELETE FROM song_playlists WHERE song_id = ?', songId);
   deleteFeedEventsByEntity('song', songId);
   run('DELETE FROM repertoire_songs WHERE id = ?', songId);
 };
@@ -2499,7 +2513,31 @@ const listSessionSongs = (sessionId) => db.prepare(`SELECT ss.*, rs.title, rs.ar
   WHERE ss.session_id = ?
   ORDER BY rs.title COLLATE NOCASE ASC`).all(sessionId);
 
+const listSongPlaylists = (songId) => db.prepare(`SELECT sp.*, vp.name AS playlist_name, vp.description AS playlist_description
+  FROM song_playlists sp
+  JOIN video_playlists vp ON vp.id = sp.playlist_id
+  WHERE sp.song_id = ?
+  ORDER BY vp.name COLLATE NOCASE ASC`).all(Number(songId));
+
+const listPlaylistSongs = (playlistId) => db.prepare(`SELECT sp.*, rs.title, rs.artist, rs.status
+  FROM song_playlists sp
+  JOIN repertoire_songs rs ON rs.id = sp.song_id
+  WHERE sp.playlist_id = ?
+  ORDER BY rs.title COLLATE NOCASE ASC`).all(Number(playlistId));
+
+const linkSongPlaylist = (songId, playlistId) => {
+  const now = Date.now();
+  run('INSERT OR IGNORE INTO song_playlists (song_id, playlist_id, created_at) VALUES (?,?,?)', Number(songId), Number(playlistId), now);
+  return one('SELECT * FROM song_playlists WHERE song_id = ? AND playlist_id = ?', Number(songId), Number(playlistId));
+};
+
+const unlinkSongPlaylist = (songId, playlistId) => {
+  const result = run('DELETE FROM song_playlists WHERE song_id = ? AND playlist_id = ?', Number(songId), Number(playlistId));
+  deleteFeedEventsByEntityKey(`song_playlist:${Number(songId)}:${Number(playlistId)}`);
+  return result;
+};
+
 const dbInfo = getDbInfo();
 console.log(`[DB INFO] path=${dbInfo.dbPath} size=${dbInfo.sizeBytes} modified=${dbInfo.modifiedAt} sessions=${dbInfo.sessions} gear=${dbInfo.gear} presets=${dbInfo.presets}`);
 
-module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, resetBadges, unlockBadge, deleteTimelineEventsByEventType, deleteFeedEventsByEntityKey, deleteFeedEventsByEntity, clearTimelineEvents, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
+module.exports = { __test: { countPositionalPlaceholders, normalizeSqlParams, assertSqlParamBindings }, listTrainingProviders, getTrainingProvider, saveTrainingProvider, deleteTrainingProvider, listLevels, bootstrapProviderLevels, listTrainingModules, getTrainingModule, saveTrainingModule, listTrainingLessons, getTrainingLesson, saveTrainingLesson, deleteTrainingLesson, saveLessonSkillLinks, listSkillGroups, getSkillLessons, saveSkillGroup, saveSkill, listSongs, getSong, saveSong, deleteSong, assignSongLessons, getUserSettings, saveUserSettings, getStreakState, saveStreakState, listBadgeUnlocks, getBadgeUnlockByKey, resetBadges, unlockBadge, deleteTimelineEventsByEventType, deleteFeedEventsByEntityKey, deleteFeedEventsByEntity, clearTimelineEvents, addTimelineEvent, listTimelineEvents, countTimelineEvents, listRepertoireSongs, getRepertoireSong, saveRepertoireSong, deleteRepertoireSong, replaceSessionSongs, listSessionSongs, listSongPlaylists, listPlaylistSongs, linkSongPlaylist, unlinkSongPlaylist, dbPath, getDbInfo, listSessions, listSessionDailyTotals, getSession, saveSession, deleteSession, listGear, getGear, saveGear, deleteGear, getGearLinks, saveGearLink, deleteGearLink, replaceGearLinks, listGearImages, addGearImage, getGearImage, deleteGearImage, saveSessionGear, listSessionGear, listSessionGearBySessionIds, getGearUsage, listPresets, getPreset, savePreset, deletePreset, listResources, getResource, saveResource, deleteResource, listTrainingVideos, getTrainingVideo, saveTrainingVideo, saveTrainingVideoUpload, saveTrainingVideoThumbnail, deleteTrainingVideo, getTrainingVideoProgress, saveTrainingVideoProgress, listVideoTimestamps, saveVideoTimestamp, deleteVideoTimestamp, listVideoPlaylists, listPlaylistGroups, getVideoPlaylist, saveVideoPlaylist, deleteVideoPlaylist, listPlaylistItems, getVideoPlaylistRollupCounts, getPlaylistVideoIdsDeep, getPlaylistStatsDeep, listPlaylistsByVideo, getPlaylistIdForVideo, listVideoPlaylistAssignments, replacePlaylistItems, addPlaylistItem, deletePlaylistItem, playlistContainsTarget, getParentPlaylistId, wouldCreateCycle, unnestPlaylist, getPlaylistFirstThumbnail, listProviders, getProvider, saveProvider, listCourses, getCourse, saveCourse, listModules, getModule, saveModule, listLessons, getLesson, saveLesson, deleteLesson, saveLessonSkills, createDraftSession, addSessionItem, updateSessionItem, deleteSessionItem, listSessionItems, getSessionWithItems, finishSession, getLessonStats, getLessonHistory, getRecentLessonHistory, getRecommendedLesson, saveAttachment, listAttachments, getAttachment, deleteAttachment, saveVideoAttachment, listVideoAttachments, getVideoAttachment, deleteVideoAttachment, listTrainingPlaylists, getTrainingPlaylist, saveTrainingPlaylist, deleteTrainingPlaylist, listTrainingPlaylistItems, replaceTrainingPlaylistItems, clearAll, checkpointWal, runIntegrityCheck, getSchemaVersion, backupToFile, close, reopen, ensureSchema, exportAllTables, importAllTables, listUserTables };
