@@ -307,23 +307,28 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     const unknownDur = Number(playlist.unknownDurationCount ?? playlist.deep_stats?.unknownDurationCount) || 0;
     const durationLabel = formatDurationWithUnknown(totalDur, unknownDur);
     const nested = Number(playlist.is_nested) === 1;
-    const metrics = videoCount === 0
-      ? '<span class="df-badge df-badge--muted">—</span>'
-      : `<span class="df-badge df-badge--muted">${videoCount} videos</span><span class="df-badge" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 35%, transparent);background:color-mix(in srgb,var(--green) 12%, transparent);">${watchedCount} watched</span><span class="df-badge df-badge--accent">${masteredCount} mastered</span>`;
+    const metrics = [
+      { value: videoCount === 0 ? '—' : videoCount, label: '📺 Videos' },
+      { value: videoCount === 0 ? '—' : watchedCount, label: '▶ Watched' },
+      { value: videoCount === 0 ? '—' : masteredCount, label: '⭐ Mastered' },
+      { value: durationLabel, label: '⏱ Duration' },
+    ].map((metric) => `<div class="playlist-metric"><div class="playlist-metric__value">${esc(String(metric.value))}</div><div class="playlist-metric__label">${esc(metric.label)}</div></div>`).join('');
     const ring = videoCount === 0
       ? ''
       : `<span class="playlist-progress-ring" aria-label="${watchedPct}% watched, ${masteredPct}% mastered" title="${watchedPct}% watched • ${masteredPct}% mastered" style="--watched:${watchedPct};--mastered:${masteredPct};"></span>`;
     return `<a class="training-playlist-list-card" href="#/training/playlists/${playlist.id}">
       <div class="playlist-thumb-wrap">${thumb ? `<img src="${thumb}" alt="${name}" class="training-playlist-preview-lead">` : '<div class="training-thumb-fallback training-playlist-preview-lead">🎬</div>'}${ring}</div>
       <div class="training-playlist-list-copy">
-        <div class="training-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span>${name}</span>
-          ${nested ? '<span class="df-btn df-btn--ghost" style="pointer-events:none;height:auto;padding:2px 8px;font-size:11px;">Nested</span>' : ''}
+        <div class="playlist-card__header">
+          <div class="playlist-card__title training-row-title">
+            <span>${name}</span>
+            ${nested ? '<span class="df-btn df-btn--ghost" style="pointer-events:none;height:auto;padding:2px 8px;font-size:11px;">Nested</span>' : ''}
+          </div>
+          <div class="playlist-card__actions"><button type="button" class="df-btn df-btn--outline" data-link-playlist-song="${playlist.id}">Link to Song</button></div>
         </div>
         <div class="training-playlist-list-description">${description || '—'}</div>
         <div style="color:var(--text2);font-size:12px;">${metaCount} • ${durationLabel} · ${esc(playlist.playlist_type || 'General')} · ${esc(playlist.difficulty_label || 'No difficulty')}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${metrics}</div>
-        <div style="margin-top:8px;"><button type="button" class="df-btn df-btn--outline" data-link-playlist-song="${playlist.id}">Link to Song</button></div>
+        <div class="playlist-metrics-row">${metrics}</div>
       </div>
     </a>`;
   };
