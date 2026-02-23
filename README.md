@@ -207,9 +207,6 @@ curl -s -X POST http://127.0.0.1:3000/api/backup/restore-last
 docker exec -it daily-fret sh -lc "node -e 'global.window={};require(\"/app/public/js/themes.js\");console.log(window.FF_THEMES.length)'"
 
 # If UI theme/style changes were deployed, hard refresh clients once (Ctrl/Cmd+Shift+R) to clear cached assets.
-# CRATE UI deploy check: verify sidebar/bottom nav shows Dashboard, Library, Scan Report, Settings and topbar status dot updates (running/idle).
-# CRATE theme deploy check: in Settings -> Themes switch Neon Djent/Class dark, refresh page, and confirm localStorage key `crate.theme` persists selected theme.
-# CRATE rollback path: publish immutable release tags (vX.Y.Z) and pin `docker-compose.prod.yml` image to previous tag for instant rollback.
 # UI polish deploy check: verify Dashboard, Sessions, Stats, and Settings headers render full-width with compact, uniform hero height.
 # UI polish deploy check: verify title/subtitle/filters/tabs stay left-aligned while hero action buttons stay right-aligned, and nav touches hero with no blank gap.
 # UI polish deploy check: verify `/#/gear` and `/#/resources` now share an identical hero/header layout (hero bar, action button alignment, search row, and filter pills), with only page text/content differing.

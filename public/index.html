@@ -1,47 +1,168 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="neon-djent">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#070910">
-  <title>CRATE</title>
+  <meta name="description" content="Daily Fret — Guitar practice tracker">
+  <meta name="theme-color" content="#111111">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Daily Fret">
+
+  <script src="/js/themes.js"></script>
+  <script src="/js/theme-overrides.js"></script>
+  <script>
+    (function() {
+      var themes = Array.isArray(window.FF_THEMES) ? window.FF_THEMES : [];
+      var fallback = window.FF_THEME_DEFAULT || 'backroom-amp';
+      var map = {};
+      themes.forEach(function (t) { map[t.id] = t; });
+      var rawTheme = localStorage.getItem('theme') || fallback;
+      var theme = map[rawTheme] ? rawTheme : fallback;
+      var hand = localStorage.getItem('handedness') || 'right';
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.handedness = hand;
+      try {
+        var rawOverrides = localStorage.getItem('ff_theme_overrides:' + theme) || '{}';
+        var overrides = JSON.parse(rawOverrides);
+        Object.keys(overrides || {}).forEach(function (name) {
+          if (name.indexOf('--') !== 0) return;
+          document.documentElement.style.setProperty(name, String(overrides[name] || ''));
+        });
+      } catch (e) {}
+      var meta = document.querySelector('meta[name="theme-color"]');
+      var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || (map[theme] && (map[theme].metaColor || (map[theme].vars && map[theme].vars['--accent']))) || '#111111';
+      if (meta) meta.setAttribute('content', accent);
+    })();
+  </script>
+
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/css/theme.base.css">
-  <link rel="stylesheet" href="/css/themes/neon-djent.css">
-  <link rel="stylesheet" href="/css/themes/classic-dark.css">
-  <script src="/js/theme-manager.js"></script>
+  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@300;400;500;700&family=Mulish:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/global.css?v=themecards10">
+  <link rel="stylesheet" href="/css/animations.css?v=fa68d74">
+
+  <title>Daily Fret</title>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">CRATE</div>
-      <a class="nav-link" href="#/dashboard" data-nav="dashboard">Dashboard</a>
-      <a class="nav-link" href="#/library" data-nav="library">Library</a>
-      <a class="nav-link" href="#/scan-report" data-nav="scan-report">Scan Report</a>
-      <a class="nav-link" href="#/settings" data-nav="settings">Settings</a>
-    </aside>
 
-    <section class="main-area">
-      <header class="topbar">
-        <input id="global-search" class="search-input" placeholder="Search path/message..." aria-label="Global search">
-        <div class="status-pill"><span id="scan-indicator" class="status-dot"></span><span id="scan-indicator-text">Idle</span></div>
-      </header>
-      <main id="app" class="page"></main>
-    </section>
+  <!-- Update Banner -->
+  <div id="update-banner" aria-live="polite">
+    <span class="update-banner__text">&#8593; Update available on GitHub</span>
+    <button id="update-btn">Sync &amp; Refresh</button>
+    <a id="update-repo-link" target="_blank" rel="noopener">View Changes &#8599;</a>
+    <button id="update-dismiss" aria-label="Dismiss">&#10005;</button>
   </div>
 
-  <nav class="mobile-nav">
-    <a href="#/dashboard" data-nav="dashboard">Dashboard</a>
-    <a href="#/library" data-nav="library">Library</a>
-    <a href="#/scan-report" data-nav="scan-report">Scan</a>
-    <a href="#/settings" data-nav="settings">Settings</a>
+
+  <div id="sync-help-modal" class="sync-help-modal" aria-hidden="true">
+    <div class="sync-help-modal__card">
+      <div class="sync-help-modal__head">
+        <strong>Update Assistant</strong>
+        <button id="sync-help-close" aria-label="Close">✕</button>
+      </div>
+      <p id="sync-help-summary"></p>
+      <pre id="sync-help-output"></pre>
+      <div class="sync-help-modal__actions">
+        <button id="sync-help-copy">Copy commands</button>
+        <button id="sync-help-refresh">Reload app</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav id="nav">
+    <div class="nav__inner">
+      <a href="#/dashboard" class="nav__logo">
+        <span class="nav__logo-dot"></span>
+        DAILY_FRET
+      </a>
+      <div class="nav__links">
+        <a href="#/sessions" class="nav__link" data-route="sessions">Sessions</a>
+        <a href="#/gear" class="nav__link" data-route="gear">Gear</a>
+        <a href="#/resources" class="nav__link" data-route="resources">Resources</a>
+        <a href="#/training" class="nav__link" data-route="training">Training</a>
+        <a href="#/songs" class="nav__link" data-route="songs">Songs</a>
+        <a href="#/presets" class="nav__link" data-route="presets">Presets</a>
+        <a href="#/progress" class="nav__link" data-route="progress">Stats</a>
+        <a href="#/tools" class="nav__link" data-route="tools">Tools</a>
+        <a href="#/settings" class="nav__link" data-route="settings">Settings</a>
+      </div>
+      <div class="nav__actions">
+        <a href="#/log" class="nav__log-btn">+ LOG</a>
+        <button class="nav__hamburger" id="nav-hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile menu -->
+    <div class="nav__mobile-menu" id="nav-mobile-menu">
+      <a href="#/sessions" class="nav__mobile-link">Sessions</a>
+      <a href="#/gear" class="nav__mobile-link">Gear</a>
+      <a href="#/resources" class="nav__mobile-link">Resources</a>
+      <a href="#/training" class="nav__mobile-link">Training</a>
+      <a href="#/songs" class="nav__mobile-link">Songs</a>
+      <a href="#/presets" class="nav__mobile-link">Presets</a>
+      <a href="#/progress" class="nav__mobile-link">Stats</a>
+      <a href="#/tools" class="nav__mobile-link">Tools</a>
+      <a href="#/settings" class="nav__mobile-link">Settings</a>
+      <a href="#/log" class="nav__mobile-link nav__mobile-link--cta">+ Log Session</a>
+    </div>
   </nav>
 
-  <script src="/js/pages/dashboard.js"></script>
-  <script src="/js/pages/library.js"></script>
-  <script src="/js/pages/scan-report.js"></script>
-  <script src="/js/pages/settings.js"></script>
-  <script src="/js/router.js"></script>
-  <script src="/js/app.js"></script>
+  <!-- Main App -->
+  <main id="app"></main>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/db.js"></script>
+  <script type="module" src="/js/utils.js"></script>
+  <script type="module" src="/js/progress_memory.js"></script>
+  <script type="module" src="/js/pages/dashboard.js"></script>
+  <script type="module" src="/js/pages/sessions.js"></script>
+  <script type="module" src="/js/pages/session-single.js"></script>
+  <script type="module" src="/js/pages/session-form.js"></script>
+  <script type="module" src="/js/pages/gear.js"></script>
+  <script type="module" src="/js/pages/resources.js"></script>
+  <script type="module" src="/js/pages/resource-videos-list.js"></script>
+  <script type="module" src="/js/pages/resource-videos-edit.js"></script>
+  <script type="module" src="/js/pages/resource-video-detail.js"></script>
+  <script type="module" src="/js/pages/training.js"></script>
+  <script type="module" src="/js/pages/presets.js"></script>
+  <script type="module" src="/js/pages/repertoire.js"></script>
+  <script type="module" src="/js/pages/progress.js"></script>
+  <script type="module" src="/js/components/help-card.js"></script>
+  <script type="module" src="/js/components/chord-diagram.js"></script>
+  <script type="module" src="/js/data/scales.js"></script>
+  <script type="module" src="/js/data/tunings.js"></script>
+  <script type="module" src="/js/data/chords.js"></script>
+  <script type="module" src="/js/pages/tools-hub.js"></script>
+  <script type="module" src="/js/audio/metronome-engine.js"></script>
+  <script type="module" src="/js/pages/tools/metronome.js"></script>
+  <script type="module" src="/js/pages/tools/chords.js"></script>
+  <script type="module" src="/js/pages/tools/scales.js"></script>
+  <script type="module" src="/js/pages/tools/progressions.js"></script>
+  <script type="module" src="/js/pages/tools/chord-chart.js"></script>
+  <script type="module" src="/js/pages/tools/bpm-guide.js"></script>
+  <script type="module" src="/js/pages/tools/tuning.js"></script>
+  <script type="module" src="/js/pages/settings.js"></script>
+  <script type="module" src="/js/router.js"></script>
+  <script type="module" src="/js/app.js?v=fa68d74"></script>
+
+  <script>
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.warn('SW registration failed:', err));
+      });
+    }
+  </script>
 </body>
 </html>
