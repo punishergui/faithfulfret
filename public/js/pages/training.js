@@ -66,6 +66,60 @@ function writeLocalJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
 }
 
+function createPlaylistThumbnailResolver(playlists = []) {
+  const byId = new Map((playlists || []).map((playlist) => [Number(playlist.id), playlist]));
+  const memo = new Map();
+
+  const hasDirectVideos = (playlist) => (playlist?.items || []).some((item) => {
+    if (String(item?.item_type || 'video') === 'playlist') return false;
+    return Number(item?.video_id || item?.videoId) > 0;
+  });
+
+  const getPlaylistThumb = (playlist, visited = new Set()) => {
+    const playlistId = Number(playlist?.id);
+    if (!playlistId) return '';
+    if (memo.has(playlistId)) return memo.get(playlistId);
+    if (visited.has(playlistId)) return '';
+
+    visited.add(playlistId);
+
+    const directThumb = String(playlist?.preview_thumbnail_url || '').trim();
+    let resolved = '';
+
+    if (hasDirectVideos(playlist)) {
+      resolved = directThumb;
+    } else {
+      const firstNested = (playlist?.items || []).find((item) => String(item?.item_type || 'video') === 'playlist' && Number(item?.child_playlist_id) > 0);
+      if (firstNested) {
+        const child = byId.get(Number(firstNested.child_playlist_id));
+        resolved = child ? getPlaylistThumb(child, visited) : '';
+      }
+    }
+
+    visited.delete(playlistId);
+    memo.set(playlistId, resolved);
+    return resolved;
+  };
+
+  return { getPlaylistThumb };
+}
+
+function runPlaylistThumbnailResolverSelfChecks() {
+  const playlistData = [
+    { id: 1, preview_thumbnail_url: 'direct.jpg', items: [{ item_type: 'video', video_id: 11 }] },
+    { id: 2, preview_thumbnail_url: '', items: [{ item_type: 'playlist', child_playlist_id: 3 }] },
+    { id: 3, preview_thumbnail_url: 'nested.jpg', items: [{ item_type: 'video', video_id: 21 }] },
+    { id: 4, preview_thumbnail_url: '', items: [{ item_type: 'playlist', child_playlist_id: 5 }] },
+    { id: 5, preview_thumbnail_url: '', items: [] },
+  ];
+  const { getPlaylistThumb } = createPlaylistThumbnailResolver(playlistData);
+  console.assert(getPlaylistThumb(playlistData[0]) === 'direct.jpg', 'Playlist thumbs: should use direct second-level video thumb');
+  console.assert(getPlaylistThumb(playlistData[1]) === 'nested.jpg', 'Playlist thumbs: should recurse into first nested playlist');
+  console.assert(getPlaylistThumb(playlistData[3]) === '', 'Playlist thumbs: should return empty when no videos exist');
+}
+
+runPlaylistThumbnailResolverSelfChecks();
+
 
 function setLastPracticeTraining({ playlistId = null, videoId = null } = {}) {
   Utils.setLastPractice({
@@ -233,9 +287,11 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     return (Number(a.order_index ?? a.sort_order) || 0) - (Number(b.order_index ?? b.sort_order) || 0);
   });
 
+  const { getPlaylistThumb } = createPlaylistThumbnailResolver(playlists);
+
   const renderCard = (playlist) => {
     const videoCount = Number(playlist.totalVideoCount ?? playlist.video_count_rollup ?? playlist.video_count) || 0;
-    const thumb = playlist.preview_thumbnail_url || '';
+    const thumb = getPlaylistThumb(playlist) || '';
     const name = esc(playlist.name || `Playlist ${playlist.id}`);
     const description = esc(playlist.description || '');
     const metaCount = videoCount === 0 ? '0 videos' : `${videoCount} videos`;
