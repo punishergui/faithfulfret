@@ -1,0 +1,14 @@
+html[data-theme='classic-dark'] {
+  --bg: #111316;
+  --surface: #1b1f23;
+  --surface-2: #232a31;
+  --text: #f1f3f5;
+  --muted: #a8b1bb;
+  --border: #3a434d;
+  --accent: #6f8fff;
+  --accent2: #a9bedf;
+  --glow: rgba(111, 143, 255, 0.35);
+  --danger: #f15b6c;
+  --warning: #efba67;
+  --success: #67d89b;
+}
