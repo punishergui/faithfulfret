@@ -4211,6 +4211,64 @@ body.print-view .chord-chart-row {
 
 .training-playlist-list-copy {
   min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.playlist-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.playlist-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.playlist-card__title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-card__actions {
+  flex: 0 0 auto;
+}
+
+.playlist-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.playlist-metric {
+  border: 1px solid color-mix(in srgb, var(--line) 85%, var(--text) 15%);
+  background: color-mix(in srgb, var(--bg2) 92%, var(--text) 8%);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.playlist-metric__value {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.playlist-metric__label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text2);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .training-playlist-list-description {
@@ -4378,6 +4436,20 @@ body.print-view .chord-chart-row {
 
   .training-playlist-list-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playlist-metrics-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .playlist-card__header {
+    align-items: flex-start;
+  }
+
+  .playlist-card__actions .df-btn {
+    white-space: nowrap;
   }
 }
 
