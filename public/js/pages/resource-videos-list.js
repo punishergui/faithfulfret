@@ -243,7 +243,7 @@ Pages.ResourceVideosList = {
     const linkedSongArtist = String(video.linked_song_artist || '').trim();
     const songBadge = linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Song: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}</span>` : '';
     const songActionLabel = linkedSongId ? 'Change Song' : 'Link Song';
-    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn" data-action="link-song" data-video-id="${video.id}" data-card-action="1" title="${songActionLabel}">${songActionLabel}</button>`;
+    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn tv-card__link-song" data-action="link-song" data-video-id="${video.id}" data-card-action="1" title="${songActionLabel}">${songActionLabel}</button>`;
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
@@ -252,8 +252,10 @@ Pages.ResourceVideosList = {
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
           ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
-          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
-          <div style="margin-top:8px;display:flex;justify-content:flex-end;">${songAction}</div>
+          <div class="tv-card__meta-row" style="margin-top:8px;">
+            <div class="tv-card__meta-left">${allTags}</div>
+            ${songAction}
+          </div>
         </div>
       </div>`;
     }
@@ -263,8 +265,10 @@ Pages.ResourceVideosList = {
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
       ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
-      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
-      <div style="margin-top:8px;display:flex;justify-content:flex-end;">${songAction}</div>
+      <div class="tv-card__meta-row" style="margin-top:8px;">
+        <div class="tv-card__meta-left">${allTags}</div>
+        ${songAction}
+      </div>
     </div>`;
   },
 
