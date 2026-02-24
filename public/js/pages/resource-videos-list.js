@@ -134,34 +134,21 @@ Pages.ResourceVideosList = {
         Utils.toast?.('Create a song first.');
         return;
       }
-      const linkedSong = Number(video.linked_song_id) ? {
-        song_id: Number(video.linked_song_id),
-        title: String(video.linked_song_title || ''),
-        artist: String(video.linked_song_artist || ''),
-      } : null;
-      const openModal = window.openSongLinkModal;
-      if (typeof openModal !== 'function') {
+      const openVideoModal = window.openVideoSongLinkModal;
+      if (typeof openVideoModal !== 'function') {
         Utils.toast?.('Song link modal unavailable.');
         return;
       }
-      openModal({
-        entityLabel: video.title || `Video ${videoId}`,
+      await openVideoModal({
+        video,
         songs,
-        linkedSong,
-        onSave: async (songId) => {
-          await DB.linkSongVideo(videoId, songId);
-          const song = songs.find((entry) => Number(entry.id) === Number(songId));
-          this.updateVideoSongState(videoId, song || { id: songId, title: `Song ${songId}`, artist: '' });
-          this.rerenderVideoCard(videoId);
-          sessionStorage.setItem('trainingVideoStatus', 'Video linked to song.');
-          Utils.toast?.('Video linked to song.');
+        onLinkedSongChange: (id, song) => {
+          this.updateVideoSongState(id, song);
+          this.rerenderVideoCard(id);
         },
-        onUnlink: async () => {
-          await DB.unlinkSongVideo(videoId);
-          this.updateVideoSongState(videoId, null);
-          this.rerenderVideoCard(videoId);
-          sessionStorage.setItem('trainingVideoStatus', 'Video unlinked from song.');
-          Utils.toast?.('Video unlinked from song.');
+        onStatus: (message) => {
+          sessionStorage.setItem('trainingVideoStatus', message);
+          Utils.toast?.(message);
         },
       });
     });
@@ -242,16 +229,11 @@ Pages.ResourceVideosList = {
     const allTags = `<span class="video-card__pill">${video.category || 'general'}</span>${tags.map((tag) => `<span class="video-card__pill">${tag}</span>`).join('')}${statusTags}`;
     const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" class="training-video-library-thumb">` : '<div class="training-thumb-fallback training-video-library-thumb-fallback">🎬</div>';
     const duration = formatVideoDuration(video.duration_seconds);
-    const linkedSongId = Number(video.linked_song_id || 0);
-    const linkedSongTitle = String(video.linked_song_title || '').trim();
-    const linkedSongArtist = String(video.linked_song_artist || '').trim();
-    const songTooltip = linkedSongId ? escHtml(`Linked to: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}`) : '';
-    const songBadge = linkedSongId
-      ? `<button type="button" class="video-card__linked-indicator" data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" data-card-action="1" aria-label="Linked song details">● Linked</button>`
-      : '';
-    const songActionLabel = linkedSongId ? 'EDIT LINK' : 'LINK SONG';
-    const songActionClass = linkedSongId ? 'df-btn--primary' : 'df-btn--outline';
-    const songAction = `<button type="button" class="df-btn ${songActionClass} training-compact-btn tv-card__link-song" data-action="link-song" data-video-id="${video.id}" data-card-action="1" ${linkedSongId ? `data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" aria-label="Edit linked song"` : 'aria-label="Link song"'}>${songActionLabel}</button>`;
+    const linkedSong = window.getVideoLinkedSong ? window.getVideoLinkedSong(video) : null;
+    const linkedSongPill = window.linkedSongPillHtml ? window.linkedSongPillHtml(linkedSong, video.id) : '';
+    const songActionLabel = linkedSong?.song_id ? 'Edit Link' : 'Link Song';
+    const songActionClass = linkedSong?.song_id ? 'df-btn--primary' : 'df-btn--outline';
+    const songAction = `<button type="button" class="df-btn ${songActionClass} training-compact-btn tv-card__link-song" data-action="link-song" data-video-id="${video.id}" data-card-action="1" aria-label="${linkedSong?.song_id ? 'Edit song link' : 'Link song'}">${songActionLabel}</button>`;
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
@@ -260,7 +242,7 @@ Pages.ResourceVideosList = {
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
           <div class="video-card__metaRow u-mt-8">
-            <div class="video-card__pills">${allTags}${songBadge}</div>
+            <div class="video-card__pills">${allTags}${linkedSongPill}</div>
             <div class="video-card__actions">${songAction}</div>
           </div>
         </div>
@@ -272,7 +254,7 @@ Pages.ResourceVideosList = {
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
       <div class="video-card__metaRow u-mt-8">
-        <div class="video-card__pills">${allTags}${songBadge}</div>
+        <div class="video-card__pills">${allTags}${linkedSongPill}</div>
         <div class="video-card__actions">${songAction}</div>
       </div>
     </div>`;
