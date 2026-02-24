@@ -42,6 +42,9 @@ docker compose -f docker-compose.prod.yml up -d
 
 # Verify DB path after deploy
 docker compose -f docker-compose.prod.yml logs daily-fret --tail=50 | rg 'DB: /data/faithfulfret.sqlite'
+
+# Refresh browser cache after UI deploys
+# (hard refresh, or reopen installed PWA)
 ```
 
 How updates work:
@@ -94,6 +97,9 @@ Manual refresh (optional):
 ```bash
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
+
+# If Dockerfile/dependency layers changed, force a clean local rebuild (dev stack)
+docker compose build --no-cache
 ```
 
 ### Data safety (important)
