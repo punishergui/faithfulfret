@@ -215,6 +215,8 @@ function openSongLinkModal({ entityLabel = 'Item', songs = [], linkedSong = null
     <div class="sync-help-modal__head"><strong>Link Song · ${safePlaylistName}</strong><button type="button" class="df-btn df-btn--ghost" data-close-modal aria-label="Close">×</button></div>
     <div style="display:grid;gap:8px;">
       <input class="df-input" data-song-search placeholder="Search songs by title...">
+      <div data-current-linked-song style="color:var(--text2);font-size:12px;"></div>
+      <div data-song-link-error style="color:var(--danger);font-size:12px;min-height:18px;"></div>
       <div data-song-results style="max-height:260px;overflow:auto;display:grid;gap:6px;"></div>
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <button type="button" class="df-btn df-btn--danger" data-unlink-song ${linkedSong?.song_id ? '' : 'disabled'}>Unlink</button>
@@ -226,16 +228,31 @@ function openSongLinkModal({ entityLabel = 'Item', songs = [], linkedSong = null
   const close = () => modal.remove();
   const searchInput = modal.querySelector('[data-song-search]');
   const listEl = modal.querySelector('[data-song-results]');
+  const linkedEl = modal.querySelector('[data-current-linked-song]');
+  const errorEl = modal.querySelector('[data-song-link-error]');
+
+  const renderLinkedSong = () => {
+    if (!linkedEl) return;
+    if (!linkedSong?.song_id) {
+      linkedEl.textContent = 'Currently linked: none';
+      return;
+    }
+    const artist = String(linkedSong.artist || '').trim();
+    linkedEl.textContent = `Currently linked: ${linkedSong.title || `Song ${linkedSong.song_id}`}${artist ? ` — ${artist}` : ''}`;
+  };
 
   const renderRows = () => {
     const q = String(searchInput?.value || '').trim().toLowerCase();
-    const rows = songs.filter((song) => String(song.title || '').toLowerCase().includes(q));
+    const rows = songs.filter((song) => {
+      const haystack = `${song.title || ''} ${song.artist || ''}`.toLowerCase();
+      return haystack.includes(q);
+    });
     listEl.innerHTML = rows.length
       ? rows.map((song) => {
         const status = String(song.status || 'learning').replace(/_/g, ' ');
         const selected = Number(linkedSong?.song_id) === Number(song.id);
         return `<button type="button" class="df-btn df-btn--outline" style="justify-content:space-between;text-align:left;${selected ? 'border-color:var(--accent);' : ''}" data-select-song="${Number(song.id)}">
-          <span>${esc(song.title || `Song ${song.id}`)}</span>
+          <span>${esc(song.title || `Song ${song.id}`)}${song.artist ? `<span style="display:block;color:var(--text2);font-size:12px;">${esc(song.artist)}</span>` : ''}</span>
           <span style="color:var(--text2);font-size:12px;">${esc(status)}</span>
         </button>`;
       }).join('')
@@ -249,17 +266,28 @@ function openSongLinkModal({ entityLabel = 'Item', songs = [], linkedSong = null
     if (btn.hasAttribute('data-select-song')) {
       const nextSongId = Number(btn.getAttribute('data-select-song') || 0);
       if (!nextSongId) return;
-      await onSave?.(nextSongId);
-      close();
+      errorEl.textContent = '';
+      try {
+        await onSave?.(nextSongId);
+        close();
+      } catch (error) {
+        errorEl.textContent = error?.message || 'Could not link song.';
+      }
       return;
     }
     if (btn.hasAttribute('data-unlink-song') && linkedSong?.song_id) {
-      await onUnlink?.();
-      close();
+      errorEl.textContent = '';
+      try {
+        await onUnlink?.();
+        close();
+      } catch (error) {
+        errorEl.textContent = error?.message || 'Could not unlink song.';
+      }
     }
   });
 
   searchInput?.addEventListener('input', renderRows);
+  renderLinkedSong();
   renderRows();
 }
 
