@@ -97,6 +97,9 @@ Manual refresh (optional):
 ```bash
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
+
+# If Dockerfile/dependency layers changed, force a clean local rebuild (dev stack)
+docker compose build --no-cache
 ```
 
 ### Data safety (important)
