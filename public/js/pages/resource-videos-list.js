@@ -46,6 +46,7 @@ Pages.ResourceVideosList = {
     ]);
 
     const normalized = this.applyProgressFilterAndSort(videos, filters.progress, filters.sort);
+    this.videoState = normalized.map((video) => ({ ...video }));
 
     const difficultyOptions = ['Beginner', 'Intermediate', 'Advanced']
       .flatMap((track) => [1, 2, 3].map((level) => ({ value: `${track}-${level}`, label: `${track} ${level}` })));
@@ -89,7 +90,7 @@ Pages.ResourceVideosList = {
           </div>
         </div>
 
-        ${normalized.length ? `<div id="video-results" style="display:${this.viewMode === 'grid' ? 'grid' : 'block'};grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">${normalized.map((video) => this.renderCard(video, this.viewMode)).join('')}</div>` : '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No videos found.</div>'}
+        ${this.videoState.length ? `<div id="video-results" style="display:${this.viewMode === 'grid' ? 'grid' : 'block'};grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">${this.videoState.map((video) => this.renderCard(video, this.viewMode)).join('')}</div>` : '<div class="df-panel df-panel--wide" style="padding:24px;text-align:center;color:var(--text2);">No videos found.</div>'}
       </div>
     `;
 
@@ -118,31 +119,46 @@ Pages.ResourceVideosList = {
       go(`#/training/videos/${card.dataset.videoLink}`);
     });
     results?.addEventListener('click', async (event) => {
-      const linkBtn = event.target.closest('[data-link-video-song-card]');
+      const linkBtn = event.target.closest('[data-action="link-song"]');
       if (!linkBtn) return;
       event.preventDefault();
       event.stopPropagation();
-      const videoId = Number(linkBtn.getAttribute('data-link-video-song-card') || 0);
+      const videoId = Number(linkBtn.getAttribute('data-video-id') || 0);
       if (!videoId) return;
-      const video = normalized.find((entry) => Number(entry.id) === videoId);
+      const video = (this.videoState || []).find((entry) => Number(entry.id) === videoId);
       if (!video) return;
-      if (!songs.length) return;
-      const linkedSong = Number(video.linked_song_id) ? { song_id: Number(video.linked_song_id), title: String(video.linked_song_title || '') } : null;
+      if (!songs.length) {
+        Utils.toast?.('Create a song first.');
+        return;
+      }
+      const linkedSong = Number(video.linked_song_id) ? {
+        song_id: Number(video.linked_song_id),
+        title: String(video.linked_song_title || ''),
+        artist: String(video.linked_song_artist || ''),
+      } : null;
       const openModal = window.openSongLinkModal;
-      if (typeof openModal !== 'function') return;
+      if (typeof openModal !== 'function') {
+        Utils.toast?.('Song link modal unavailable.');
+        return;
+      }
       openModal({
         entityLabel: video.title || `Video ${videoId}`,
         songs,
         linkedSong,
         onSave: async (songId) => {
           await DB.linkSongVideo(videoId, songId);
+          const song = songs.find((entry) => Number(entry.id) === Number(songId));
+          this.updateVideoSongState(videoId, song || { id: songId, title: `Song ${songId}`, artist: '' });
+          this.rerenderVideoCard(videoId);
           sessionStorage.setItem('trainingVideoStatus', 'Video linked to song.');
-          await this.render();
+          Utils.toast?.('Video linked to song.');
         },
         onUnlink: async () => {
           await DB.unlinkSongVideo(videoId);
+          this.updateVideoSongState(videoId, null);
+          this.rerenderVideoCard(videoId);
           sessionStorage.setItem('trainingVideoStatus', 'Video unlinked from song.');
-          await this.render();
+          Utils.toast?.('Video unlinked from song.');
         },
       });
     });
@@ -153,6 +169,33 @@ Pages.ResourceVideosList = {
       event.preventDefault();
       go(`#/training/videos/${card.dataset.videoLink}`);
     });
+  },
+
+
+  updateVideoSongState(videoId, song) {
+    const id = Number(videoId || 0);
+    if (!id) return;
+    this.videoState = (this.videoState || []).map((entry) => {
+      if (Number(entry.id) !== id) return entry;
+      if (!song) return { ...entry, linked_song_id: null, linked_song_title: '', linked_song_artist: '' };
+      return {
+        ...entry,
+        linked_song_id: Number(song.id) || null,
+        linked_song_title: String(song.title || ''),
+        linked_song_artist: String(song.artist || ''),
+      };
+    });
+  },
+
+  rerenderVideoCard(videoId) {
+    const id = Number(videoId || 0);
+    if (!id) return;
+    const container = document.querySelector('#video-results');
+    const current = container?.querySelector(`[data-video-link="${id}"]`);
+    if (!container || !current || !Array.isArray(this.videoState)) return;
+    const video = this.videoState.find((entry) => Number(entry.id) === id);
+    if (!video) return;
+    current.outerHTML = this.renderCard(video, this.viewMode);
   },
 
   applyProgressFilterAndSort(videos = [], progressFilter = 'all', sort = 'recentlyAdded') {
@@ -197,8 +240,10 @@ Pages.ResourceVideosList = {
     const duration = formatVideoDuration(video.duration_seconds);
     const linkedSongId = Number(video.linked_song_id || 0);
     const linkedSongTitle = String(video.linked_song_title || '').trim();
-    const songBadge = linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Song: ${linkedSongTitle || `Song ${linkedSongId}`}</span>` : '';
-    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn" data-link-video-song-card="${video.id}" data-card-action="1" title="Link to song">🎵</button>`;
+    const linkedSongArtist = String(video.linked_song_artist || '').trim();
+    const songBadge = linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Song: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}</span>` : '';
+    const songActionLabel = linkedSongId ? 'Change Song' : 'Link Song';
+    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn" data-action="link-song" data-video-id="${video.id}" data-card-action="1" title="${songActionLabel}">${songActionLabel}</button>`;
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
