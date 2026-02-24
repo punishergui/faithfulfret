@@ -32,8 +32,16 @@ docker compose up -d --force-recreate
 
 ## RUNBOOK (Docker + GHCR)
 
-- **Required Node version:** Node.js `22.x` for local non-Docker runs (Docker image is pinned to `node:22.14.0-alpine`).
+- **Required Node version:** Node.js `20.x` for local non-Docker runs (Docker image is pinned to `node:20.19.5-alpine`).
 - **Port mapping remains:** host `3000` -> container `9999`.
+
+### CI/Docker build notes
+
+The Docker image now uses a two-stage build so CI is reliable:
+- **builder stage** runs `npm ci` (includes dev deps) and `npm run build:manual`
+- **runtime stage** runs `npm ci --omit=dev` and copies only runtime artifacts
+
+This avoids relying on local bind mounts and keeps production images minimal/reproducible.
 
 ### Build locally
 
@@ -68,7 +76,7 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags when needed for instant rollback.
+Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags when needed for instant rollback (example: `ghcr.io/<owner>/faithfulfret:v1.2.3`).
 
 After deploy, verify hero asset wiring is GHCR-safe (no local overrides): `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` returns `200`, and `grep -R "/img/hero/.*\.svg" -n public` returns no active hero SVG references.
 
