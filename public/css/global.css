@@ -4377,6 +4377,31 @@ body.print-view .chord-chart-row {
   aspect-ratio: 16 / 9;
 }
 
+
+.tv-card__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.tv-card__meta-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.tv-card__link-song {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: auto !important;
+  white-space: nowrap;
+}
+
 .training-playlists-layout {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr);
