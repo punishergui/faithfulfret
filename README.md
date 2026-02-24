@@ -73,6 +73,7 @@ Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags w
 After deploy, verify hero asset wiring is GHCR-safe (no local overrides): `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` returns `200`, and `grep -R "/img/hero/.*\.svg" -n public` returns no active hero SVG references.
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).
+After deploy, verify service-worker asset freshness: update a JS/CSS asset (for example `/js/pages/training.js`), hard refresh once, then confirm subsequent loads use the updated file while offline fallback for `/` still works from cached `/index.html`.
 After deploy, verify Training video progress works (Watched/Mastered toggles + notes save/refresh) and Playlist pages show thumbnail previews with readable two-line titles on desktop and mobile.
 After deploy, verify Training videos remain URL-based: create/edit videos with YouTube URLs, metadata fetch works, and thumbnails render from oEmbed/URL values.
 After deploy, verify **Fetch Details** on `#/training/videos/new` auto-fills title, thumbnail, and duration (yt-dlp metadata), manual duration overrides save, and unknown durations render as `—` (never `00:00`).
