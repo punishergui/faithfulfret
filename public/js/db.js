@@ -529,6 +529,18 @@
       return api(`/api/training/playlists/${playlistId}/songs`);
     },
 
+    async getVideoSongLink(videoId) {
+      return api(`/api/videos/${videoId}/song`);
+    },
+
+    async linkSongVideo(videoId, songId) {
+      return api(`/api/videos/${videoId}/link-song`, { method: 'POST', body: JSON.stringify({ song_id: Number(songId) || 0 }) });
+    },
+
+    async unlinkSongVideo(videoId) {
+      return api(`/api/videos/${videoId}/link-song`, { method: 'DELETE' });
+    },
+
     async exportAll() {
       const payload = await api('/api/export');
       payload.localSettings = readLocalSettings();

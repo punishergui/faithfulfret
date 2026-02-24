@@ -420,6 +420,8 @@ function normalizeTrainingVideo(row = {}) {
   const thumb = resolveTrainingThumb(row);
   return {
     ...row,
+    linked_song_id: Number(row.linked_song_id) || null,
+    linked_song_title: String(row.linked_song_title || ''),
     hasLocalVideo: false,
     thumbUrl: thumb,
     thumb_url: thumb,
@@ -541,6 +543,8 @@ function playlistWithItems(id) {
       ...item,
       item_type: 'video',
       duration_seconds: Number(video?.duration_seconds) || 0,
+      linked_song_id: Number(video?.linked_song_id) || null,
+      linked_song_title: String(video?.linked_song_title || ''),
       video,
       progress,
     };
@@ -1917,6 +1921,43 @@ apiRouter.get('/training/videos/:id', (req, res) => {
   const row = Store.getTrainingVideo(req.params.id);
   if (!row) return res.status(404).json({ error: 'not found' });
   return res.json(normalizeTrainingVideo(row));
+});
+
+apiRouter.get('/videos/:id/song', (req, res) => {
+  const video = Store.getTrainingVideo(req.params.id);
+  if (!video) return res.status(404).json({ error: 'video not found' });
+  return res.json(Store.getVideoSongLink(req.params.id) || null);
+});
+
+apiRouter.post('/videos/:id/link-song', (req, res) => {
+  const videoId = Number(req.params.id);
+  const songId = Number(req.body?.song_id || 0);
+  const video = Store.getTrainingVideo(videoId);
+  const song = Store.getRepertoireSong(songId);
+  if (!video || !song) return res.status(404).json({ error: 'song or video not found' });
+  const linked = Store.linkSongVideo(songId, videoId);
+  Store.addTimelineEvent({
+    event_type: 'song_status_changed',
+    title: `Linked video: ${song.title}`,
+    subtitle: video.title || `Video ${videoId}`,
+    entity_id: `song_video:${songId}:${videoId}`,
+  });
+  return res.status(201).json(linked);
+});
+
+apiRouter.delete('/videos/:id/link-song', (req, res) => {
+  const videoId = Number(req.params.id);
+  const existing = Store.getVideoSongLink(videoId);
+  Store.unlinkSongVideo(videoId);
+  if (existing?.song_id) {
+    Store.addTimelineEvent({
+      event_type: 'song_status_changed',
+      title: 'Unlinked song video',
+      subtitle: `Song ${existing.song_id} · Video ${videoId}`,
+      entity_id: `song_video:${existing.song_id}:${videoId}`,
+    });
+  }
+  return res.json({ ok: true });
 });
 
 apiRouter.get('/training/videos/:id/progress', (req, res) => {

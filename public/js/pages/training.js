@@ -207,10 +207,10 @@ function renderPlaylistCardInner(playlist, { linkedSong = null, compact = false 
   </div>`;
 }
 
-function openPlaylistSongLinkModal({ playlist, songs = [], linkedSong = null, onSave, onUnlink }) {
+function openSongLinkModal({ entityLabel = 'Item', songs = [], linkedSong = null, onSave, onUnlink }) {
   const modal = document.createElement('div');
   modal.className = 'sync-help-modal open';
-  const safePlaylistName = esc(playlist?.name || `Playlist ${playlist?.id || ''}`);
+  const safePlaylistName = esc(entityLabel || 'Item');
   modal.innerHTML = `<div class="sync-help-modal__card" role="dialog" aria-modal="true" aria-label="Link playlist to song" style="max-width:560px;">
     <div class="sync-help-modal__head"><strong>Link Song · ${safePlaylistName}</strong><button type="button" class="df-btn df-btn--ghost" data-close-modal aria-label="Close">×</button></div>
     <div style="display:grid;gap:8px;">
@@ -262,6 +262,8 @@ function openPlaylistSongLinkModal({ playlist, songs = [], linkedSong = null, on
   searchInput?.addEventListener('input', renderRows);
   renderRows();
 }
+
+window.openSongLinkModal = openSongLinkModal;
 
 function savePlaylistProgress(playlistId, lastVideoId) {
   setLastPracticeTraining({ playlistId, videoId: lastVideoId });
@@ -553,7 +555,7 @@ Pages.TrainingPlaylists = { async render() { await renderWithError(async () => {
     const playlist = playlists.find((entry) => Number(entry.id) === playlistId);
     if (!playlist) return;
     const linkedSong = linkedSongsByPlaylistId.get(playlistId) || null;
-    openPlaylistSongLinkModal({
+    openSongLinkModal({
       playlist,
       songs: repertoireSongs,
       linkedSong,
@@ -749,10 +751,12 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const watched = video?.watched_at;
     const mastered = video?.mastered_at;
     const thumb = video?.thumbnail_url || video?.thumb_url || video?.thumbUrl || '';
+    const linkedSongId = Number(video?.linked_song_id || 0);
+    const linkedSongTitle = String(video?.linked_song_title || '').trim();
     return `<div id="playlist-video-${videoId}" class="training-playlist-row" data-open-video="${videoId}" data-item-id="${item.id}">
       ${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">🎬</div>'}
-      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${(() => { const sec = getDurSec(video); if (sec == null) return `<span style=\"color:var(--text3);font-size:12px;\">—</span>`; const label = formatDuration(sec) || '00:00'; return `<span style=\"color:var(--text3);font-size:12px;\">${label}</span>`; })()}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}</div></div>
-      <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
+      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${(() => { const sec = getDurSec(video); if (sec == null) return `<span style=\"color:var(--text3);font-size:12px;\">—</span>`; const label = formatDuration(sec) || '00:00'; return `<span style=\"color:var(--text3);font-size:12px;\">${label}</span>`; })()}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}${linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Linked: ${esc(linkedSongTitle || `Song ${linkedSongId}`)}</span>` : ''}</div></div>
+      <div class="training-playlist-row-controls"><button class="df-btn df-btn--outline training-compact-btn playlist-item-action" data-link-video-song="${videoId}" type="button">${linkedSongId ? 'Change Song' : 'Link to Song'}</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
     </div>`;
   };
 
@@ -826,7 +830,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
 
   const bindListEvents = () => {
     app.querySelectorAll('.training-playlist-row').forEach((row) => row.addEventListener('click', (event) => {
-      if (event.target.closest('button[data-up],button[data-down],button[data-remove-id],button[data-unnest-id],button[data-link-playlist-song],.training-playlist-row-controls,.playlist-card__actions')) return;
+      if (event.target.closest('button[data-up],button[data-down],button[data-remove-id],button[data-unnest-id],button[data-link-playlist-song],button[data-link-video-song],.training-playlist-row-controls,.playlist-card__actions')) return;
       const nestedId = Number(row.dataset.openPlaylist);
       if (nestedId) return go(`#/training/playlists/${nestedId}?parentId=${id}`);
       const videoId = Number(row.dataset.openVideo);
@@ -834,6 +838,40 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       savePlaylistProgress(id, videoId);
       pushRecentPlaylist(playlist);
       go(`#/training/videos/${videoId}?fromPlaylist=${encodeURIComponent(id)}`);
+    }));
+
+    app.querySelectorAll('[data-link-video-song]').forEach((b) => b.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const videoId = Number(b.getAttribute('data-link-video-song') || 0);
+      if (!videoId) return;
+      const video = videosMap.get(videoId);
+      if (!video) return;
+      if (!Array.isArray(repertoireSongs)) repertoireSongs = await DB.getRepertoireSongs({}).catch(() => []);
+      if (!repertoireSongs.length) return showErr('Create a song first.');
+      const linkedSong = Number(video.linked_song_id) ? {
+        song_id: Number(video.linked_song_id),
+        title: String(video.linked_song_title || ''),
+      } : null;
+      openSongLinkModal({
+        entityLabel: video.title || `Video ${videoId}`,
+        songs: repertoireSongs,
+        linkedSong,
+        onSave: async (songId) => {
+          await DB.linkSongVideo(videoId, songId);
+          const song = repertoireSongs.find((entry) => Number(entry.id) === Number(songId));
+          videosMap.set(videoId, { ...video, linked_song_id: Number(songId), linked_song_title: String(song?.title || `Song ${songId}`) });
+          sessionStorage.setItem('trainingPlaylistStatus', 'Video linked to song.');
+          go(route);
+        },
+        onUnlink: async () => {
+          if (!linkedSong?.song_id) return;
+          await DB.unlinkSongVideo(videoId);
+          videosMap.set(videoId, { ...video, linked_song_id: null, linked_song_title: '' });
+          sessionStorage.setItem('trainingPlaylistStatus', 'Video unlinked from song.');
+          go(route);
+        },
+      });
     }));
 
     app.querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', async (event) => {
@@ -913,8 +951,8 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
       if (!repertoireSongs.length) return showErr('Create a song first.');
       const childPlaylist = idToPlaylist.get(childPlaylistId) || { id: childPlaylistId, name: `Playlist ${childPlaylistId}` };
       const linkedSong = linkedSongsByPlaylistId.get(childPlaylistId) || null;
-      openPlaylistSongLinkModal({
-        playlist: childPlaylist,
+      openSongLinkModal({
+        entityLabel: childPlaylist.name || `Playlist ${childPlaylistId}`,
         songs: repertoireSongs,
         linkedSong,
         onSave: async (songId) => {
