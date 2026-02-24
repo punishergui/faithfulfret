@@ -33,7 +33,7 @@ Pages.ResourceVideosList = {
     const difficultyTrack = filters.difficulty ? filters.difficulty.split('-')[0] : '';
     const difficultyLevel = filters.difficulty ? Number(filters.difficulty.split('-')[1]) : '';
 
-    const [videos, playlists] = await Promise.all([
+    const [videos, playlists, songs] = await Promise.all([
       DB.getAllTrainingVideos({
         q: filters.q,
         category: filters.category,
@@ -42,6 +42,7 @@ Pages.ResourceVideosList = {
         difficulty_level: difficultyLevel || '',
       }),
       DB.getVideoPlaylists(),
+      DB.getRepertoireSongs({}).catch(() => []),
     ]);
 
     const normalized = this.applyProgressFilterAndSort(videos, filters.progress, filters.sort);
@@ -116,6 +117,35 @@ Pages.ResourceVideosList = {
       if (event.target.closest('button,a,input,select,textarea,[data-card-action]')) return;
       go(`#/training/videos/${card.dataset.videoLink}`);
     });
+    results?.addEventListener('click', async (event) => {
+      const linkBtn = event.target.closest('[data-link-video-song-card]');
+      if (!linkBtn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const videoId = Number(linkBtn.getAttribute('data-link-video-song-card') || 0);
+      if (!videoId) return;
+      const video = normalized.find((entry) => Number(entry.id) === videoId);
+      if (!video) return;
+      if (!songs.length) return;
+      const linkedSong = Number(video.linked_song_id) ? { song_id: Number(video.linked_song_id), title: String(video.linked_song_title || '') } : null;
+      const openModal = window.openSongLinkModal;
+      if (typeof openModal !== 'function') return;
+      openModal({
+        entityLabel: video.title || `Video ${videoId}`,
+        songs,
+        linkedSong,
+        onSave: async (songId) => {
+          await DB.linkSongVideo(videoId, songId);
+          sessionStorage.setItem('trainingVideoStatus', 'Video linked to song.');
+          await this.render();
+        },
+        onUnlink: async () => {
+          await DB.unlinkSongVideo(videoId);
+          sessionStorage.setItem('trainingVideoStatus', 'Video unlinked from song.');
+          await this.render();
+        },
+      });
+    });
     results?.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
       const card = event.target.closest('[data-video-link]');
@@ -165,6 +195,10 @@ Pages.ResourceVideosList = {
     const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${statusTags}`;
     const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" class="training-video-library-thumb">` : '<div class="training-thumb-fallback training-video-library-thumb-fallback">🎬</div>';
     const duration = formatVideoDuration(video.duration_seconds);
+    const linkedSongId = Number(video.linked_song_id || 0);
+    const linkedSongTitle = String(video.linked_song_title || '').trim();
+    const songBadge = linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Song: ${linkedSongTitle || `Song ${linkedSongId}`}</span>` : '';
+    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn" data-link-video-song-card="${video.id}" data-card-action="1" title="Link to song">🎵</button>`;
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
@@ -172,7 +206,9 @@ Pages.ResourceVideosList = {
           <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
+          ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
+          <div style="margin-top:8px;display:flex;justify-content:flex-end;">${songAction}</div>
         </div>
       </div>`;
     }
@@ -181,7 +217,9 @@ Pages.ResourceVideosList = {
       <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
+      ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${allTags}</div>
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">${songAction}</div>
     </div>`;
   },
 
