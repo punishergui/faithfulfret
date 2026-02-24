@@ -70,6 +70,24 @@ docker compose -f docker-compose.prod.yml up -d
 
 Keep rollback path: publish immutable `vX.Y.Z` tags and pin compose image tags when needed for instant rollback.
 
+For deploys that include DB changes, verify migrations immediately:
+
+```bash
+node server/scripts/print_schema.js /data/faithfulfret.sqlite
+# Expect: user_version >= 2 and albums_columns includes albumKey
+```
+
+Rollback/pin example:
+
+```yaml
+# docker-compose.prod.yml
+services:
+  daily-fret:
+    image: ghcr.io/<owner>/daily-fret:vX.Y.Z
+```
+
+After pinning, run `docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`.
+
 After deploy, verify hero asset wiring is GHCR-safe (no local overrides): `curl -I http://127.0.0.1:3000/img/hero/djent.jpg` returns `200`, and `grep -R "/img/hero/.*\.svg" -n public` returns no active hero SVG references.
 
 After deploy, verify Training routes load: `#/training`, `#/training/videos`, and `#/training/playlists` (Videos are now under Training, not Resources).

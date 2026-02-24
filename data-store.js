@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const dataDir = '/data';
+const dataDir = process.env.FF_DATA_DIR || '/data';
 const dbPath = path.join(dataDir, 'faithfulfret.sqlite');
+const LATEST_SCHEMA_VERSION = 2;
 
 function isDataMountPresent() {
   try {
@@ -300,6 +301,9 @@ ensureColumn('presets', 'audioPath', 'TEXT');
 ensureColumn('presets', 'audioMime', 'TEXT');
 ensureColumn('presets', 'audioDuration', 'REAL');
 ensureColumn('presets', 'audioData', 'TEXT');
+ensureColumn('albums', 'albumKey', 'TEXT');
+ensureColumn('albums', 'albumDir', 'TEXT');
+ensureColumn('albums', 'albumGroupKey', 'TEXT');
 ensureColumn('training_videos', 'url', 'TEXT');
 ensureColumn('training_videos', 'provider', 'TEXT');
 ensureColumn('training_videos', 'videoId', 'TEXT');
@@ -560,8 +564,16 @@ function seedTrainingDefaults() {
 
 function openDb() {
   db = new Database(dbPath);
-  db.exec('PRAGMA journal_mode = WAL;');
-  ensureSchema();
+  try {
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec(BASE_SCHEMA_SQL);
+    runMigrations();
+  } catch (error) {
+    if (/readonly|read-only/i.test(String(error?.message || ''))) {
+      throw new Error(`Database at ${dbPath} is read-only. Migrations require write access. Original error: ${error.message}`);
+    }
+    throw error;
+  }
   seedTrainingDefaults(db);
   if (typeof initQueries === 'function') initQueries();
   return db;
@@ -575,13 +587,80 @@ function assertQueriesInitialized() {
 
 openDb();
 
-function ensureColumn(table, column, definition) {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!columns.some((row) => row.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  }
+function quoteIdentifier(value = '') {
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
-ensureColumn('gear_links', 'isPrimary', 'INTEGER DEFAULT 0');
+
+function hasTable(table) {
+  const row = db.prepare('SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?').get('table', String(table));
+  return Boolean(row);
+}
+
+function hasColumn(table, column) {
+  if (!hasTable(table)) return false;
+  const columns = db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all();
+  return columns.some((row) => row.name === column);
+}
+
+function ensureColumn(table, column, definition) {
+  if (!hasTable(table) || hasColumn(table, column)) return false;
+  db.exec(`ALTER TABLE ${quoteIdentifier(table)} ADD COLUMN ${quoteIdentifier(column)} ${definition}`);
+  return true;
+}
+
+function hasIndex(name) {
+  const row = db.prepare('SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?').get('index', String(name));
+  return Boolean(row);
+}
+
+function ensureIndex(name, ddl) {
+  if (hasIndex(name)) return false;
+  db.exec(ddl);
+  return true;
+}
+
+function getUserVersion() {
+  const row = db.prepare('PRAGMA user_version;').get();
+  return row ? Number(Object.values(row)[0] || 0) : 0;
+}
+
+function setUserVersion(version) {
+  db.pragma(`user_version = ${Number(version)}`);
+}
+
+function runMigrations() {
+  const migrations = [
+    { version: 1, label: 'legacy schema hardening', up: ensureSchema },
+    {
+      version: 2,
+      label: 'albums albumKey compatibility',
+      up: () => {
+        db.exec(`CREATE TABLE IF NOT EXISTS albums (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT,
+          path TEXT
+        )`);
+        ensureColumn('albums', 'albumKey', 'TEXT');
+        ensureColumn('albums', 'albumDir', 'TEXT');
+        ensureColumn('albums', 'albumGroupKey', 'TEXT');
+        ensureIndex('idx_albums_album_key', 'CREATE INDEX idx_albums_album_key ON albums(albumKey)');
+        db.prepare(`UPDATE albums
+          SET albumKey = COALESCE(NULLIF(albumKey, ''), NULLIF(albumDir, ''), NULLIF(path, ''))
+          WHERE 1=1`).run();
+      },
+    },
+  ];
+
+  let current = getUserVersion();
+  migrations.forEach((migration) => {
+    if (current >= migration.version) return;
+    migration.up();
+    setUserVersion(migration.version);
+    current = migration.version;
+    console.log(`[DB MIGRATION] v${migration.version} applied: ${migration.label}`);
+  });
+  if (current < LATEST_SCHEMA_VERSION) setUserVersion(LATEST_SCHEMA_VERSION);
+}
 
 const LEGACY_PRIMARY_KEY = 'primary';
 const readPrimaryFlag = (row = {}) => Number(row.isPrimary ?? row[LEGACY_PRIMARY_KEY]) ? 1 : 0;
