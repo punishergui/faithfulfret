@@ -713,6 +713,7 @@ curl -s 'http://127.0.0.1:3000/api/oembed?url=https://www.youtube.com/watch?v=dQ
 # 4i) verify long words/URLs wrap in editor + video detail display (no bleed behind sidebar), Enter creates paragraphs, Shift+Enter inserts line breaks, and save+refresh keeps formatted Description (including emoji).
 # 4j) verify sanitization blocks script/img/iframe/event-handler/style injection, only keeps safe http(s) links with target+rel, and preserves only allowed span data-color values (text/muted/accent/accent2/good/warn/bad) across save+reload (including inside h2/h3).
 # 4k) create a new training video with blank duration and verify save auto-fetches duration_seconds, nested playlist rows show per-video durations, playlist total time uses deepDurationSeconds, and unknown durations render as — (not 00:00).
+# 4l) verify #/training/videos and #/training/playlists/<id> cards keep pills/actions on one meta row (actions right-aligned), LINK SONG becomes EDIT LINK when linked, and linked-status tooltip opens on hover/focus/tap and closes on outside click/Escape.
 # Phase A tools checks
 # 5) open #/tools/metronome and verify classic START/STOP + Tap Tempo + time-signature dots are present (reverted behavior).
 # 6) open #/tools/tunings and verify ~20 tunings, per-string Play buttons, and Play All plucked playback are present.

@@ -781,10 +781,15 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     const thumb = video?.thumbnail_url || video?.thumb_url || video?.thumbUrl || '';
     const linkedSongId = Number(video?.linked_song_id || 0);
     const linkedSongTitle = String(video?.linked_song_title || '').trim();
+    const linkedSongArtist = String(video?.linked_song_artist || '').trim();
+    const songTooltip = linkedSongId ? esc(`Linked to: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}`) : '';
+    const songIndicator = linkedSongId
+      ? `<button type="button" class="video-card__linked-indicator" data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" aria-label="Linked song details" data-card-action="1">● Linked</button>`
+      : '';
     return `<div id="playlist-video-${videoId}" class="training-playlist-row" data-open-video="${videoId}" data-item-id="${item.id}">
       ${thumb ? `<img src="${thumb}" alt="${esc(video?.title || '')}" class="training-playlist-thumb training-playlist-thumb-xl">` : '<div class="training-thumb-fallback training-playlist-thumb-xl">🎬</div>'}
-      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${(() => { const sec = getDurSec(video); if (sec == null) return `<span style=\"color:var(--text3);font-size:12px;\">—</span>`; const label = formatDuration(sec) || '00:00'; return `<span style=\"color:var(--text3);font-size:12px;\">${label}</span>`; })()}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}${linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Linked: ${esc(linkedSongTitle || `Song ${linkedSongId}`)}</span>` : ''}</div></div>
-      <div class="training-playlist-row-controls"><button class="df-btn df-btn--outline training-compact-btn playlist-item-action" data-link-video-song="${videoId}" type="button">${linkedSongId ? 'Change Song' : 'Link to Song'}</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
+      <div class="training-playlist-row-copy"><div class="training-row-title training-row-title-clamp">${esc(video?.title || `Video ${videoId}`)}</div><div class="video-card__metaRow u-mt-8"><div class="video-card__pills">${(() => { const sec = getDurSec(video); if (sec == null) return '<span class="video-card__subtle">—</span>'; const label = formatDuration(sec) || '00:00'; return `<span class="video-card__subtle">${label}</span>`; })()}${watched ? '<span class="training-status-badge">WATCHED</span>' : ''}${mastered ? '<span class="training-status-badge is-mastered">MASTERED</span>' : ''}${songIndicator}</div><div class="video-card__actions"><button class="df-btn ${linkedSongId ? 'df-btn--primary' : 'df-btn--outline'} training-compact-btn playlist-item-action" data-link-video-song="${videoId}" type="button" ${linkedSongId ? `data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" aria-label="Edit linked song"` : 'aria-label="Link song"'} data-card-action="1">${linkedSongId ? 'EDIT LINK' : 'LINK SONG'}</button></div></div></div>
+      <div class="training-playlist-row-controls"><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-up="${idx}" type="button">Move up</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-down="${idx}" type="button">Move down</button><button class="df-btn df-btn--ghost training-compact-btn playlist-item-action" data-remove-id="${item.id}" type="button">Remove</button></div>
     </div>`;
   };
 
@@ -831,6 +836,7 @@ Pages.TrainingPlaylistEdit = { async render(id) { await renderWithError(async ()
     renderAddSelectors();
     updateSidebarStats();
     bindListEvents();
+    window.TooltipHelper?.bind(container);
     setBusy(state.saving);
   };
 

@@ -4377,6 +4377,73 @@ body.print-view .chord-chart-row {
   aspect-ratio: 16 / 9;
 }
 
+.u-mt-8 {
+  margin-top: 8px;
+}
+
+.video-card__metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.video-card__pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.video-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.video-card__pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.video-card__subtle {
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.video-card__linked-indicator {
+  border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--line) 40%);
+  background: color-mix(in srgb, var(--ok) 20%, transparent 80%);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.df-tooltip {
+  position: absolute;
+  z-index: 90;
+  max-width: min(320px, calc(100vw - 16px));
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--bg) 70%, var(--text) 30%);
+  font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .video-card__actions {
+    width: 100%;
+  }
+}
 
 .tv-card__meta-row {
   display: flex;

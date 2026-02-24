@@ -1,5 +1,7 @@
 window.Pages = window.Pages || {};
 
+function escHtml(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
 function formatVideoDuration(seconds) {
   const total = Number(seconds);
   if (!Number.isFinite(total) || total <= 0) return '';
@@ -112,6 +114,7 @@ Pages.ResourceVideosList = {
     });
 
     const results = app.querySelector('#video-results');
+    window.TooltipHelper?.bind(results || app);
     results?.addEventListener('click', (event) => {
       const card = event.target.closest('[data-video-link]');
       if (!card) return;
@@ -196,6 +199,7 @@ Pages.ResourceVideosList = {
     const video = this.videoState.find((entry) => Number(entry.id) === id);
     if (!video) return;
     current.outerHTML = this.renderCard(video, this.viewMode);
+    window.TooltipHelper?.bind(container);
   },
 
   applyProgressFilterAndSort(videos = [], progressFilter = 'all', sort = 'recentlyAdded') {
@@ -235,15 +239,19 @@ Pages.ResourceVideosList = {
       pdfCount > 0 ? '<span class="training-status-badge">PDF</span>' : '',
       !pdfCount && attachmentCount > 0 ? '<span class="training-status-badge">ATTACHMENTS</span>' : '',
     ].filter(Boolean).join('');
-    const allTags = `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${video.category || 'general'}</span>${tags.map((tag) => `<span class="df-btn df-btn--outline" style="padding:2px 8px;font-size:11px;">${tag}</span>`).join('')}${statusTags}`;
+    const allTags = `<span class="video-card__pill">${video.category || 'general'}</span>${tags.map((tag) => `<span class="video-card__pill">${tag}</span>`).join('')}${statusTags}`;
     const thumbHtml = thumb ? `<img src="${thumb}" alt="${video.title || ''}" class="training-video-library-thumb">` : '<div class="training-thumb-fallback training-video-library-thumb-fallback">🎬</div>';
     const duration = formatVideoDuration(video.duration_seconds);
     const linkedSongId = Number(video.linked_song_id || 0);
     const linkedSongTitle = String(video.linked_song_title || '').trim();
     const linkedSongArtist = String(video.linked_song_artist || '').trim();
-    const songBadge = linkedSongId ? `<span class="playlist-linked-badge" title="Linked song">Song: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}</span>` : '';
-    const songActionLabel = linkedSongId ? 'Change Song' : 'Link Song';
-    const songAction = `<button type="button" class="df-btn df-btn--outline training-compact-btn tv-card__link-song" data-action="link-song" data-video-id="${video.id}" data-card-action="1" title="${songActionLabel}">${songActionLabel}</button>`;
+    const songTooltip = linkedSongId ? escHtml(`Linked to: ${linkedSongTitle || `Song ${linkedSongId}`}${linkedSongArtist ? ` — ${linkedSongArtist}` : ''}`) : '';
+    const songBadge = linkedSongId
+      ? `<button type="button" class="video-card__linked-indicator" data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" data-card-action="1" aria-label="Linked song details">● Linked</button>`
+      : '';
+    const songActionLabel = linkedSongId ? 'EDIT LINK' : 'LINK SONG';
+    const songActionClass = linkedSongId ? 'df-btn--primary' : 'df-btn--outline';
+    const songAction = `<button type="button" class="df-btn ${songActionClass} training-compact-btn tv-card__link-song" data-action="link-song" data-video-id="${video.id}" data-card-action="1" ${linkedSongId ? `data-tooltip-content="${songTooltip}" data-tooltip-toggle="true" aria-label="Edit linked song"` : 'aria-label="Link song"'}>${songActionLabel}</button>`;
 
     if (viewMode === 'list') {
       return `<div class="df-panel training-video-library-card is-list" role="link" tabindex="0" data-video-link="${video.id}">${thumbHtml}
@@ -251,10 +259,9 @@ Pages.ResourceVideosList = {
           <div class="training-row-title">${video.title || '(Untitled)'}</div>
           <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
           <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
-          ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
-          <div class="tv-card__meta-row" style="margin-top:8px;">
-            <div class="tv-card__meta-left">${allTags}</div>
-            ${songAction}
+          <div class="video-card__metaRow u-mt-8">
+            <div class="video-card__pills">${allTags}${songBadge}</div>
+            <div class="video-card__actions">${songAction}</div>
           </div>
         </div>
       </div>`;
@@ -264,10 +271,9 @@ Pages.ResourceVideosList = {
       <div style="margin-top:10px;" class="training-row-title">${video.title || '(Untitled)'}</div>
       <div style="color:var(--text2);font-size:12px;">${video.author || ''}</div>
       <div style="margin-top:6px;color:var(--text2);font-size:12px;">${difficulty}${duration ? ` • ${duration}` : ''}</div>
-      ${songBadge ? `<div style="margin-top:6px;">${songBadge}</div>` : ''}
-      <div class="tv-card__meta-row" style="margin-top:8px;">
-        <div class="tv-card__meta-left">${allTags}</div>
-        ${songAction}
+      <div class="video-card__metaRow u-mt-8">
+        <div class="video-card__pills">${allTags}${songBadge}</div>
+        <div class="video-card__actions">${songAction}</div>
       </div>
     </div>`;
   },
