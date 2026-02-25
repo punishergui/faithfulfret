@@ -200,6 +200,7 @@ Pages.Gear = {
                 ${['Newest', 'Oldest', 'Name A-Z', 'Price low->high', 'Priority', 'Most used', 'Recently used'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
               </select>
               <div class="gear-view-switch" role="group" aria-label="Gear view mode">
+                <!-- View-toggle SVG icons stay inline here to avoid external icon dependencies. -->
                 <button type="button" class="df-btn df-btn--outline gear-view-btn ${selectedView === 'cards' ? 'is-active' : ''}" data-gear-view-btn="cards" title="Large cards" aria-label="Large cards" aria-pressed="${selectedView === 'cards'}">
                   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
                     <rect x="4" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -539,11 +540,12 @@ Pages.Gear = {
       <div class="gear-card card-reveal" onclick="go('#/gear/edit/${g.id}')">
         <div class="gear-card__media">${this._renderCardMedia(g, fallbackImage)}</div>
         <div class="gear-card__body">
-          <div class="gear-card__category">${g.category || ''}</div>
           <div class="gear-card__title">
             <span class="gear-card__name">${g.name || 'Unnamed'}</span>
             ${(g.brand || g.model) ? `<span class="gear-card__sub">${[g.brand, g.model].filter(Boolean).join(' · ')}</span>` : ''}
           </div>
+          <div class="gear-card__usage">Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
+          <div class="gear-card__last-used">Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
@@ -557,7 +559,7 @@ Pages.Gear = {
             <div class="gear-card__links">
               ${topLink ? `<a href="${topLink.url}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">${topLink.label || 'Link'}</a>` : ''}
               ${primaryUrl ? `<a href="${primaryUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
-              <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Manual</a>
+              <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link gear-card__link--manual" onclick="event.stopPropagation()">Manual</a>
             </div>
           </div>
           ${sortedLinks.slice(0, 3).map((link) => `
