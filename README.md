@@ -767,3 +767,5 @@ curl -fsS -X POST "http://127.0.0.1:3000/api/import" \
   -H 'Content-Type: application/json' \
   --data-binary @backup.json | jq .
 ```
+
+After deploy, verify `/#/gear` view switcher (Large cards / Compact cards / List) updates layout instantly, persists after refresh via `localStorage.ff_gear_view`, and remains usable on small screens.
