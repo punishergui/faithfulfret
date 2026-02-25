@@ -72,6 +72,10 @@ function formatCurrency(v) {
   return Utils.formatPrice(Number(v) || 0);
 }
 
+function normalizeGearView(value) {
+  return ['cards', 'compact', 'list'].includes(value) ? value : 'cards';
+}
+
 Pages.Gear = {
   async render() {
     const app = document.getElementById('app');
@@ -103,6 +107,7 @@ Pages.Gear = {
     const sortStorageKey = 'df:gearSort';
     const advancedStorageKey = 'df:gearAdvancedFilters';
     const searchStorageKey = 'df:gearSearch';
+    const viewStorageKey = 'ff_gear_view';
     const filters = ['all', 'owned', 'wishlist', 'sold'];
     if (!this._filtersInitialized) {
       this._selectedFilter = 'all';
@@ -126,10 +131,12 @@ Pages.Gear = {
     const storedFilter = normalizeStatusFilterValue(storedFilterRaw);
     const activeStatusFilter = filters.includes(this._selectedFilter) ? this._selectedFilter : (filters.includes(storedFilter) ? storedFilter : 'all');
     const selectedSort = this._selectedSort || localStorage.getItem(sortStorageKey) || 'Newest';
+    const selectedView = normalizeGearView(this._selectedView || localStorage.getItem(viewStorageKey) || 'cards');
     const searchTerm = this._searchTerm ?? (localStorage.getItem(searchStorageKey) || '');
     const advanced = this._advancedFilters || JSON.parse(localStorage.getItem(advancedStorageKey) || '{}');
     this._selectedFilter = activeStatusFilter;
     this._selectedSort = selectedSort;
+    this._selectedView = selectedView;
     this._searchTerm = searchTerm;
     this._advancedFilters = {
       category: advanced.category || 'All',
@@ -171,7 +178,7 @@ Pages.Gear = {
         actions: '<a href="#/gear/add" class="df-btn df-btn--primary">+ Add Gear</a>',
       })}
 
-      <div class="page-wrap" style="padding:24px 24px 60px;">
+      <div class="page-wrap gear-page" data-gear-view="${selectedView}" style="padding:24px 24px 60px;">
         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
           <div style="flex:1 1 760px;min-width:0;">
             <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:12px;align-items:center;">
@@ -187,11 +194,38 @@ Pages.Gear = {
               <label><input type="checkbox" id="gear-filter-target" ${this._advancedFilters.hasTargetPrice ? 'checked' : ''}> With target price</label>
               <label><input type="checkbox" id="gear-filter-missing-target" ${this._advancedFilters.missingTargetPrice ? 'checked' : ''}> Missing target price</label>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+            <div class="gear-controls-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
               <label class="df-label" style="margin:0;">Sort</label>
               <select class="df-input" id="gear-sort" style="max-width:240px;">
                 ${['Newest', 'Oldest', 'Name A-Z', 'Price low->high', 'Priority', 'Most used', 'Recently used'].map((opt) => `<option value="${opt}" ${selectedSort === opt ? 'selected' : ''}>${opt}</option>`).join('')}
               </select>
+              <div class="gear-view-switch" role="group" aria-label="Gear view mode">
+                <button type="button" class="df-btn df-btn--outline gear-view-btn ${selectedView === 'cards' ? 'is-active' : ''}" data-gear-view-btn="cards" title="Large cards" aria-label="Large cards" aria-pressed="${selectedView === 'cards'}">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                    <rect x="4" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="13" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="4" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="13" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button type="button" class="df-btn df-btn--outline gear-view-btn ${selectedView === 'compact' ? 'is-active' : ''}" data-gear-view-btn="compact" title="Compact cards" aria-label="Compact cards" aria-pressed="${selectedView === 'compact'}">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                    <rect x="4" y="5" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="10" y="5" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="16" y="5" width="4" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="4" y="12" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="10" y="12" width="5" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <rect x="16" y="12" width="4" height="5" rx="1.2" fill="none" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button type="button" class="df-btn df-btn--outline gear-view-btn ${selectedView === 'list' ? 'is-active' : ''}" data-gear-view-btn="list" title="List" aria-label="List" aria-pressed="${selectedView === 'list'}">
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                    <line x1="5" y1="7" x2="20" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="5" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="5" y1="17" x2="20" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             ${visible.length ? this._renderByCategory(byCategory) : this._renderEmpty()}
           </div>
@@ -245,6 +279,25 @@ Pages.Gear = {
       this._selectedSort = e.target.value;
       localStorage.setItem(sortStorageKey, this._selectedSort);
       this.render();
+    });
+
+    const gearPage = app.querySelector('.gear-page');
+    const syncViewButtons = (nextView) => {
+      app.querySelectorAll('[data-gear-view-btn]').forEach((btn) => {
+        const isActive = btn.getAttribute('data-gear-view-btn') === nextView;
+        btn.classList.toggle('is-active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+      });
+    };
+    app.querySelectorAll('[data-gear-view-btn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextView = normalizeGearView(btn.getAttribute('data-gear-view-btn'));
+        if (nextView === this._selectedView) return;
+        this._selectedView = nextView;
+        localStorage.setItem(viewStorageKey, nextView);
+        gearPage?.setAttribute('data-gear-view', nextView);
+        syncViewButtons(nextView);
+      });
     });
 
     app.querySelector('#gear-reset-filters')?.addEventListener('click', () => {
@@ -446,7 +499,7 @@ Pages.Gear = {
   _renderByCategory(byCategory) {
     return Object.entries(byCategory).map(([cat, items]) => `
       <div class="cat-header">${cat} <span style="color:var(--text2);">(${items.length})</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;background:var(--line);margin-bottom:32px;">
+      <div class="gear-grid">
         ${items.map((g) => this._renderCard(g)).join('')}
       </div>
     `).join('');

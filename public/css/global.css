@@ -1198,6 +1198,123 @@ select.df-input option {
 /* ============================================================
    GEAR CARD
    ============================================================ */
+
+.gear-controls-row {
+  justify-content: flex-start;
+}
+
+.gear-view-switch {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.gear-view-btn {
+  min-width: 32px;
+  min-height: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--line2);
+  transition: border-color 0.18s, background-color 0.18s, box-shadow 0.18s;
+}
+
+.gear-view-btn:hover,
+.gear-view-btn:focus-visible,
+.gear-view-btn.is-active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line2));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent), 0 0 10px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.gear-view-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg2));
+}
+
+.gear-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  margin-bottom: 32px;
+}
+
+.gear-page[data-gear-view="compact"] .gear-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.gear-page[data-gear-view="compact"] .gear-card {
+  min-height: 220px;
+}
+
+.gear-page[data-gear-view="compact"] .gear-card__body {
+  padding: 12px;
+}
+
+.gear-page[data-gear-view="compact"] .gear-card__name {
+  font-size: 18px;
+}
+
+.gear-page[data-gear-view="compact"] .gear-card__notes {
+  -webkit-line-clamp: 1;
+  margin-bottom: 6px;
+}
+
+.gear-page[data-gear-view="compact"] .gear-card [data-link-inline-row] {
+  grid-template-columns: 1fr 92px 120px auto auto !important;
+  gap: 4px !important;
+}
+
+.gear-page[data-gear-view="list"] .gear-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gear-page[data-gear-view="list"] .gear-card {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.gear-page[data-gear-view="list"] .gear-card::after {
+  background: linear-gradient(90deg, rgba(10,10,8,.45), rgba(10,10,8,.82));
+}
+
+.gear-page[data-gear-view="list"] .gear-card__body {
+  padding: 12px 14px;
+}
+
+.gear-page[data-gear-view="list"] .gear-card__name {
+  font-size: 18px;
+}
+
+.gear-page[data-gear-view="list"] .gear-card__notes {
+  -webkit-line-clamp: 1;
+  margin-bottom: 6px;
+}
+
+.gear-page[data-gear-view="list"] .gear-card [data-link-inline-row] {
+  grid-template-columns: 1fr 100px 130px auto auto !important;
+}
+
+@media (max-width: 860px) {
+  .gear-controls-row {
+    align-items: flex-start;
+  }
+
+  .gear-view-switch {
+    margin-left: 0;
+  }
+
+  .gear-page[data-gear-view="list"] .gear-card {
+    grid-template-columns: 1fr;
+    min-height: 210px;
+  }
+}
 .gear-card {
   background: var(--bg1);
   position: relative;
