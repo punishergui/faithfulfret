@@ -769,4 +769,5 @@ curl -fsS -X POST "http://127.0.0.1:3000/api/import" \
 ```
 
 After deploy, verify `/#/gear` view switcher (Large cards / Compact cards / List) updates layout instantly, persists after refresh via `localStorage.ff_gear_view`, and remains usable on small screens.
-After deploy, verify Compact view hides pricing/date/history/long-notes blocks (no card overflow), and List view renders as aligned rows (thumb, name, category, status, actions) that collapse cleanly to two lines on mobile.
+After deploy, verify Compact view hides all price-checking UI/summary blocks and keeps only core info (thumb, name, owned/wishlist pill, used count, last used, manual link) without overflow.
+After deploy, verify List view renders true single-row entries (thumb, left-aligned truncated name, used count, last used, owned/wishlist pill, manual link), with category text removed inside rows/cards.
