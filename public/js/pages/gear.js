@@ -320,35 +320,6 @@ Pages.Gear = {
       this.render();
     });
 
-    app.querySelectorAll('[data-link-inline-save]').forEach((btn) => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const gearId = btn.getAttribute('data-gear-id');
-        const linkId = btn.getAttribute('data-link-id');
-        const row = app.querySelector(`[data-link-inline-row="${linkId}"]`);
-        if (!row) return;
-        const price = row.querySelector('[name="linkInlinePrice"]')?.value || '';
-        const lastChecked = row.querySelector('[name="linkInlineLastChecked"]')?.value || '';
-        const isPrimary = row.querySelector('[name="linkInlinePrimary"]')?.checked ? 1 : 0;
-        if (isPrimary) {
-          const gearItem = gear.find((g) => g.id === gearId);
-          await Promise.all((gearItem?.linksList || []).filter((l) => l.id !== linkId && Number(l.isPrimary)).map((l) => DB.saveGearLink(gearId, { id: l.id, isPrimary: 0 })));
-        }
-        await DB.saveGearLink(gearId, { id: linkId, price, lastChecked, isPrimary });
-        Utils.toast?.('Link updated');
-        this.render();
-      });
-    });
-
-    app.querySelectorAll('[data-link-checked-today]').forEach((btn) => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await DB.saveGearLink(btn.getAttribute('data-gear-id'), { id: btn.getAttribute('data-link-id'), lastChecked: Utils.today() });
-        Utils.toast?.('Checked today');
-        this.render();
-      });
-    });
-
     this._initCarousels(app);
     setTimeout(() => Utils.staggerReveal(app, '.gear-card', 0), 50);
   },
@@ -464,12 +435,6 @@ Pages.Gear = {
     return sorted.map((entry) => entry.item);
   },
 
-  _bestPrice(gearItem) {
-    const prices = (gearItem.linksList || []).map((l) => money(l.price)).filter((v) => Number.isFinite(v) && v > 0);
-    if (Number.isFinite(Number(gearItem.targetPrice))) prices.push(Number(gearItem.targetPrice));
-    return prices.length ? Math.min(...prices) : null;
-  },
-
   _computeStats(gear) {
     return Utils.computeGearStats(gear || []);
   },
@@ -518,24 +483,6 @@ Pages.Gear = {
     const sortedLinks = [...(g.linksList || [])].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
     const topLink = sortedLinks.find((l) => l.url);
 
-    let wishlistMeta = '';
-    if (normalizeGearStatus(g.status) === 'wishlist') {
-      const bestPrice = this._bestPrice(g);
-      const bestLink = sortedLinks.find((l) => money(l.price) === bestPrice);
-      const targetPrice = Number(g.targetPrice);
-      const hasTarget = Number.isFinite(targetPrice);
-      const delta = hasTarget && Number.isFinite(bestPrice) ? bestPrice - targetPrice : null;
-      const linkDates = sortedLinks.map((l) => l.lastChecked).filter(Boolean).sort().reverse();
-      const lastChecked = linkDates[0] || '';
-      wishlistMeta = `
-        <div class="gear-card__meta gear-card__meta--pricing" style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
-          <div>Best price: ${Number.isFinite(bestPrice) ? formatCurrency(bestPrice) : '—'} ${bestLink?.label ? `· ${bestLink.label}` : ''}</div>
-          <div>Target: ${hasTarget ? formatCurrency(targetPrice) : '—'} ${delta == null ? '' : `· ${delta <= 0 ? 'Under target' : 'Over target'} (${formatCurrency(delta)})`}</div>
-          <div>Last checked: ${lastChecked ? Utils.formatDate(lastChecked, 'short') : '—'}</div>
-        </div>
-      `;
-    }
-
     return `
       <div class="gear-card card-reveal" onclick="go('#/gear/edit/${g.id}')">
         <div class="gear-card__media">${this._renderCardMedia(g, fallbackImage)}</div>
@@ -548,32 +495,18 @@ Pages.Gear = {
           <div class="gear-card__last-used">Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
-          ${wishlistMeta}
           ${normalizeGearStatus(g.status) === 'owned' ? `<div class="gear-card__meta gear-card__meta--history" style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
             <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
             <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           </div>` : ''}
           ${g.status ? `<span class="gear-card__status df-badge ${statusBadge}">${gearStatusLabel(g.status)}</span>` : ''}
           <div class="gear-card__footer">
-            ${g.boughtPrice || g.price ? `<span class="gear-card__price gear-card__pricing">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
             <div class="gear-card__links">
               ${topLink ? `<a href="${topLink.url}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">${topLink.label || 'Link'}</a>` : ''}
               ${primaryUrl ? `<a href="${primaryUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
               <a href="${manualUrl}" target="_blank" rel="noopener" class="gear-card__link gear-card__link--manual" onclick="event.stopPropagation()">Manual</a>
             </div>
           </div>
-          ${sortedLinks.slice(0, 3).map((link) => `
-            <div class="gear-card__history" data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto auto;gap:6px;align-items:end;">
-              <div style="font-size:12px;color:var(--text2);">${link.isPrimary ? '★ Primary' : ''} ${link.label || 'Link'}</div>
-              <input class="df-input" name="linkInlinePrice" type="number" step="0.01" value="${link.price ?? ''}" placeholder="Price">
-              <input class="df-input" name="linkInlineLastChecked" type="date" value="${link.lastChecked || ''}">
-              <label style="font-size:12px;color:var(--text2);display:flex;gap:4px;align-items:center;"><input type="checkbox" name="linkInlinePrimary" ${Number(link.isPrimary) ? 'checked' : ''}>Primary</label>
-              <div style="display:flex;gap:4px;">
-                <button type="button" class="df-btn df-btn--outline" data-link-checked-today="1" data-gear-id="${g.id}" data-link-id="${link.id}">Checked today</button>
-                <button type="button" class="df-btn df-btn--outline" data-link-inline-save="1" data-gear-id="${g.id}" data-link-id="${link.id}">Save</button>
-              </div>
-            </div>
-          `).join('')}
         </div>
       </div>
     `;
@@ -688,6 +621,37 @@ Pages.GearForm = {
       row.querySelector('[data-remove-link]')?.addEventListener('click', () => {
         row.remove();
         if (!linksWrap.children.length) linksWrap.innerHTML = '<div style="color:var(--text3);font-size:12px;">No links yet.</div>';
+      });
+
+      row.querySelector('[data-link-row-checked-today]')?.addEventListener('click', () => {
+        const dateInput = row.querySelector('[name="linkLastChecked"]');
+        if (!dateInput) return;
+        dateInput.value = Utils.today();
+      });
+
+      row.querySelector('[data-link-row-save]')?.addEventListener('click', async () => {
+        if (!isEdit) {
+          Utils.toast?.('Save this gear item first, then link rows can be saved individually.');
+          return;
+        }
+        const linkId = row.getAttribute('data-link-id');
+        if (!linkId) {
+          Utils.toast?.('New link row will save when you save the gear item.');
+          return;
+        }
+        const isPrimary = row.querySelector('[name="linkPrimary"]')?.checked ? 1 : 0;
+        if (isPrimary) {
+          await Promise.all((gear.linksList || []).filter((l) => l.id !== linkId && Number(l.isPrimary)).map((l) => DB.saveGearLink(gear.id, { id: l.id, isPrimary: 0 })));
+        }
+        await DB.saveGearLink(gear.id, {
+          id: linkId,
+          label: row.querySelector('[name="linkLabel"]')?.value || '',
+          url: row.querySelector('[name="linkUrl"]')?.value || '',
+          price: row.querySelector('[name="linkPrice"]')?.value || '',
+          lastChecked: row.querySelector('[name="linkLastChecked"]')?.value || '',
+          isPrimary,
+        });
+        Utils.toast?.('Link updated');
       });
     }
 
@@ -833,7 +797,11 @@ Pages.GearForm = {
         <div><label class="df-label">Price</label><input class="df-input" name="linkPrice" value="${link.price ?? ''}" type="number" step="0.01"></div>
         <div><label class="df-label">Last Checked</label><input class="df-input" name="linkLastChecked" value="${link.lastChecked || ''}" type="date"></div>
         <div><label class="df-label">Primary</label><input name="linkPrimary" type="checkbox" ${Number(link.isPrimary) ? 'checked' : ''}></div>
-        <button type="button" data-remove-link="1" class="df-btn df-btn--outline" style="height:40px;">Remove</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+          <button type="button" data-link-row-checked-today="1" class="df-btn df-btn--outline" style="height:40px;">Checked today</button>
+          <button type="button" data-link-row-save="1" class="df-btn df-btn--outline" style="height:40px;">Save</button>
+          <button type="button" data-remove-link="1" class="df-btn df-btn--outline" style="height:40px;">Remove</button>
+        </div>
       </div>
     `;
   },
