@@ -527,7 +527,7 @@ Pages.Gear = {
       const linkDates = sortedLinks.map((l) => l.lastChecked).filter(Boolean).sort().reverse();
       const lastChecked = linkDates[0] || '';
       wishlistMeta = `
-        <div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+        <div class="gear-card__meta gear-card__meta--pricing" style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
           <div>Best price: ${Number.isFinite(bestPrice) ? formatCurrency(bestPrice) : '—'} ${bestLink?.label ? `· ${bestLink.label}` : ''}</div>
           <div>Target: ${hasTarget ? formatCurrency(targetPrice) : '—'} ${delta == null ? '' : `· ${delta <= 0 ? 'Under target' : 'Over target'} (${formatCurrency(delta)})`}</div>
           <div>Last checked: ${lastChecked ? Utils.formatDate(lastChecked, 'short') : '—'}</div>
@@ -537,21 +537,23 @@ Pages.Gear = {
 
     return `
       <div class="gear-card card-reveal" onclick="go('#/gear/edit/${g.id}')">
-        ${this._renderCardMedia(g, fallbackImage)}
+        <div class="gear-card__media">${this._renderCardMedia(g, fallbackImage)}</div>
         <div class="gear-card__body">
           <div class="gear-card__category">${g.category || ''}</div>
-          <div class="gear-card__name">${g.name || 'Unnamed'}</div>
-          ${(g.brand || g.model) ? `<div class="gear-card__sub">${[g.brand, g.model].filter(Boolean).join(' · ')}</div>` : ''}
+          <div class="gear-card__title">
+            <span class="gear-card__name">${g.name || 'Unnamed'}</span>
+            ${(g.brand || g.model) ? `<span class="gear-card__sub">${[g.brand, g.model].filter(Boolean).join(' · ')}</span>` : ''}
+          </div>
           ${g.boughtDate || g.dateAcquired ? `<div class="gear-card__date">${Utils.formatDate(g.boughtDate || g.dateAcquired, 'short')}</div>` : ''}
           ${g.notes ? `<div class="gear-card__notes">${Utils.truncate(g.notes, 100)}</div>` : ''}
           ${wishlistMeta}
-          ${normalizeGearStatus(g.status) === 'owned' ? `<div style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
+          ${normalizeGearStatus(g.status) === 'owned' ? `<div class="gear-card__meta gear-card__meta--history" style="margin-top:8px;color:var(--text2);font-size:12px;display:grid;gap:4px;">
             <div>Used in sessions: ${Number(g.usage?.usedCount || 0)}</div>
             <div>Last used: ${g.usage?.lastUsed ? Utils.formatDate(g.usage.lastUsed, 'short') : '—'}</div>
           </div>` : ''}
+          ${g.status ? `<span class="gear-card__status df-badge ${statusBadge}">${gearStatusLabel(g.status)}</span>` : ''}
           <div class="gear-card__footer">
-            ${g.boughtPrice || g.price ? `<span class="gear-card__price">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
-            ${g.status ? `<span class="df-badge ${statusBadge}">${gearStatusLabel(g.status)}</span>` : ''}
+            ${g.boughtPrice || g.price ? `<span class="gear-card__price gear-card__pricing">${Utils.formatPrice(g.boughtPrice || g.price)}</span>` : ''}
             <div class="gear-card__links">
               ${topLink ? `<a href="${topLink.url}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">${topLink.label || 'Link'}</a>` : ''}
               ${primaryUrl ? `<a href="${primaryUrl}" target="_blank" rel="noopener" class="gear-card__link" onclick="event.stopPropagation()">Buy</a>` : ''}
@@ -559,7 +561,7 @@ Pages.Gear = {
             </div>
           </div>
           ${sortedLinks.slice(0, 3).map((link) => `
-            <div data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto auto;gap:6px;align-items:end;">
+            <div class="gear-card__history" data-link-inline-row="${link.id}" onclick="event.stopPropagation()" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);display:grid;grid-template-columns:1fr 120px 140px auto auto;gap:6px;align-items:end;">
               <div style="font-size:12px;color:var(--text2);">${link.isPrimary ? '★ Primary' : ''} ${link.label || 'Link'}</div>
               <input class="df-input" name="linkInlinePrice" type="number" step="0.01" value="${link.price ?? ''}" placeholder="Price">
               <input class="df-input" name="linkInlineLastChecked" type="date" value="${link.lastChecked || ''}">
